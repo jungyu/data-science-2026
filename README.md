@@ -30,9 +30,11 @@
 .
 ├── LICENSE          # 授權資訊 (MIT)
 ├── README.md        # 本說明文件
+├── agent-init/      # AI Agent 治理初始化範本（可複用到其他專案）
 ├── books/           # 核心學習手冊
 │   ├── IM-Complete-Lesson-Handbook.md
 │   └── Skills-Handbook.md
+├── project-first/   # 企業知識 RAG 系統建構教案（OpenAI API × MCP × Skills）
 └── pdf/             # 深度學習資源
     └── AI_Agent_Skills_Mastery.pdf
 ```
@@ -43,7 +45,9 @@
 
 1. **基礎建立**: 從 `books/IM-Complete-Lesson-Handbook.md` 的 Unit 0 開始，建立計算思維與基礎開發環境。
 2. **AI 賦能**: 閱讀 `books/Skills-Handbook.md`，學習如何將專業領域知識（如稅務、財報、SOP）轉化為 AI Agent 可使用的 Skills。
-3. **實戰驗證**: 每個單元都要求將成果提交至 GitHub，四年的累積將成為你最強大的作品集。
+3. **治理初始化**: 參考 `agent-init/README.md`，把 AI Agent 治理框架（Constitution、SDD-BDD、Gates）導入你的專案。
+4. **Project-First 實作**: 從 `project-first/00-setup.md` 建置環境，再依序閱讀 `project-first/index.md` 的章節地圖完成企業級 RAG 範例。
+5. **實戰驗證**: 每個單元都要求將成果提交至 GitHub，四年的累積將成為你最強大的作品集。
 
 ---
 

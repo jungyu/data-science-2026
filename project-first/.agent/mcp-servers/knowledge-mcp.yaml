@@ -1,0 +1,19 @@
+# 檔案：.agent/mcp-servers/knowledge-mcp.yaml
+# 在 claude-settings.json 中引用此設定
+
+name: knowledge-mcp
+description: 企業 HR 知識庫（只讀存取）
+namespace_restriction: "hr-*"
+readonly: true
+rate_limit:
+  requests_per_minute: 60
+  tokens_per_minute: 100000
+
+# 只允許特定 IP 範圍存取（辦公室網段）
+allowed_origins:
+  - "192.168.1.0/24"
+
+# 稽核所有查詢
+audit:
+  enabled: true
+  log_destination: ".agent/logs/mcp-audit.jsonl"

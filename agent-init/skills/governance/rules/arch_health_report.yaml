@@ -1,0 +1,23 @@
+id: gov.arch_health_report.v1
+name: Architecture Health Report
+purpose: >
+  以「可維運性」視角找出技術債的早期徵兆（依賴循環、孤兒模組、抽象外洩、schema drift）。
+inputs:
+  repo_snapshot: "當前模組/依賴圖/變更摘要（可由工具產生）"
+outputs:
+  report:
+    format: "markdown"
+    path: "docs/reports/architecture-health-report-<date>.md"
+  risk_flags:
+    enum: [none, low, medium, high]
+checks:
+  - "circular dependency detection"
+  - "orphan modules"
+  - "duplicate abstractions（同義不同名）"
+  - "config sprawl（散落 env / constants）"
+  - "IR/schema version skew"
+recommendations:
+  - "提出 refactor boundaries（不直接改大爆炸）"
+  - "提出 contract / ADR 補件清單"
+schedule_hint:
+  suggested: "monthly"

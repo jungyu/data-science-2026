@@ -1,0 +1,22 @@
+# Audit MCP Server 配置（Placeholder）
+# 用途：查詢操作日誌與品質評分
+# 狀態：待實作（見 Ch09 延伸練習）
+
+name: audit-mcp
+description: "稽核 MCP Server — 查詢 Action Log 與品質評分"
+status: planned
+
+tools:
+  - name: query_action_log
+    description: "查詢操作日誌（依日期、操作者、namespace 篩選）"
+    read_only: true
+  - name: get_quality_scores
+    description: "取得 namespace 的品質評分歷史"
+    read_only: true
+  - name: list_recent_operations
+    description: "列出最近的操作摘要"
+    read_only: true
+
+security:
+  read_only: true
+  audit_trail: true

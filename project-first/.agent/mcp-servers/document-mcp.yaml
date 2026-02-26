@@ -1,0 +1,22 @@
+# Document MCP Server 配置（Placeholder）
+# 用途：串接企業文件系統（Confluence / SharePoint）
+# 狀態：待實作（見 Ch09 延伸練習）
+
+name: document-mcp
+description: "企業文件系統 MCP Server — 串接 Confluence / SharePoint"
+status: planned
+
+tools:
+  - name: search_documents
+    description: "搜尋企業文件系統中的文件"
+    read_only: true
+  - name: get_document_content
+    description: "取得文件內容（純文字）"
+    read_only: true
+  - name: list_spaces
+    description: "列出可用的文件空間"
+    read_only: true
+
+security:
+  read_only: true
+  namespace_restriction: "依 MCP 啟動參數限定"

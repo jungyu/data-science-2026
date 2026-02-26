@@ -1,0 +1,40 @@
+# 檔案：.agent/skills/governance/rules/knowledge_quality_gate.yaml
+
+name: knowledge_quality_gate
+description: "知識品質閘門 — 在攝取和查詢前驗證知識品質"
+trigger: "每次文件攝取（ingest）和定期品質掃描"
+
+checks:
+  metadata_completeness:
+    required_fields: ["source", "owner", "last_updated", "status"]
+    fail_action: "reject_ingest"
+
+  document_freshness:
+    max_age_days: 180
+    hr_legal_max_age_days: 90
+    fail_action: "reject_ingest"
+
+  approval_status:
+    required_status: "approved"
+    fail_action: "reject_ingest"
+
+  chunk_quality:
+    min_chunk_length: 10
+    max_chunk_length: 2000
+    no_empty_chunks: true
+    fail_action: "reject_ingest"
+
+  retrieval_validation:
+    min_hit_at_5: 0.6
+    test_queries_count: 3
+    fail_action: "warn_and_flag"
+
+thresholds:
+  fresh_ratio_warning: 0.75
+  fresh_ratio_critical: 0.60
+  deprecated_ratio_max: 0.10
+
+actions:
+  on_warning: "notify_owner"
+  on_critical: "block_queries_and_notify"
+  on_pass: "log_and_continue"

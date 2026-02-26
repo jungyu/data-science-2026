@@ -1,0 +1,30 @@
+# 檔案：.agent/tasks/inbox/update-hr-leave-policy.task.yml
+
+name: 更新年假政策文件
+priority: normal
+complexity: lite
+
+# 此任務允許存取的路徑
+allowed_paths:
+  - hr-policies/leave-policy-2026.pdf   # 新文件
+  - .agent/logs/                        # Action Log 記錄
+
+# 明確禁止存取的範圍
+forbidden_paths:
+  - legal-policies/                     # 法務文件不在此任務範圍
+  - financial-reports/                  # 財務報告不在此任務範圍
+  - .agent/memory/constitution.md       # Constitution 不可在此任務中修改
+
+# 允許的 namespace 操作
+namespace_restrictions:
+  readable: ["hr-leaves", "hr-benefits"]
+  writable: ["hr-leaves"]              # 只能寫入 hr-leaves
+
+# 需要遵守的治理規則
+governance_rules:
+  - ingest_gate                         # 文件品質驗證
+  - retrieval_gate                      # 攝取後的查詢驗證
+
+# 此任務不觸發 HITL（Lite 模式 + 非跨部門）
+hitl_exemption: true
+hitl_exemption_reason: "單一部門 Lite 模式更新，符合授權豁免條件"

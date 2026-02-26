@@ -1,0 +1,213 @@
+# ============================================================
+# Intent Drift Detector — 意圖漂移偵測規則
+# ============================================================
+# 偵測偏離平台核心意圖的變更，防止系統演化方向失控。
+# 系統演化必須沿著 intent map 定義的方向前進。
+# ============================================================
+
+id: gov.intent_drift_detector.v1
+version: "1.0.0"
+name: "意圖漂移偵測"
+description: |
+  透過 intent map（平台目的、不可妥協項、擴展向量）偵測
+  可能導致平台方向漂移的變更。任何偏離 non-negotiables
+  的變更必須附帶補救方案或明確的豁免理由。
+
+scope:
+  applies_to:
+    - "{{SRC_DIR}}/**"
+    - "{{API_DIR}}/**"
+    - "contracts/**"
+    - "package.json"
+    - "docs/intent/**"
+  trigger_on:
+    - file_create
+    - file_modify
+    - file_delete
+
+# ------------------------------------------------------------
+# Intent Map 定義
+# ------------------------------------------------------------
+intent_map:
+  paths:
+    platform_purpose: "docs/intent/platform-purpose.md"
+    non_negotiables: "docs/intent/non-negotiables.md"
+    expansion_vector: "docs/intent/expansion-vector.md"
+
+  description: |
+    Intent map 由三份文件組成：
+    1. platform-purpose.md — 平台存在的核心理由與目標受眾
+    2. non-negotiables.md — 不可妥協的技術與產品約束
+    3. expansion-vector.md — 允許的擴展方向與優先順序
+
+  setup_guide: |
+    首次使用時，請建立以下三份文件：
+
+    docs/intent/platform-purpose.md:
+      - 平台的核心使命（一句話）
+      - 主要目標受眾
+      - 核心價值主張
+
+    docs/intent/non-negotiables.md:
+      - 技術約束（如：必須支援離線、資料必須可匯出）
+      - 產品約束（如：必須支援多語言、不依賴單一供應商）
+      - 安全約束（如：使用者資料不送往第三方）
+
+    docs/intent/expansion-vector.md:
+      - 短期擴展方向（本季）
+      - 中期擴展方向（本年）
+      - 明確排除的方向（不做的事）
+
+# ------------------------------------------------------------
+# 規則定義
+# ------------------------------------------------------------
+rules:
+
+  - id: I1
+    name: "引入平台鎖定格式須提供逃生艙"
+    description: |
+      當變更引入供應商特定格式、專有 API、或平台鎖定技術時，
+      必須同時提供逃生艙（escape hatch），確保系統不會被
+      單一供應商或格式永久綁定。
+    severity: error
+    condition: |
+      changes_introduce(vendor_specific_format OR proprietary_api OR platform_lock_in)
+      AND NOT provides_escape_hatch
+    action: block
+    message: |
+      ❌ 偵測到引入平台鎖定格式但未提供逃生艙。
+
+      偵測到的鎖定風險：
+      - 類型：{lock_in_type}
+      - 涉及檔案：{affected_files}
+
+      請提供以下任一逃生艙：
+      1. 抽象層（Adapter/Interface）隔離供應商特定邏輯
+      2. 匯出工具，可將資料轉換為開放格式
+      3. 替代實作方案（可切換的 provider）
+
+      參考 docs/intent/non-negotiables.md 中的供應商鎖定政策。
+
+  - id: I2
+    name: "隱性耦合（必須依賴特定平台 runtime）須說明與替代方案"
+    description: |
+      當變更引入對特定平台 runtime 的隱性依賴
+      （如：只能在特定雲端環境執行、依賴特定瀏覽器 API、
+      需要特定作業系統功能）時，必須明確說明並提供替代方案。
+    severity: error
+    condition: |
+      changes_introduce(platform_runtime_dependency)
+      AND dependency_is_implicit
+      AND NOT (
+        commit_message CONTAINS "PLATFORM-DEP:"
+        OR changed_files INTERSECT ["{{ADR_DIR}}/**"]
+      )
+    action: block
+    message: |
+      ❌ 偵測到隱性平台 runtime 耦合但缺少說明。
+
+      偵測到的隱性依賴：
+      - Runtime：{platform_runtime}
+      - 影響範圍：{affected_scope}
+
+      請選擇以下其一：
+      1. 在 commit message 中加入 PLATFORM-DEP: 標記，說明：
+         - 為何需要此平台依賴
+         - 在其他環境的替代方案或降級策略
+      2. 建立 ADR 詳細記錄平台依賴決策
+
+# ------------------------------------------------------------
+# 封鎖條件（硬性阻擋）
+# ------------------------------------------------------------
+blocks:
+  - id: I_BLOCK_1
+    name: "禁止違反 non-negotiables 且無補救方案"
+    description: |
+      任何違反 docs/intent/non-negotiables.md 中定義的不可妥協項的變更，
+      若未提供補救方案（remediation plan），將被硬性阻擋。
+    condition: |
+      violates(intent_map.non_negotiables)
+      AND NOT has_remediation_plan
+      AND NOT commit_message CONTAINS "NON-NEG-EXEMPT:"
+    action: block
+    message: |
+      🚨 封鎖：變更違反 non-negotiables 且無補救方案。
+
+      違反的項目：
+      - {violated_non_negotiable}
+
+      請選擇以下其一：
+      1. 修改實作以符合 non-negotiables
+      2. 提供補救方案（在 PR 描述或 ADR 中說明）
+      3. 如確認需要例外，在 commit message 中加入
+         NON-NEG-EXEMPT: 並說明理由（需 tech lead 核准）
+
+# ------------------------------------------------------------
+# 漂移指標
+# ------------------------------------------------------------
+drift_indicators:
+  - name: "供應商 API 直接呼叫密度"
+    description: "直接呼叫供應商 API（非透過抽象層）的比例"
+    threshold: "< 10% of total API calls"
+    measurement: "vendor_direct_calls / total_api_calls"
+
+  - name: "平台特定程式碼比例"
+    description: "只能在特定平台執行的程式碼佔比"
+    threshold: "< 15% of source code"
+    measurement: "platform_specific_lines / total_lines"
+
+  - name: "資料格式可攜性"
+    description: "所有使用者資料必須可匯出為開放格式"
+    threshold: "100% exportable"
+    measurement: "exportable_data_types / total_data_types"
+
+  - name: "Non-negotiable 合規率"
+    description: "符合 non-negotiables 的元件比例"
+    threshold: ">= 100%"
+    measurement: "compliant_components / total_components"
+
+# ------------------------------------------------------------
+# 豁免條件
+# ------------------------------------------------------------
+exemptions:
+  - description: "開發環境特定設定不觸發（如 dev server 設定）"
+    condition: |
+      file_path MATCH ["**/dev/**", "**/.dev.*", "**/development.*"]
+      AND NOT affects_production_code
+  - description: "實驗性功能（feature flag 控制）暫時豁免"
+    condition: |
+      behind_feature_flag
+      AND feature_flag_documented
+  - description: "附有 tech lead 核准的豁免標記"
+    condition: commit_message CONTAINS "NON-NEG-EXEMPT:"
+
+# ------------------------------------------------------------
+# 自動修正建議
+# ------------------------------------------------------------
+suggestions:
+  - trigger: I1
+    hint: |
+      建議步驟：
+      1. 識別供應商特定的部分（API call、資料格式、SDK）
+      2. 建立抽象介面（Interface / Adapter pattern）
+      3. 將供應商特定邏輯封裝在 adapter 中
+      4. 提供至少一個替代 adapter（或 mock adapter）
+      5. 在文件中記錄如何切換 provider
+
+  - trigger: I2
+    hint: |
+      建議步驟：
+      1. 列出所有平台特定的 API 或功能使用
+      2. 評估在其他環境的可行替代方案
+      3. 實作 graceful degradation（優雅降級）
+      4. 在 ADR 或 commit message 中記錄決策
+
+  - trigger: I_BLOCK_1
+    hint: |
+      建議步驟：
+      1. 重新檢視 docs/intent/non-negotiables.md
+      2. 評估是否有符合 non-negotiables 的替代實作
+      3. 若確實需要例外：
+         a. 撰寫補救方案（時間表 + 具體步驟）
+         b. 取得 tech lead 核准
+         c. 在 commit message 中加入 NON-NEG-EXEMPT:

@@ -1,0 +1,199 @@
+# ============================================================
+# Style Canon Enforcer — 風格規範強制執行規則
+# ============================================================
+# 確保所有新增程式碼遵循專案既有的命名、錯誤處理、
+# logging 與 CSS 合併慣例，防止風格碎片化。
+# ============================================================
+
+id: gov.style_canon_enforcer.v1
+version: "1.0.0"
+name: "風格規範強制執行"
+description: |
+  同一模組內禁止混用多種 async pattern、error handling pattern 或 naming convention。
+  所有新增程式碼必須遵循專案的 style canon，確保一致性與可維護性。
+
+scope:
+  applies_to:
+    - "{{SRC_DIR}}/**"
+    - "{{API_DIR}}/**"
+    - "components/**"
+  trigger_on:
+    - file_create
+    - file_modify
+
+# ------------------------------------------------------------
+# 風格規範參考
+# ------------------------------------------------------------
+style_canon:
+  reference_path: "{{STYLE_CANON_PATH}}"
+  naming:
+    files: "{{FILE_NAMING_CONVENTION}}"           # 例：kebab-case, PascalCase, camelCase
+    components: "{{COMPONENT_NAMING_CONVENTION}}"  # 例：PascalCase
+    functions: "{{FUNCTION_NAMING_CONVENTION}}"    # 例：camelCase
+    constants: "{{CONSTANT_NAMING_CONVENTION}}"    # 例：UPPER_SNAKE_CASE
+    types: "{{TYPE_NAMING_CONVENTION}}"            # 例：PascalCase with I/T prefix or none
+  error_handling:
+    module: "{{ERROR_TYPE_MODULE}}"                # 統一錯誤型別模組
+    pattern: "{{ERROR_PATTERN}}"                   # 例：Result<T, E>, throw AppError, try/catch
+  logging:
+    module: "{{LOGGING_UTILITY}}"                  # 集中式 logging 工具
+    levels: ["debug", "info", "warn", "error"]
+  css_merge:
+    utility: "{{CSS_MERGE_UTILITY}}"               # CSS class 合併工具
+
+# ------------------------------------------------------------
+# 規則定義
+# ------------------------------------------------------------
+rules:
+
+  - id: S1
+    name: "新檔案命名必須遵循 style canon"
+    description: |
+      所有新建檔案的命名必須符合專案 style canon 中定義的慣例。
+      包含檔案名稱、匯出的 function/class/type 名稱。
+    severity: error
+    condition: |
+      file_is_new
+      AND file_path MATCH ["{{SRC_DIR}}/**", "{{API_DIR}}/**", "components/**"]
+      AND NOT naming_follows_convention(style_canon.naming)
+    action: warn
+    message: |
+      ⚠️ 新檔案命名不符合 style canon。
+      請參考 {{STYLE_CANON_PATH}} 中的命名慣例：
+      - 檔案：{{FILE_NAMING_CONVENTION}}
+      - 元件：{{COMPONENT_NAMING_CONVENTION}}
+      - 函式：{{FUNCTION_NAMING_CONVENTION}}
+      - 常數：{{CONSTANT_NAMING_CONVENTION}}
+      - 型別：{{TYPE_NAMING_CONVENTION}}
+
+  - id: S2
+    name: "新錯誤處理必須使用指定的錯誤型別"
+    description: |
+      所有新增的錯誤處理程式碼必須使用專案指定的統一錯誤型別，
+      避免自行定義 Error class 或使用原生 Error 搭配字串訊息。
+    severity: error
+    condition: |
+      changes_introduce(error_handling)
+      AND NOT uses_module(style_canon.error_handling.module)
+      AND NOT file_path MATCH [style_canon.error_handling.module]
+    action: warn
+    message: |
+      ⚠️ 偵測到新增的錯誤處理未使用指定的錯誤型別。
+      請使用 {{ERROR_TYPE_MODULE}} 中定義的錯誤型別，而非：
+      - 自行定義的 Error class
+      - 原生 Error + 字串訊息
+      - 未分類的 throw
+
+  - id: S3
+    name: "新 logging 必須使用集中式 logging 工具"
+    description: |
+      所有新增的 logging 必須使用專案的集中式 logging 工具，
+      避免直接使用 console.log/warn/error 或其他 logging library。
+    severity: warning
+    condition: |
+      changes_introduce(logging)
+      AND uses_direct_console(["console.log", "console.warn", "console.error", "console.info"])
+      AND NOT file_path MATCH ["{{LOGGING_UTILITY}}", "**/*.test.*", "**/*.spec.*"]
+    action: warn
+    message: |
+      ⚠️ 偵測到直接使用 console.* 進行 logging。
+      請改用 {{LOGGING_UTILITY}} 提供的 logging 函式，確保：
+      - 統一的 log 格式與 level 控制
+      - 生產環境的 log 過濾
+      - 結構化 logging（含 context metadata）
+
+  - id: S4
+    name: "CSS class 合併必須使用指定工具"
+    description: |
+      所有動態 CSS class 合併必須使用專案指定的工具函式，
+      避免手動字串拼接或使用其他 class merge library。
+    severity: warning
+    condition: |
+      changes_introduce(css_class_merging)
+      AND NOT uses_utility(style_canon.css_merge.utility)
+      AND file_path MATCH ["components/**", "{{SRC_DIR}}/**"]
+    action: warn
+    message: |
+      ⚠️ 偵測到 CSS class 合併未使用指定工具。
+      請改用 {{CSS_MERGE_UTILITY}} 進行 class 合併，而非：
+      - 手動字串拼接（`className={a + " " + b}`）
+      - template literal 拼接（`className={\`${a} ${b}\`}`）
+      - 其他 class merge library
+
+# ------------------------------------------------------------
+# 封鎖條件（硬性阻擋）
+# ------------------------------------------------------------
+blocks:
+  - id: S_BLOCK_1
+    name: "禁止同一模組混用 2+ async/error patterns"
+    description: |
+      同一模組（目錄）內不得同時存在兩種以上的 async pattern
+      或 error handling pattern。這是防止風格碎片化的硬性規則。
+    condition: |
+      module_contains(async_patterns, count >= 2)
+      OR module_contains(error_patterns, count >= 2)
+    action: block
+    message: |
+      🚨 封鎖：同一模組混用 2+ async/error patterns。
+
+      偵測到的混用情況：
+      - 模組路徑：{module_path}
+      - 發現的 patterns：{detected_patterns}
+
+      請統一為專案指定的 pattern，參考 {{STYLE_CANON_PATH}}。
+
+  - id: S_BLOCK_2
+    name: "禁止 magic strings 未集中管理"
+    description: |
+      重複出現的字串常數（magic strings）必須集中定義於常數模組，
+      不得散落在多個檔案中。
+    condition: |
+      string_literal_appears_in(files, count >= 3)
+      AND string_is_not_centralized
+      AND string_length > 3
+    action: warn
+    message: |
+      ⚠️ 偵測到 magic string 未集中管理。
+      字串 "{string_value}" 出現在 {count} 個檔案中。
+      請將其提取至常數模組並統一引用。
+
+# ------------------------------------------------------------
+# 豁免條件
+# ------------------------------------------------------------
+exemptions:
+  - description: "測試檔案中的 console.log 不觸發 S3"
+    condition: file_path MATCH "**/*.test.*" OR file_path MATCH "**/*.spec.*"
+  - description: "開發工具與 script 不觸發命名規則"
+    condition: file_path MATCH "scripts/**" OR file_path MATCH "tools/**"
+  - description: "第三方整合層允許遵循第三方命名慣例"
+    condition: file_path MATCH "**/integrations/**" OR file_path MATCH "**/adapters/**"
+
+# ------------------------------------------------------------
+# 自動修正建議
+# ------------------------------------------------------------
+suggestions:
+  - trigger: S1
+    hint: |
+      請根據 {{STYLE_CANON_PATH}} 重新命名檔案與匯出。
+      使用專案的 rename script（若有）確保所有引用同步更新。
+
+  - trigger: S2
+    hint: |
+      建議步驟：
+      1. 引入 {{ERROR_TYPE_MODULE}} 中的錯誤型別
+      2. 將自訂 Error 替換為專案標準錯誤型別
+      3. 確保錯誤包含足夠的 context 資訊
+
+  - trigger: S3
+    hint: |
+      建議步驟：
+      1. 引入 {{LOGGING_UTILITY}} 中的 logger
+      2. 將 console.* 替換為 logger 對應的 level 方法
+      3. 加入結構化 context（如 module name, operation）
+
+  - trigger: S4
+    hint: |
+      建議步驟：
+      1. 引入 {{CSS_MERGE_UTILITY}}
+      2. 將字串拼接替換為工具函式呼叫
+      3. 確保條件式 class 使用工具支援的語法

@@ -1,0 +1,153 @@
+# ============================================================
+# ADR Gate — 架構決策記錄守門規則
+# ============================================================
+# 確保影響架構的重大變更皆留下 ADR 記錄。
+# 決策不記錄等於決策不存在。
+# ============================================================
+
+id: gov.adr_gate.v1
+version: "1.0.0"
+name: "架構決策記錄守門"
+description: |
+  影響部署管線、建置流程、核心版本系統、或引入新依賴的變更，
+  必須建立對應的 ADR（Architecture Decision Record）。
+  ADR 確保團隊成員（含未來的自己）能理解決策的背景與取捨。
+
+scope:
+  applies_to:
+    - "{{ADR_DIR}}/**"
+    - ".github/**"
+    - "docker*"
+    - "Dockerfile*"
+    - "**/Dockerfile*"
+    - "*.config.*"
+    - "package.json"
+    - "{{SRC_DIR}}/**"
+    - "contracts/**"
+  trigger_on:
+    - file_create
+    - file_modify
+    - file_delete
+
+# ------------------------------------------------------------
+# ADR 範本
+# ------------------------------------------------------------
+adr_template:
+  path: "{{ADR_DIR}}/TEMPLATE.md"
+  required_sections:
+    - "## 背景（Context）"
+    - "## 決策（Decision）"
+    - "## 理由（Rationale）"
+    - "## 後果（Consequences）"
+    - "## 替代方案（Alternatives Considered）"
+  naming_convention: "{{ADR_DIR}}/NNN-<kebab-case-title>.md"
+
+# ------------------------------------------------------------
+# 規則定義
+# ------------------------------------------------------------
+rules:
+
+  - id: A1
+    name: "部署或建置管線變更須留 ADR"
+    description: |
+      涉及 CI/CD 管線、部署流程、建置設定、或 hosting 基礎設施的變更，
+      必須建立新的 ADR 記錄決策背景與影響。
+    severity: error
+    condition: |
+      changed_files INTERSECT [
+        ".github/workflows/**",
+        "docker*", "Dockerfile*", "**/Dockerfile*",
+        "*.config.*",
+        "deploy/**", "infra/**", "terraform/**"
+      ]
+      AND changes_affect(deployment_pipeline OR build_process OR hosting_config)
+      AND NOT changed_files INTERSECT ["{{ADR_DIR}}/**"]
+    action: block
+    message: |
+      ❌ 偵測到部署或建置管線變更，但未建立 ADR。
+      請在 {{ADR_DIR}}/ 下新增 ADR，記錄：
+      - 變更的背景與動機
+      - 選擇此方案的理由
+      - 對現有部署流程的影響
+      - 回滾計畫
+
+  - id: A2
+    name: "核心版本或契約系統變更須 ADR 與 intent map 更新"
+    description: |
+      涉及核心版本管理策略、契約系統架構、或跨模組共用基礎設施的變更，
+      必須建立 ADR 並更新 intent map，確保變更方向與平台意圖一致。
+    severity: error
+    condition: |
+      changes_affect(versioning_system OR contract_infrastructure OR shared_core)
+      AND NOT (
+        changed_files INTERSECT ["{{ADR_DIR}}/**"]
+        AND changed_files INTERSECT ["docs/intent/**"]
+      )
+    action: block
+    message: |
+      ❌ 偵測到核心版本或契約系統變更，但缺少 ADR 或 intent map 更新。
+      請同時提供：
+      1. {{ADR_DIR}}/ 下的新 ADR
+      2. docs/intent/ 下的 intent map 更新（如影響平台方向）
+
+  - id: A3
+    name: "新增依賴（framework 或 runtime 層級）須 ADR 與風險分析"
+    description: |
+      引入新的 framework、runtime dependency、或重大 library 時，
+      必須建立 ADR 並附風險分析（bundle 影響、維護狀態、授權條款、替代方案）。
+    severity: error
+    condition: |
+      changed_files INTERSECT ["package.json", "requirements.txt", "go.mod", "Cargo.toml", "Gemfile"]
+      AND changes_affect(new_dependency, scope=framework OR runtime OR major_library)
+      AND NOT changed_files INTERSECT ["{{ADR_DIR}}/**"]
+    action: block
+    message: |
+      ❌ 偵測到新增 framework 或 runtime 層級依賴，但未建立 ADR。
+      請在 {{ADR_DIR}}/ 下新增 ADR，包含：
+      - 為何需要此依賴（現有方案不足之處）
+      - 風險分析：bundle size 影響、維護活躍度、授權條款
+      - 替代方案比較
+      - 移除計畫（若未來需要替換）
+
+# ------------------------------------------------------------
+# 豁免條件
+# ------------------------------------------------------------
+exemptions:
+  - description: "devDependencies 中的開發工具更新（如 lint plugin 升級）不觸發"
+    condition: |
+      changes_only_affect(devDependencies)
+      AND change_type = version_bump
+  - description: "patch 版本升級不觸發 A3"
+    condition: dependency_change_type = patch_bump
+  - description: "附有核准的 ADR 豁免編號可跳過"
+    condition: commit_message CONTAINS "ADR-EXEMPT:"
+
+# ------------------------------------------------------------
+# 自動修正建議
+# ------------------------------------------------------------
+suggestions:
+  - trigger: A1
+    hint: |
+      建議步驟：
+      1. 複製 {{ADR_DIR}}/TEMPLATE.md 為新 ADR 檔案
+      2. 填寫背景、決策、理由、後果等必要章節
+      3. 特別說明對現有 CI/CD 流程的影響
+      4. 附上回滾步驟
+
+  - trigger: A2
+    hint: |
+      建議步驟：
+      1. 建立 ADR 說明核心系統變更的動機與設計
+      2. 檢視 docs/intent/non-negotiables.md 確認不違反核心約束
+      3. 更新 docs/intent/expansion-vector.md（如開啟新方向）
+
+  - trigger: A3
+    hint: |
+      建議步驟：
+      1. 建立 ADR 並填寫依賴評估表：
+         - 名稱、版本、授權條款
+         - 每週下載量 / GitHub stars / 最近更新日期
+         - Bundle size 影響（gzipped）
+         - 替代方案列表與比較
+      2. 確認授權條款與專案相容
+      3. 記錄未來移除或替換的可行路徑

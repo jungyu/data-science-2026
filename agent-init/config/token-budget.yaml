@@ -1,0 +1,85 @@
+# Token Budget Guidelines
+# AI agent 操作成本意識指引
+# 非硬性限制，而是幫助 agent 做出成本效益判斷的參考值
+#
+# last_verified: 2026-02-26
+
+# 操作類型預算參考
+budgets:
+  # 簡單操作：單檔修改、bug fix、小改動
+  simple:
+    target_tokens: 5000
+    max_tokens: 10000
+    examples:
+      - "修正 typo"
+      - "更新單一設定值"
+      - "新增/修改一個函式"
+    guidelines:
+      - "直接執行，不需要大量探索"
+      - "Read 目標檔案 → Edit → 完成"
+
+  # 中等操作：多檔修改、分析任務、重構
+  moderate:
+    target_tokens: 15000
+    max_tokens: 30000
+    examples:
+      - "跨 3-5 檔案的功能修改"
+      - "程式碼品質分析"
+      - "新增 API endpoint + test"
+    guidelines:
+      - "先花 10-15% 探索，再執行"
+      - "避免讀取不相關的檔案"
+      - "善用 Grep/Glob 而非逐檔 Read"
+
+  # 複雜操作：架構變更、大型功能、系統分析
+  complex:
+    target_tokens: 30000
+    max_tokens: 60000
+    examples:
+      - "新增 IR node type（影響 parser/generator/bridge）"
+      - "跨模組重構"
+      - "完整性審計（如本次 .agent/ 審計）"
+    guidelines:
+      - "必須先建立 TodoWrite 追蹤進度"
+      - "考慮使用 Task subagent 做平行探索"
+      - "每完成一個子任務就更新進度，避免重做"
+
+  # 研究任務：開放式探索、方案評估
+  research:
+    target_tokens: 10000
+    max_tokens: 20000
+    examples:
+      - "評估是否採用某框架"
+      - "比較多個實作方案"
+      - "理解現有架構"
+    guidelines:
+      - "設定明確的研究問題，避免無限發散"
+      - "善用 WebSearch 而非從零推導"
+      - "產出結論，不只是資料收集"
+
+# 成本意識行為
+agent_behavior:
+  # 避免浪費的模式
+  avoid:
+    - "讀取整個目錄結構再開始思考（先 Grep 目標）"
+    - "重複讀取同一檔案（記住已讀內容）"
+    - "對每個小改動都做完整專案分析"
+    - "在不需要時使用 --ultrathink"
+    - "用 Task subagent 做能直接 Grep 完成的簡單搜尋"
+
+  # 鼓勵的模式
+  prefer:
+    - "平行工具呼叫（一次多個 Grep/Read）"
+    - "精準的搜尋模式（Grep 比逐檔 Read 便宜）"
+    - "善用 MEMORY.md 中的已知路徑"
+    - "中間產物（TodoWrite）幫助斷點續做"
+    - "在 context 接近限制前主動壓縮"
+
+# 預算超支處理
+overbudget:
+  # 超過 target 但未達 max：繼續但提高效率
+  soft_limit: "提醒自己加速，減少探索性操作"
+  # 超過 max：必須向人類說明
+  hard_limit: "暫停，向人類報告進度和剩餘工作量，詢問是否繼續"
+  # 例外：人類明確要求「不計成本」時可忽略
+  override: "人類說 'take your time' 或 'be thorough' 時，max 可加倍"

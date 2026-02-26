@@ -1,0 +1,52 @@
+# 檔案：.agent/config/token-budget.yaml
+
+# RAG 特有的 Token 成本說明：
+# - 每次 Embedding 呼叫消耗 input tokens（依文字長度）
+# - 每次 GPT-4o 生成消耗 input（問題 + chunks） + output tokens
+# - 每次 MCP 工具呼叫消耗少量 tokens（描述 + 結果）
+
+tiers:
+  simple:
+    target: 5000
+    limit: 10000
+    typical_use:
+      - 單份文件的常規更新（re-embed）
+      - 單一問題的查詢測試
+      - 查看 namespace 統計
+
+  moderate:
+    target: 20000
+    limit: 40000
+    typical_use:
+      - 批次攝取 10-30 份文件
+      - 執行 Eval Gate（測試集查詢）
+      - 新增一個 namespace 的完整流程
+
+  complex:
+    target: 60000
+    limit: 120000
+    typical_use:
+      - 全域知識庫健康掃描
+      - 更換嵌入模型的評估（A/B 比較）
+      - 新接入一個外部知識來源的完整流程
+
+  research:
+    target: 30000
+    limit: 60000
+    typical_use:
+      - 評估新的 Chunking 策略
+      - 比較不同 top-k 設定的效果
+      - 調研是否需要引入 Hybrid Search
+
+# RAG 操作的成本指引
+patterns:
+  preferred:
+    - 批次嵌入（比逐條嵌入省 API 呼叫次數）
+    - 使用已有的 Eval 測試集，不每次重建
+    - 優先查詢 namespace_stats，而非全域掃描
+    - 中間產物（chunk 快取）幫助斷點續做
+
+  avoid:
+    - 對每份文件獨立進行完整的 Eval Gate（用批次）
+    - 重複嵌入相同的文字（應快取 vector）
+    - 用 GPT-4o 做可以用規則處理的 metadata 驗證

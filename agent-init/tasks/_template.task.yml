@@ -1,0 +1,68 @@
+# {{PROJECT_NAME}} Task Pack Template
+# Usage: copy to inbox/ and fill in fields
+# Naming: TASK-YYYYMMDD-SHORT_NAME.yml
+
+taskId: TASK-YYYYMMDD-XXXX
+title: ""
+priority: P0 | P1 | P2
+status: inbox | running | done | blocked
+
+summary: ""
+
+related_docs:
+  - ""
+
+constraints:
+  - ""
+
+# Path boundary enforcement — agent MUST NOT touch files outside allowed_paths
+# Use glob patterns matching actual repo structure
+allowed_paths:
+  - ""
+
+# Explicit exclusions — even if inside allowed_paths, these are off-limits
+forbidden_paths:
+  - ""
+
+required_outputs:
+  - type: diff | doc | report | sql | test
+    path: ""
+    notes: ""
+
+acceptance_tests:
+  - ""
+
+# Which governance gates apply? Pick from .agent/skills/governance/rules/*.yaml
+# Agent should self-check against these before marking task done.
+governance_rules:
+  # - "contract_first_gate: <trigger condition>"
+  # - "ai_quarantine_merge: <trigger condition>"
+  # - "style_canon_enforcer: <trigger condition>"
+  # - "adr_gate: <trigger condition>"
+  # - "intent_drift_detector: <trigger condition>"
+  # - "arch_health_report: <trigger condition>"
+
+# --- Path reference template (customize for your project) ---
+#
+# 根據你的專案結構，在此列出常用路徑供快速參考：
+#
+# Source code:
+#   {{SRC_DIR}}/**
+#
+# API routes:
+#   {{API_DIR}}/**
+#
+# API contracts:
+#   contracts/**
+#
+# Database / migrations:
+#   {{MIGRATION_DIR}}/**
+#
+# Shared libraries:
+#   {{LIB_DIR}}/**
+#
+# Tests:
+#   {{TEST_DIR}}/**
+#
+# Components / UI:
+#   {{COMPONENT_DIR}}/**
