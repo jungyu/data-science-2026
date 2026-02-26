@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+
+# 虛擬環境
+.venv/
+venv/
+env/
+
+# 測試與工具快取
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage*
+htmlcov/
+
+# 環境變數
+.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 模型產出
+models/*.pkl
+models/*.joblib
+models/*.pt
+models/*.onnx
+
+# 資料快取
+data/*.csv
+data/*.parquet
+data/*.pkl
+
+# 輸出圖表
+outputs/*.png
+outputs/*.html
+
+# MLflow
+mlruns/
+mlflow.db
+
+# Jupyter
+.ipynb_checkpoints/
