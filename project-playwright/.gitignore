@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# 虛擬環境
+.venv/
+venv/
+env/
+
+# 環境設定
+.env
+
+# 輸出檔案
+output/
+*.png
+*.pdf
+*.csv
+*.xlsx
+!ch00-setup/*.png
+
+# Playwright
+playwright-report/
+test-results/
+blob-report/
+trace/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
