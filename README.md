@@ -168,6 +168,4 @@
 
 ## 👤 作者
 
-- Aaron Yu
-- Email: <jungyuyu@gmail.com>
-- Contact: <aaron@makiot.com>
+作者：Aaron Yu (https://github.com/jungyu), Claude AI, ChatGPT AI
