@@ -15,6 +15,34 @@
 
 你可以把它理解成一個「可直接落地到企業場景」的資管 AI/DS 訓練基地。
 
+### 系統架構總覽
+
+```text
+User
+ ↓
+AI Agent (Planner)
+ ↓
+MCP Server (Tool Contracts)
+ ├── RAG Service
+ ├── KPI Service
+ ├── Ticket Service
+ └── Automation Trigger
+ ↓
+Data Layer (DB / KB / Logs)
+```
+
+---
+
+## AI 協作架構師能力階梯
+
+| Level | 能力 | 對應教材 |
+|-------|------|----------|
+| 1 | 能使用 AI | `docs/pandas`、`docs/altair` |
+| 2 | 能設計 RAG | `project-first`、`docs/scikit-learn` |
+| 3 | 能設計 Tool Contract | `docs/architect`、`docs/ai-agent` |
+| 4 | 能設計治理與觀測 | `agent-init`、`docs/architect` |
+| 5 | 能設計可演進系統 | 全課程整合 + 作品集 |
+
 ---
 
 ## 你會學到什麼
@@ -28,6 +56,15 @@
 - **企業治理能力**：權限隔離、品質門檻、審核機制、可追溯操作紀錄
 - **可展示作品集**：從教材練習一路累積到可發表/可面試展示的專題
 
+## 本課程不教什麼
+
+- Prompt engineering 技巧炫技
+- 單純模型調參（hyperparameter tuning only）
+- 只做 demo 的 chatbot
+- 黑箱式 AI 使用
+
+> 我們的重點是：**架構設計、工程落地、治理機制**——能進企業、能上線、能被審核的 AI 系統。
+
 ---
 
 ## 專案地圖
@@ -36,8 +73,8 @@
 .
 ├── agent-init/          # AI Agent 治理初始化範本（可移植）
 ├── books/               # 核心手冊（資管完全手冊、Skills 手冊）
-├── docs/                # 課程教材（Pandas / scikit-learn / AI架構師 / AI Agent協作 / Altair / methodology / supabase）
-├── project-first/       # 企業 RAG × MCP × Skills 教案與程式碼
+├── docs/                # 課程教材（Pandas / scikit-learn / AI架構師 / AI Agent協作 / Altair / project-first / methodology / supabase）
+├── project-first/       # 企業 RAG × MCP × Skills 專案程式碼
 ├── project-forcasting/  # 預測任務專案（Forecasting）
 ├── project-playwright/  # 自動化測試與代理工作流專案
 ├── pdf/                 # 補充 PDF 資源
@@ -55,7 +92,7 @@
 - [AI 架構師教材](docs/architect/00-philosophy.md)
 - [AI Agent 協作教材](docs/ai-agent/README.md)
 - [資料視覺化 Altair 教材](docs/altair/README.md)
-- [project-first：企業 RAG 實作](project-first/index.md)
+- [project-first：企業 RAG 實作](docs/project-first/README.md)
 - [agent-init：治理框架範本](agent-init/README.md)
 - [project-forcasting](project-forcasting/README.md)
 - [project-playwright](project-playwright/README.md)
