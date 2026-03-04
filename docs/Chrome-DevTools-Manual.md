@@ -1,4 +1,4 @@
-# 🔍 Head First：用 Chrome DevTools 讀懂任何網站
+# 🔍 用 Chrome DevTools 讀懂任何網站
 
 > **你的任務不是「把畫面截圖下來」**
 > 你的任務是：**「找到資料從哪裡來、怎麼來、長什麼樣子」**
