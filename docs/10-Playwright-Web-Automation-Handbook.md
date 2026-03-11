@@ -1,4 +1,4 @@
-# 🧠 Head First Playwright 學習手冊
+# 🧠 Playwright 學習手冊
 ### 用真實瀏覽器，抓任何網站的資料！
 
 > 📖 **參考來源**：[DataScout / playwright_base](https://github.com/jungyu/DataScout/tree/b81b6308c7aa63a953dcfdf30a7c40bce3a8e68e)
