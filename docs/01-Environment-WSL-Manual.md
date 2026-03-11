@@ -79,6 +79,38 @@ wsl --install
 
 ---
 
+#### 💡 進階提示：如果預設安裝了 Alpine Linux？（如何更換為 Ubuntu）
+
+有時 `wsl --install` 可能會預設安裝輕量化的 Alpine Linux，但本課程建議使用系統支援度最廣的 **Ubuntu**。
+
+1. **查看目前可安裝的版本**  
+   在 Windows 的 PowerShell 或 CMD 中輸入：
+   ```powershell
+   wsl --list --online
+   ```
+
+2. **安裝 Ubuntu**  
+   執行安裝指令（預設安裝最新 LTS 版本）：
+   ```powershell
+   wsl --install -d Ubuntu
+   ```
+   *安裝時會彈出新視窗要求設定 Username 和 Password，請務必記住！*
+
+3. **切換預設發行版**  
+   如果你希望以後輸入 `wsl` 就直接進入 Ubuntu，請執行：
+   ```powershell
+   wsl --set-default Ubuntu
+   ```
+
+4. **移除舊的 Alpine (選填)**  
+   若不再需要 Alpine（會刪除內部所有檔案）：
+   ```powershell
+   wsl --unregister Alpine
+   ```
+
+
+---
+
 #### 🧠 大腦體操：為什麼不直接用 Windows CMD？
 
 | 比較項目 | PowerShell / CMD | Bash (WSL) |
