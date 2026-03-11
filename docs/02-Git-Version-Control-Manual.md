@@ -58,6 +58,49 @@ cd repo
 
 **💡 小技巧**：`git clone` 會自動幫你設定好遠端連線，連 `git init` 都省了！
 
+---
+
+### 🔐 認證機制：SSH vs HTTPS
+
+當你要把程式碼推送到 GitHub 時，Git 需要確認你的身份。
+
+#### 1. HTTPS（預設，需 Token）
+網址以 `https://` 開頭。優點是簡單，缺點是每次（或一段時間後）都需要輸入 **Personal Access Token (PAT)**，且 Token 會過期。
+
+#### 2. SSH（專業推薦，免密碼） ⭐
+網址以 `git@github.com` 開頭。設定一次金鑰後，就能永久免密碼安全推送。
+
+---
+
+### 🛠️ SSH Key 設定三部曲（以 WSL/Linux 為例）
+
+##### 第一步：產生金鑰 (SSH Key)
+在終端機輸入：
+```bash
+ssh-keygen -t ed25519 -C "您的註冊信箱"
+```
+> **提示**：看到詢問路徑或密碼，直接連按 3 次 **Enter** 即可（保持預設預設是不設密碼）。
+
+##### 第二步：複製公鑰內容
+執行以下指令並複製輸出的長字串：
+```bash
+cat ~/.ssh/id_ed25519.pub
+```
+
+##### 第三步：交給 GitHub
+1. 登入 GitHub -> **Settings** -> **SSH and GPG keys**。
+2. 點擊 **New SSH key**。
+3. 把內容貼進 **Key** 欄位，完成！
+
+##### ✅ 驗證連線
+```bash
+ssh -T git@github.com
+```
+看到 `"Hi [您的帳號]! You've successfully authenticated..."` 就成功了！
+
+---
+
+
 ### 📸 場景二：保存你的工作
 
 ```bash

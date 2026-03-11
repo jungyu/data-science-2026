@@ -462,6 +462,51 @@ git push -u origin main
 
 ---
 
+#### 🔐 進階技能：設定 SSH Key，免密碼推送到 GitHub
+
+在 WSL2 (Ubuntu) 環境下，最推薦的做法是使用 SSH Key。這能讓您在 `git push` 或 `git pull` 時不需要每次都輸入長長的 Token 密碼，既安全又方便。
+
+請按照以下三個簡單步驟操作：
+
+##### 第一步：產生您的專屬金鑰 (SSH Key)
+在您的 Ubuntu 終端機輸入這行指令：
+```bash
+ssh-keygen -t ed25519 -C "您的 GitHub 註冊信箱"
+```
+> **注意**：系統會問您要存在哪或是否輸入密碼（Passphrase），直接連按 3 下 **Enter** 即可（保持預設路徑且不設密碼）。
+
+##### 第二步：複製公鑰內容
+產生完成後，您需要把「公鑰」的內容複製起來交給 GitHub。請執行：
+```bash
+cat ~/.ssh/id_ed25519.pub
+```
+畫面上會出現一串以 `ssh-ed25519` 開頭、您的信箱結尾的長字串。請完整選取並複製它。
+
+##### 第三步：將金鑰新增至 GitHub 網頁
+1. 登入您的 GitHub 官網。
+2. 點擊右上角個人頭像 -> **Settings**。
+3. 在左側選單找到 **SSH and GPG keys**。
+4. 點擊右上角的綠色按鈕 **New SSH key**。
+5. **Title**: 隨便取個名字（例如：`My-WSL-PC`）。
+6. **Key**: 把剛剛複製的那串內容貼進去。
+7. 按下 **Add SSH key**，完成！
+
+##### ✅ 測試是否成功
+回到 Ubuntu 終端機，輸入這行指令測試連線：
+```bash
+ssh -T git@github.com
+```
+如果是第一次連線，會問你：*Are you sure you want to continue connecting (yes/no/[fingerprint])?*  
+請輸入 **yes** 並按 **Enter**。
+
+如果看到 `"Hi [您的帳號]! You've successfully authenticated..."`，就代表您已經成功「登入」GitHub 了！
+
+> 💡 **實戰小技巧：複製專案時的選擇**  
+> 以後在 GitHub 點擊綠色的 "Code" 按鈕複製網址時，請記得切換到 **SSH** 分頁（網址會是 `git@github.com:使用者名稱/專案名.git`），這樣才不會被要求輸入帳號密碼。
+
+---
+
+
 #### 🧱 防呆建議
 
 > 如果你 `git push` 失敗，**不要慌**，讀最後那幾行錯誤訊息。
@@ -528,21 +573,24 @@ sudo systemctl start docker
 sudo usermod -aG docker $USER
 
 # 重新登入後，測試 Docker 是否正常
-docker --version
-docker run hello-world
+# 注意：Ubuntu 重視安全性，即便加入了 docker 群組，有時仍會因權限問題無法執行。
+# 因此建議在所有 docker 指令前都加上 sudo，既安全又保險。
+
+sudo docker --version
+sudo docker run hello-world
 
 # 啟動 Nginx 伺服器
-docker run -d -p 8080:80 --name my-nginx nginx
+sudo docker run -d -p 8080:80 --name my-nginx nginx
 
 # 確認容器正在運行
-docker ps
+sudo docker ps
 
 # 在 Windows 瀏覽器輸入 http://localhost:8080
 # 你應該會看到 Nginx 歡迎頁面！ 🎉
 
 # 停止並刪除容器
-docker stop my-nginx
-docker rm my-nginx
+sudo docker stop my-nginx
+sudo docker rm my-nginx
 ```
 
 ---
