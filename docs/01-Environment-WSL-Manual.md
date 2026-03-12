@@ -11,6 +11,23 @@
 
 ---
 
+---
+
+## 🎯 你的學習地圖：打造專屬地基
+
+在接下來的幾章中，我們將一步步引導你建立起專業的開發環境。這份手冊的最終目標是帶領你完成本週的畢業挑戰：
+
+**[🏆 直接跳轉到本週畢業作業：打造地基](#week03-assignment) (建議學完 Chapter 1~8 再開始)**
+
+### 你將會逐步解鎖的「裝備」：
+- **Chapter 1 & 4**：解鎖 `README.md` (環境紀錄與 Git 協作)
+- **Chapter 6**：解鎖 `docker-compose.yml` (一鍵啟動資料庫)
+- **Chapter 8**：解鎖 `config.json` 與 `.env` (資安與配置)
+
+讓我們開始這場從零到一的特訓吧！
+
+---
+
 ## 目錄
 
 - [第一階段：喚醒終端機 (The Awakening)](#第一階段喚醒終端機-the-awakening)
@@ -26,7 +43,7 @@
   - [Chapter 6：Docker Compose](#chapter-6docker-compose)
 - [第五階段：全端開發實戰 (Supabase & Web)](#第五階段全端開發實戰-supabase--web)
   - [Chapter 7：Supabase CLI 與後端整合](#chapter-7supabase-cli-與後端整合)
-  - [Chapter 8：畢業專案 — 你的 CLI 助手](#chapter-8畢業專案--你的-cli-助手)
+  - [Chapter 8：配置與資安 (JSON & .env)](#chapter-8配置與資安-json--env)
 - [🧠 教學小撇步 (Head First Style Tips)](#-教學小撇步-head-first-style-tips)
 
 ---
@@ -125,6 +142,12 @@ wsl --install
 ---
 
 #### ⚠️ 防呆區 (Wait, what?)
+
+- **遇到 Windows 10 未升級導致沒有 WSL？**  
+  → **先決條件：**您必須執行 Windows 10 版本 2004 和更新版本（組建 19041 和更新版本）或 Windows 11，才能使用 `wsl --install` 等相關命令。如果您使用的是舊版，請參閱 [微軟手動安裝頁面](https://learn.microsoft.com/zh-tw/windows/wsl/install-manual)。
+
+- **遇到 Windows 登入的使用者權限-不具系統管理能力？**  
+  → 往下看 [補充說明：Windows 權限與系統管理員](#windows-admin-rights)。
 
 - **看到 `The virtual machine could not be started`？**  
   → 進入 BIOS 確認已啟用「虛擬化技術 (Virtualization Technology)」
@@ -411,78 +434,27 @@ cat /var/log/syslog | grep "ERROR" | sort | uniq > unique_errors.txt
 └──────────────────────────────────────────┘
 ```
 
----
+#### 🔐 第一步：設定 SSH Key 與 GitHub 連線
 
-#### 🛠️ 任務：將 CLI 練習筆記推送到 GitHub
-
-```bash
-# 初始化一個 Git 倉庫
-mkdir cli-notes && cd cli-notes
-git init
-
-# 設定你的身份（首次使用必做）
-git config --global user.name "你的名字"
-git config --global user.email "your@email.com"
-
-# 建立你的練習筆記
-echo "# CLI 練習筆記" > README.md
-echo "## 今天學到的指令" >> README.md
-echo "- pwd：顯示目前路徑" >> README.md
-
-# 將檔案加入暫存區
-git add README.md
-# 或加入所有改動
-git add .
-
-# 提交 commit（附上有意義的訊息）
-git commit -m "feat: 新增 CLI 基礎指令筆記"
-
-# 連結到 GitHub 遠端倉庫
-git remote add origin https://github.com/你的帳號/cli-notes.git
-
-# 推送到 GitHub
-git push -u origin main
-```
-
----
-
-#### 🔑 Git 常用指令速查表
-
-| 指令 | 功能 |
-|------|------|
-| `git init` | 初始化倉庫 |
-| `git status` | 查看目前狀態 |
-| `git add <file>` | 加入暫存區 |
-| `git commit -m "msg"` | 提交 |
-| `git log --oneline` | 查看提交歷史 |
-| `git push` | 推送到遠端 |
-| `git pull` | 拉取遠端更新 |
-| `git branch` | 查看分支 |
-| `git checkout -b <branch>` | 建立並切換分支 |
-
----
-
-#### 🔐 進階技能：設定 SSH Key，免密碼推送到 GitHub
-
-在 WSL2 (Ubuntu) 環境下，最推薦的做法是使用 SSH Key。這能讓您在 `git push` 或 `git pull` 時不需要每次都輸入長長的 Token 密碼，既安全又方便。
+在 WSL2 (Ubuntu) 環境下，最推薦的做法是使用 SSH Key。這能讓您在 `git clone` 或 `git push` 時不需要每次都輸入長長的密碼，既安全又方便。
 
 請按照以下三個簡單步驟操作：
 
-##### 第一步：產生您的專屬金鑰 (SSH Key)
+##### 1. 產生您的專屬金鑰 (SSH Key)
 在您的 Ubuntu 終端機輸入這行指令：
 ```bash
 ssh-keygen -t ed25519 -C "您的 GitHub 註冊信箱"
 ```
 > **注意**：系統會問您要存在哪或是否輸入密碼（Passphrase），直接連按 3 下 **Enter** 即可（保持預設路徑且不設密碼）。
 
-##### 第二步：複製公鑰內容
+##### 2. 複製公鑰內容
 產生完成後，您需要把「公鑰」的內容複製起來交給 GitHub。請執行：
 ```bash
 cat ~/.ssh/id_ed25519.pub
 ```
 畫面上會出現一串以 `ssh-ed25519` 開頭、您的信箱結尾的長字串。請完整選取並複製它。
 
-##### 第三步：將金鑰新增至 GitHub 網頁
+##### 3. 將金鑰新增至 GitHub 網頁
 1. 登入您的 GitHub 官網。
 2. 點擊右上角個人頭像 -> **Settings**。
 3. 在左側選單找到 **SSH and GPG keys**。
@@ -501,25 +473,102 @@ ssh -T git@github.com
 
 如果看到 `"Hi [您的帳號]! You've successfully authenticated..."`，就代表您已經成功「登入」GitHub 了！
 
+---
+
+#### 🛠️ 第二步：從 GitHub 複製專案與基礎操作
+
+在真實的開發流程中，我們通常會**先在 GitHub 網頁上建立好一個 Repository (專案倉庫)**，然後再把它「複製 (Clone)」到我們的電腦上。
+
+**前置作業：** 請先到 GitHub 網頁上點擊 `New repository`，建立一個名為 `cli-notes` 的專案（不要勾選 Add a README file），並複製它的 SSH 網址。
+
 > 💡 **實戰小技巧：複製專案時的選擇**  
-> 以後在 GitHub 點擊綠色的 "Code" 按鈕複製網址時，請記得切換到 **SSH** 分頁（網址會是 `git@github.com:使用者名稱/專案名.git`），這樣才不會被要求輸入帳號密碼。
+> 以後在 GitHub 點擊綠色的 "Code" 按鈕複製網址時，請記得切換到 **SSH** 分頁（網址會是 `git@github.com:使用者名稱/專案名.git`），這樣才不會被要求輸入密碼。
+
+```bash
+# 1. 將 GitHub 上的專案複製 (Clone) 到本地端
+git clone git@github.com:你的帳號/cli-notes.git
+
+# 進入專案資料夾
+cd cli-notes
+
+# 2. 設定你的身份（首次使用必做）
+# 💡 注意：即使剛剛設定了 SSH 金鑰，這裡還是「必須」設定的！
+# SSH 金鑰是為了「連線免密碼」，而這裡的設定是為了「在每筆 Commit 紀錄你是誰」。
+git config --global user.name "你的名字"
+git config --global user.email "your@email.com"
+
+# 3. 建立你的練習筆記
+echo "# CLI 練習筆記" > README.md
+echo "## 今天學到的指令" >> README.md
+echo "- pwd：顯示目前路徑" >> README.md
+
+# 4. 將檔案加入暫存區
+git add README.md
+# 或加入所有改動
+git add .
+
+# 5. 提交 commit（附上有意義的訊息）
+git commit -m "feat: 新增 CLI 基礎指令筆記"
+
+# 6. 推送到 GitHub (因為是 clone 下來的，所以已經設定好遠端連結，直接 push 即可)
+git push
+```
+
+---
+
+#### 🔑 Git 常用指令速查表
+
+| 指令 | 功能 |
+|------|------|
+| `git clone` | 複製遠端倉庫到本地 |
+| `git status` | 查看目前狀態 |
+| `git add <file>` | 加入暫存區 |
+| `git commit -m "msg"` | 提交 |
+| `git log --oneline` | 查看提交歷史 |
+| `git push` | 推送到遠端 |
+| `git pull` | 拉取遠端更新 |
+| `git branch` | 查看分支 |
+| `git checkout -b <branch>` | 建立並切換分支 |
 
 ---
 
 
 #### 🧱 防呆建議
 
-> 如果你 `git push` 失敗，**不要慌**，讀最後那幾行錯誤訊息。
+> 如果你 `git push` 或連線 GitHub 失敗，**不要慌**，讀最後那幾行錯誤訊息。
 
 常見錯誤與解法：
 
 ```bash
+# 錯誤：ssh: connect to host github.com port 22: Connection timed out
+# 解法：你的網路環境（如公司或學校防火牆）可能封鎖了 22 Port。
+# 替代方案 1：改用 HTTPS 網址複製與推播專案。
+# 替代方案 2：建立或編輯 ~/.ssh/config 檔案，讓 SSH 改走 443 Port：
+#   Host github.com
+#       Hostname ssh.github.com
+#       Port 443
+#       User git
+
+# 錯誤：403 Forbidden 或 Permission denied (publickey)
+# 解法：代表 GitHub 拒絕了你的存取。
+# 1. 執行 `ssh -T git@github.com` 確認 SSH 公鑰確實已新增至 GitHub。
+# 2. 若使用 HTTPS 且出現 403，請確認你的 Token (PAT) 具備 repo 存取權限。
+# 3. 再三確認你是否有該專案的寫入 (Write) 權限
+
+# 錯誤：不小心重複執行了 `ssh-keygen`，導致電腦舊金鑰被覆蓋、金鑰不匹配
+# 解法：因為電腦本機的金鑰被覆蓋了，原本註冊在 GitHub 上的公鑰就會失效，必須重新綁定。
+# 1. 執行 `cat ~/.ssh/id_ed25519.pub` 重新複製「最新產生」的公鑰內容。
+# 2. 登入 GitHub → 點擊右上角頭像 → Settings → SSH and GPG keys。
+# 3. 將畫面上舊的（失效的）金鑰刪除 (Delete) 以防混淆。
+# 4. 點擊 `New SSH key`，把這把新公鑰貼上去並儲存。
+# 5. 回到終端機重新執行 `ssh -T git@github.com` 確認連線。
+
 # 錯誤：remote: Support for password authentication was removed
 # 解法：使用 Personal Access Token (PAT) 代替密碼
 # 到 GitHub → Settings → Developer settings → Personal access tokens
 
 # 錯誤：error: failed to push some refs
-# 解法：先 pull 再 push
+# 解法：通常是因為遠端有新的進度，先 pull 再 push
 git pull origin main --rebase
 git push origin main
 
@@ -563,7 +612,7 @@ git push origin main
 
 ---
 
-#### 🛠️ 任務：啟動 Nginx 網頁伺服器
+#### 🛠️ 任務：啟動 Playwright 自動化爬蟲環境
 
 ```bash
 # 安裝 Docker（在 WSL Ubuntu 內）
@@ -571,50 +620,123 @@ sudo apt update
 sudo apt install docker.io -y
 sudo systemctl start docker
 sudo usermod -aG docker $USER
+# 💡 指令拆解：
+# usermod: 修改使用者帳號屬性的指令
+# -aG docker: `-a` (append 附加) 和 `-G` (Group 群組)，意思是「附加到 docker 這個群組中」
+# $USER: 這是一個系統環境變數，代表「當前登入的使用者名稱」(例如 aaron)
+# 整句白話文：「把現在的我，加入到可以管理 docker 的群組裡，讓我之後能操作它。」
 
 # 重新登入後，測試 Docker 是否正常
 # 注意：Ubuntu 重視安全性，即便加入了 docker 群組，有時仍會因權限問題無法執行。
 # 因此建議在所有 docker 指令前都加上 sudo，既安全又保險。
 
 sudo docker --version
+# 執行官方的測試用迷你容器，如果你看到 "Hello from Docker!"
+# 就代表 Docker 引擎的心跳正常，安裝大成功！
 sudo docker run hello-world
 
-# 啟動 Nginx 伺服器
-sudo docker run -d -p 8080:80 --name my-nginx nginx
+# 啟動自動化測試與爬蟲環境 (Playwright)
+# 這裡我們下載並執行微軟官方提供的 Playwright 容器（內建瀏覽器驅動）
+sudo docker run -d -p 8080:8080 --name my-playwright-env mcr.microsoft.com/playwright:v1.40.0-jammy tail -f /dev/null
 
 # 確認容器正在運行
 sudo docker ps
 
-# 在 Windows 瀏覽器輸入 http://localhost:8080
-# 你應該會看到 Nginx 歡迎頁面！ 🎉
+# 進入容器內部逛逛 (這就是你未來的 MCP Server / Automation 執行基地)
+sudo docker exec -it my-playwright-env /bin/bash
+# (逛完後輸入 exit 退出)
 
 # 停止並刪除容器
-sudo docker stop my-nginx
-sudo docker rm my-nginx
+sudo docker stop my-playwright-env
+sudo docker rm my-playwright-env
 ```
+
+> **🏠 深度探索：Docker 創造的東西到底存在哪？**
+>
+> 這是最多人問的問題！既然我沒看到檔案夾，那 Docker 把資料藏哪了？
+> 1. **容器與映像檔**：它們存放在一個由 Docker 管理的「虛擬硬碟」中。在 Windows WSL 中，這個檔案通常藏在 `%LOCALAPPDATA%/Docker/wsl/data/ext4.vhdx`。這是一個大黑盒子，為了效能，Docker 不建議你直接去翻它。
+> 2. **持久化的資料 (Volumes)**：我們在 `docker-compose.yml` 寫的 `volumes`。如果你想要檔案直接「掉」在你的 Windows 資料夾裡方便你讀取，那就要用 **Bind Mount (路徑映射)**，把 Linux 某個路徑與 Windows 目錄連起來。我們在後續專案會用到！
 
 ---
 
 #### ⚠️ 防呆區 (Wait, what?)
 
-- **`Cannot connect to the Docker daemon`？**  
-  → 執行 `sudo service docker start` 啟動 Docker 服務
+- **`Cannot connect to the Docker daemon` 或遇到 `System has not been booted with systemd` 錯誤？**  
+  如果是前者，通常執行 `sudo service docker start` 就能啟動。  
+  *(💡 觀念補充：`systemctl` 是 Ubuntu 現代的背景服務系統 (systemd)，而 WSL 早期沒啟用它。)*  
+
+  **🚀 進階解法：在 WSL (Ubuntu 24.04.4 LTS) 中徹底啟用 systemd**  
+  現在的 WSL 已經原生支援 systemd，強烈建議啟用它，這樣才能正常使用 `systemctl`！  
+  1. 編輯設定檔：  
+     ```bash
+     sudo nano /etc/wsl.conf
+     ```
+  2. 貼上這兩行設定，然後存檔離開 (`Ctrl+O`, `Enter`, `Ctrl+X`)：  
+     ```ini
+     [boot]
+     systemd=true
+     ```
+  3. 回到 **Windows PowerShell (系統管理員)**，徹底關閉 WSL：  
+     ```powershell
+     wsl --shutdown
+     ```
+  4. 重新開啟你的 Ubuntu 終端機，這時 `sudo systemctl start docker` 就能完美運作了！
 
 - **`port is already allocated`？**  
-  → 換一個 port：`docker run -d -p 8081:80 nginx`
+  → 換一個 port：`docker run -d -p 8081:8080 mcr.microsoft.com/playwright:v1.40.0-jammy tail -f /dev/null`
 
 ---
 
 ### Chapter 6：Docker Compose
 
-#### 🛠️ 任務：一鍵啟動資料庫與應用程式
+#### 🌉 觀念橋樑：從單一容器到 Docker Compose
+
+剛剛我們學會了用 `docker run` 啟動**一個** Nginx 容器（一個貨櫃）。但現實世界中，一個網站通常不會只有網頁伺服器，它還需要**資料庫（PostgreSQL）**、**後端 API（Node.js / Python）**甚至**快取（Redis）**。
+
+如果每次都要手動輸入很長的指令去啟動三、四個容器，不僅容易打錯參數，還很難建立它們之間的網路連線（讓後端能連到資料庫）。
+
+**這時候 Docker Compose 就來拯救我們了！**  
+它就像是一張「**貨物配置清單（YAML 檔）**」，我們只要把需要哪些容器、密碼是什麼、開哪個 Port 寫在清單上，就能「**一鍵叫出所有貨櫃，並自動把它們連好網路**」。
+
+---
+
+#### 🛠️ 任務：一鍵啟動資料庫環境 (Docker Compose)
+
+> **💡 為什麼範例用 Postgres 而不是 Supabase？**  
+> 這是個好問題！**Supabase 的核心其實就是 PostgreSQL。**  
+> 在 Chapter 6 我們先學習如何用 Docker 啟動一個「原味」的資料庫（像是在學開手排車）；到了 Chapter 7，我們會改用 Supabase（像是開自動駕駛的特斯拉），它會幫我們把資料庫、API、權限管理全部打包好。學會本章，你才能理解 Supabase 底部是在運作什麼。
+
+---
+
+**📝 預備知識：用 Nano 編輯檔案**  
+在接下來的任務裡，我們需要新增或編輯設定檔。Linux 內建最親民的文字編輯器叫做 **Nano**。
+基本操作只有四步：
+1. **輸入與貼上：** 打開檔案後，你可以直接打字。如果是從網頁複製的文字，對著 Terminal **點擊滑鼠右鍵** 就能貼上。
+   - **💡 為什麼不是 Ctrl+V？** 在 Linux 終端機裡，`Ctrl+C` 是用來「中斷/強制停止程式」的，如果直接按 `Ctrl+V` 則可能打出怪字元。因此，微軟的 Windows Terminal 預設將複製與貼上的快捷鍵設定為 `Ctrl+Shift+C` 與 `Ctrl+Shift+V` 以避免衝突！
+   - **⚙️ 如何確認/修改 Terminal 快捷鍵：**
+     點擊 Windows Terminal 最上方標籤列右側的 `下拉式選單 (˅)` → `設定 (Settings)` → 點擊左側 `互動 (Interaction)`，勾選「**使用 Ctrl+Shift+C/V 做為複製/貼上**」來啟用快捷鍵。
+2. **存檔準備：** 按 `Ctrl + O` (這是英文字母 O，不是零)。
+3. **確認檔名：** 螢幕下方會問你檔名對不對？按下 `Enter` 確認。
+4. **離開編輯：** 按 `Ctrl + X` 關閉檔案並回到終端機。
+
+有了這些基本功，就可以來建立我們的第一張設定清單了！
+
+```bash
+# 1. 依照作業規範建立資料夾並進入 (例如 week03)
+mkdir week03 && cd week03
+
+# 2. 開啟 Nano 準備撰寫 yaml 設定檔
+nano docker-compose.yml
+```
+
+**(進入 Nano 編輯畫面後，右鍵貼上以下內容，然後 Ctrl+O -> Enter -> Ctrl+X 存檔離開！)**
 
 ```yaml
 # 建立 docker-compose.yml
 version: '3.8'
 
 services:
-  # PostgreSQL 資料庫
+  # 資料庫服務 (Supabase 的核心就是它！)
   db:
     image: postgres:15
     environment:
@@ -681,6 +803,14 @@ supabase login
 mkdir my-supabase-project && cd my-supabase-project
 supabase init
 
+# 💡 初始化後，你的目錄會長這樣：
+# your-project/
+# ├── [學習週別]/      # 你之前的作業區
+# └── supabase/         # 自動生成的 Supabase 控制中心
+#     ├── config.toml   # 核心設定檔 (API Key、Port 等)
+#     ├── migrations/   # 資料庫遷移紀錄 (Schema)
+#     └── seed.sql      # 初始資料快照
+
 # 連結到你的雲端專案
 supabase link --project-ref your-project-id
 
@@ -726,98 +856,53 @@ supabase stop
 
 ---
 
-### Chapter 8：畢業專案 — 你的 CLI 助手
+### Chapter 8：開發者的護身符 (設定檔與資安)
 
-#### 🎓 實戰任務：自動備份 Shell Script
+#### 📝 觀念 1：JSON 資料建模 (Configuration)
+在現代全端開發中，**JSON** 是最常見的資料交換與設定格式。它就像是 Python 的字典或 JavaScript 的物件。
 
-建立一個 `backup.sh` 腳本，自動備份重要檔案：
-
-```bash
-#!/bin/bash
-# ================================================
-# backup.sh - 自動備份並上傳到 Supabase Storage
-# 作者：[你的名字]
-# 日期：$(date +%Y-%m-%d)
-# ================================================
-
-# === 設定區 ===
-BACKUP_DIR="$HOME/backups"
-SOURCE_DIR="$HOME/projects"
-SUPABASE_URL="https://你的專案.supabase.co"
-SUPABASE_BUCKET="backups"
-TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-BACKUP_FILE="backup_${TIMESTAMP}.tar.gz"
-
-# === 顏色設定 ===
-GREEN='\033[0;32m'
-RED='\033[0;31m'
-YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
-
-# === 函式定義 ===
-log_info() {
-    echo -e "${GREEN}[INFO]${NC} $1"
+**範例格式 (`config.json`)：**
+```json
+{
+  "project_name": "My Supabase App",
+  "region": "ap-northeast-1",
+  "features": [
+    "auth",
+    "database",
+    "storage"
+  ]
 }
-
-log_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
-}
-
-log_warn() {
-    echo -e "${YELLOW}[WARN]${NC} $1"
-}
-
-# === 主程式 ===
-log_info "開始備份程序..."
-
-# 1. 建立備份目錄
-mkdir -p "$BACKUP_DIR"
-log_info "備份目錄：$BACKUP_DIR"
-
-# 2. 壓縮檔案
-log_info "正在壓縮 $SOURCE_DIR..."
-if tar -czf "$BACKUP_DIR/$BACKUP_FILE" "$SOURCE_DIR" 2>/dev/null; then
-    log_info "壓縮完成：$BACKUP_FILE"
-else
-    log_error "壓縮失敗！"
-    exit 1
-fi
-
-# 3. 顯示備份大小
-BACKUP_SIZE=$(du -sh "$BACKUP_DIR/$BACKUP_FILE" | cut -f1)
-log_info "備份大小：$BACKUP_SIZE"
-
-# 4. 上傳到 Supabase Storage（需要 curl 和 API Key）
-if [ -n "$SUPABASE_SERVICE_KEY" ]; then
-    log_info "上傳到 Supabase..."
-    curl -X POST \
-        "${SUPABASE_URL}/storage/v1/object/${SUPABASE_BUCKET}/${BACKUP_FILE}" \
-        -H "Authorization: Bearer ${SUPABASE_SERVICE_KEY}" \
-        -H "Content-Type: application/gzip" \
-        --data-binary "@${BACKUP_DIR}/${BACKUP_FILE}"
-    log_info "上傳完成！✅"
-else
-    log_warn "未設定 SUPABASE_SERVICE_KEY，跳過上傳步驟"
-fi
-
-# 5. 清理 7 天前的舊備份
-find "$BACKUP_DIR" -name "backup_*.tar.gz" -mtime +7 -delete
-log_info "已清理 7 天前的舊備份"
-
-log_info "備份程序完成！🎉"
 ```
+> **⚠️ 格式防呆：**
+> 1. JSON 的字串和鍵名**都必須使用雙引號 (`"`)**，不能用單引號。
+> 2. 最後一個屬性後面**絕對不能有逗號 (`,`)**。這也是最常見的語法錯誤！
+
+#### 🛡️ 觀念 2：環境變數與 .gitignore
+在開發 Supabase 或串接其他第三方服務時，你一定會拿到「API Key」或資料庫密碼。
+**絕對不要把這把鑰匙直接寫在程式碼中，更不要被 `git push` 上傳到 GitHub！** (否則不僅是資安外洩，有些服務甚至會把你帳號停權)。
+
+**開發業界標準實務 (3 步防護)：**
+1. **建立 `.env` 檔案（真正的鑰匙）：**
+   此檔案會存放真實密碼，而且**只會存在你的本機**。
+2. **建立 `.env.example` 檔案（空鑰匙盒）：**
+   隨專案上傳給其他人看，讓他們知道需要填入哪些變數，但裡面**不能填寫真實密碼**。
+3. **建立 `.gitignore` 檔案（海關黑名單）：**
+   明確告訴 Git：「永遠不要追蹤 `.env` 檔案」。
 
 ```bash
-# 讓腳本可執行
-chmod +x backup.sh
+# 在你即將推送到 GitHub 的專案目錄中操作 (例如 week03/)
 
-# 執行備份
-./backup.sh
+# 1. 產生真實環境變數檔 (放真 Key)
+echo 'SUPABASE_API_KEY="eyJhbG..."' > .env
 
-# 設定排程（每天凌晨 2 點自動備份）
-crontab -e
-# 加入以下這行：
-# 0 2 * * * /home/你的名字/backup.sh >> /home/你的名字/backup.log 2>&1
+# 2. 產生範本檔 (讓看 Repo 的人知道要填這欄)
+echo 'SUPABASE_API_KEY=""' > .env.example
+
+# 3. 把 .env 列入 Git 黑名單！！！
+echo ".env" >> .gitignore
+
+# 此時如果做 git add .
+# Git 就會自動忽略 .env！恭喜你已經擁有了真正的資安觀念。
 ```
 
 ---
@@ -944,7 +1029,155 @@ tldr git
 | Chapter 5 | 容器化思維 | docker run, ps | ☐ |
 | Chapter 6 | Docker Compose | compose up/down | ☐ |
 | Chapter 7 | Supabase CLI | 雲端資料庫連線 | ☐ |
-| Chapter 8 | 畢業專案 | Shell Script 實戰 | ☐ |
+| Chapter 8 | 配置與資安 | JSON, .env, .gitignore | ☐ |
+
+---
+
+<a id="week03-assignment"></a>
+## 🎓 畢業考：本週作業 (打造地基)
+
+各位同學好！這一週我們從純軟體開發跨入了「系統環境」的領域。這些工具（WSL, Docker, Supabase）是現代全端工程師與資料科學家的標準配備。
+
+這週的作業目的不是要考倒你，而是要幫你建立起屬於自己的雲端開發工作台。請依照以下說明，將所有成果整理至你的 GitHub 倉庫 (Repository) 中。
+
+### 📁 本週目錄結構
+請在你的 Repo 根目錄下建立一個 `[學習週別]` 資料夾 (例如 `week03`)，結構如下：
+
+```text
+/ (Repo Root)
+└── [學習週別]/
+    ├── README.md            # 本週學習心得與任務檢核（必填！）
+    ├── docker-compose.yml   # 你的 Docker 練習設定檔
+    ├── config.json          # 專案配置練習檔
+    └── .env.example         # 變數範本（保護秘密的示範）
+```
+
+### 🎯 任務詳細說明
+
+#### 1. WSL 與 Docker 環境解鎖 🛠️
+在 `[學習週別]/README.md` 中，請用幾句話記錄你的安裝心得：
+- 你在安裝 WSL 或 Docker 時有遇到什麼「驚喜（Bug）」嗎？你是如何解決的？
+- 請在 `[學習週別]/` 下放一個 `docker-compose.yml`（可以是我們課堂練習的 Nginx 或簡單資料庫版本），確保你能一鍵啟動環境。
+
+#### 2. Supabase 雲端專案初始化 ☁️
+請到 [Supabase 官方網站](https://supabase.com/)建立一個新專案，並：
+- 在 `[學習週別]/README.md` 中貼上你的 **Project URL**（不需要貼 API Key，資安第一！）。
+- 練習建立一個簡單的資料表（例如：`students` 或 `tasks`）。
+
+#### 3. JSON 資料建模練習 📂
+建立一個 `[學習週別]/config.json` 檔案，用 JSON 格式描述你的 Supabase 專案資訊：
+- 包含 `project_name`、`region`、`features` (用 Array 列表) 等欄位。
+- 注意：確認你的 JSON 格式正確，不要漏掉任何一個雙引號或逗號。
+
+#### 4. Git 提交與資安習慣（重點！核心評分項） 🛡️
+這是這週最重要的習慣練習：
+- **不要把 API Key 傳上 GitHub：**
+  - 建立一個 `.env` 存真正的 Key。
+  - 建立一個 `.env.example` 存「空白的欄位」方便同學參考。
+  - **把 `.env` 加到根目錄的 `.gitignore`。**
+- **Commit Message：**
+  - 請練習用 `feat:` 或 `docs:` 開頭來寫你的提交訊息。
+  - *範例：* `git commit -m "feat: 完成 [學習週別] Supabase 初始設定與 JSON 練習"`
+
+### 📝 學習日誌檢核表
+請將以下內容拷貝並貼在 `[學習週別]/README.md` 檔案中，並自行打勾確認：
+
+```markdown
+### [學習週別] 任務完成清單
+- [ ] WSL 2 環境運作正常
+- [ ] Docker 能成功啟動 `docker-compose.yml` 中的服務
+- [ ] Supabase 雲端專案已建立
+- [ ] 成功編輯 `config.json` 且格式正確
+- [ ] 已設定 `.gitignore` 保護敏感資訊
+```
+
+> **💡 悄悄話**
+> 如果你在執行 `git push` 的時候看到一堆紅色錯誤，先別緊張！看最後兩行，Git 通常會告訴你該怎麼做。如果真的卡住了，把錯誤碼丟到我們的討論區，我們會一起解決它。
+> 
+> 「概念（Why）→ 實作（Do）→ 提交（Ship）」，讓我們一起把這週的進度 Ship 掉吧！
+
+- 截止時間：下週上課前 
+- 繳交地點：你自己的 GitHub 倉庫 `[學習週別]` 資料夾
+
+---
+
+<a id="windows-admin-rights"></a>
+## 🔑 補充說明：Windows 權限與系統管理員
+
+如果在環境安裝與執行過程中，遇到 **Windows 登入的使用者權限-不具系統管理能力**，請參考以下的處理方式與觀念：
+
+### 1. 一般情況：取得 Administrator 權限
+
+如果你的帳號已經是管理員群組，只需要 **提升權限 (Run as Administrator)**。
+
+- **方法 1：右鍵提升**
+  在程式 (如 PowerShell, Windows Terminal, CMD) 上**右鍵**，選「**以系統管理員身分執行**」。
+- **方法 2：開始功能表**
+  搜尋 `powershell`，然後**右鍵** → **以系統管理員身分執行**。
+
+### 2. 檢查自己是不是 Administrator
+
+在 PowerShell 或 CMD 輸入：
+```powershell
+whoami /groups
+```
+如果看到 `BUILTIN\Administrators`，代表你是管理員。
+
+### 3. 啟用 Windows 隱藏的 Administrator 帳號
+
+Windows 有一個預設被關閉的**內建 Administrator**。可以用管理員權限的 CMD 執行以下指令開啟：
+```cmd
+net user administrator /active:yes
+```
+設定密碼：
+```cmd
+net user administrator *
+```
+之後就能登入 `Administrator`，這個帳號具有**真正完整的管理權限**。
+*(若要關閉，請執行 `net user administrator /active:no`)*
+
+### 4. 取得更高權限：SYSTEM
+
+有些操作（例如 Docker、WSL、核心服務）其實是 SYSTEM 層級 (`SYSTEM > Administrator`)。
+
+開發者常用 PsExec 工具來取得：
+1. 下載 **PsExec** 工具。
+2. 執行指令：
+   ```cmd
+   psexec -i -s cmd.exe
+   ```
+3. 確認身份：你會得到 `NT AUTHORITY\SYSTEM`。
+   ```cmd
+   whoami
+   ```
+   會顯示 `nt authority\system`。
+
+### 5. Windows 權限層級（由低到高）
+
+```text
+User
+ ↓
+Administrator
+ ↓
+SYSTEM
+ ↓
+TrustedInstaller
+```
+*(最高其實是 TrustedInstaller，但通常只有 Windows Update 使用。)*
+
+### 6. Windows + WSL 開發者實務權限組合
+
+如果在做 Docker、WSL、AI agent、Playwright、Supabase 等開發，**最佳模式其實是：**
+
+`Windows Admin + Windows Terminal + WSL root`
+
+而不是一直用 SYSTEM。
+架構建議如下：
+```text
+Windows Admin
+   └─ WSL root (使用 sudo su)
+        └─ docker
+```
 
 ---
 
