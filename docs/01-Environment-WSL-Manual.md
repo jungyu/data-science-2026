@@ -43,7 +43,7 @@
   - [Chapter 6：Docker Compose](#chapter-6docker-compose)
 - [第五階段：全端開發實戰 (Supabase & Web)](#第五階段全端開發實戰-supabase--web)
   - [Chapter 7：Supabase CLI 與後端整合](#chapter-7supabase-cli-與後端整合)
-  - [Chapter 8：配置與資安 (JSON & .env)](#chapter-8配置與資安-json--env)
+  - [Chapter 8：開發者的護身符 (設定檔與資安)](#chapter-8開發者的護身符-設定檔與資安)
 - [🧠 教學小撇步 (Head First Style Tips)](#-教學小撇步-head-first-style-tips)
 
 ---
@@ -74,7 +74,7 @@
 └────────────────────────────────────────────────┘
 ```
 
-> WSL 不是模擬器，不是虛擬機，而是**內嵌在 Windows 裡的真正 Linux 核心**。  
+> WSL 2 對開發者來說幾乎是原生 Linux 體驗，底層由 Windows 啟動的**輕量虛擬機**承載 Linux 核心。  
 > 這意味著你可以同時享受 Windows 的應用生態，以及 Linux 的開發環境。
 
 ---
@@ -295,17 +295,27 @@ ls -la 的輸出範例：
 
 ---
 
+#### 🔐 `sudo` 使用邊界（先講清楚再用）
+
+在初學階段，`sudo` 的確可以減少撞牆，但請遵守這三條：
+1. **可以用 `sudo` 的時機**：安裝套件、啟動系統服務、修改 `/etc` 等系統層設定。
+2. **不要用 `sudo` 的時機**：編輯自己的專案檔案（`~/` 下），避免把檔案擁有者改成 root。
+3. **避免長時間 root shell**：不建議用 `sudo su` 做日常開發，改用「單行命令 + sudo」。
+
+---
+
 #### 🛠️ 任務：享受被拒絕的挫折感
 
 ```bash
-# 嘗試修改系統檔案（你會被拒絕，這很正常！）
-echo "hack" > /etc/hosts
+# 嘗試在系統目錄建立檔案（你會被拒絕，這很正常！）
+touch /usr/local/share/permission-lab.txt
 
 # 你將看到：
-# -bash: /etc/hosts: Permission denied
+# touch: cannot touch '/usr/local/share/permission-lab.txt': Permission denied
 
-# 用 sudo 才能修改（但要非常小心！）
-sudo nano /etc/hosts
+# 這一步使用 sudo，因為你正在寫入系統目錄（/usr/local/share）
+sudo touch /usr/local/share/permission-lab.txt
+sudo rm /usr/local/share/permission-lab.txt
 
 # 查看自己的身份
 whoami
@@ -325,7 +335,8 @@ ls -la test.sh
 #### ⚠️ 防呆區 (Wait, what?)
 
 - **`sudo: command not found`？**  
-  → 某些最小化安裝的 Linux 沒有 sudo，執行 `su root` 切換到 root 使用者
+  → 先確認你是否在 Ubuntu：`cat /etc/os-release`。  
+  → 若是精簡版 Linux，請找助教協助補裝 `sudo`；不建議改成長期使用 root 進行開發。
 
 - **`chmod: invalid mode`？**  
   → 確認你輸入的是 3 位數字（例如 `755`，不是 `75`）
@@ -358,26 +369,36 @@ ls -la test.sh
 #### 🛠️ 任務：在一萬行 log 中找出錯誤
 
 ```bash
-# 先產生一個假的 log 檔案來練習
-cat /var/log/syslog | head -100
+# 先產生一個可重現的練習 log（避免不同系統路徑差異）
+cat > app.log <<'EOF'
+INFO Server started
+ERROR DB connection failed
+INFO Retry request
+ERROR Timeout while calling API
+WARN Disk usage high
+ERROR DB connection failed
+EOF
 
 # 最基本的：grep 搜尋
-grep "ERROR" /var/log/syslog
+grep "ERROR" app.log
 
 # 搭配管線，同時計算有幾行 ERROR
-grep "ERROR" /var/log/syslog | wc -l
+grep "ERROR" app.log | wc -l
 
 # 搜尋並只顯示前 10 筆
-grep "ERROR" /var/log/syslog | head -10
+grep "ERROR" app.log | head -10
 
 # 輸出到檔案（覆蓋）
-grep "ERROR" /var/log/syslog > errors_only.txt
+grep "ERROR" app.log > errors_only.txt
 
 # 輸出到檔案（追加，不覆蓋）
-grep "ERROR" /var/log/syslog >> all_errors.txt
+grep "ERROR" app.log >> all_errors.txt
 
 # 組合技：找錯誤、排序、去重複、存檔
-cat /var/log/syslog | grep "ERROR" | sort | uniq > unique_errors.txt
+grep "ERROR" app.log | sort | uniq > unique_errors.txt
+
+# （選修）如果你的系統有 /var/log/syslog，也可這樣練習：
+# grep "ERROR" /var/log/syslog | head -10
 ```
 
 ---
@@ -510,8 +531,9 @@ git add .
 # 5. 提交 commit（附上有意義的訊息）
 git commit -m "feat: 新增 CLI 基礎指令筆記"
 
-# 6. 推送到 GitHub (因為是 clone 下來的，所以已經設定好遠端連結，直接 push 即可)
-git push
+# 6. 首次推送到 GitHub（明確指定 main，避免 upstream / 分支名卡關）
+git branch -M main
+git push -u origin main
 ```
 
 ---
@@ -536,45 +558,7 @@ git push
 #### 🧱 防呆建議
 
 > 如果你 `git push` 或連線 GitHub 失敗，**不要慌**，讀最後那幾行錯誤訊息。
-
-常見錯誤與解法：
-
-```bash
-# 錯誤：ssh: connect to host github.com port 22: Connection timed out
-# 解法：你的網路環境（如公司或學校防火牆）可能封鎖了 22 Port。
-# 替代方案 1：改用 HTTPS 網址複製與推播專案。
-# 替代方案 2：建立或編輯 ~/.ssh/config 檔案，讓 SSH 改走 443 Port：
-#   Host github.com
-#       Hostname ssh.github.com
-#       Port 443
-#       User git
-
-# 錯誤：403 Forbidden 或 Permission denied (publickey)
-# 解法：代表 GitHub 拒絕了你的存取。
-# 1. 執行 `ssh -T git@github.com` 確認 SSH 公鑰確實已新增至 GitHub。
-# 2. 若使用 HTTPS 且出現 403，請確認你的 Token (PAT) 具備 repo 存取權限。
-# 3. 再三確認你是否有該專案的寫入 (Write) 權限
-
-# 錯誤：不小心重複執行了 `ssh-keygen`，導致電腦舊金鑰被覆蓋、金鑰不匹配
-# 解法：因為電腦本機的金鑰被覆蓋了，原本註冊在 GitHub 上的公鑰就會失效，必須重新綁定。
-# 1. 執行 `cat ~/.ssh/id_ed25519.pub` 重新複製「最新產生」的公鑰內容。
-# 2. 登入 GitHub → 點擊右上角頭像 → Settings → SSH and GPG keys。
-# 3. 將畫面上舊的（失效的）金鑰刪除 (Delete) 以防混淆。
-# 4. 點擊 `New SSH key`，把這把新公鑰貼上去並儲存。
-# 5. 回到終端機重新執行 `ssh -T git@github.com` 確認連線。
-
-# 錯誤：remote: Support for password authentication was removed
-# 解法：使用 Personal Access Token (PAT) 代替密碼
-# 到 GitHub → Settings → Developer settings → Personal access tokens
-
-# 錯誤：error: failed to push some refs
-# 解法：通常是因為遠端有新的進度，先 pull 再 push
-git pull origin main --rebase
-git push origin main
-
-# 錯誤：nothing to commit, working tree clean
-# 這不是錯誤！代表你的檔案已經是最新狀態 ✅
-```
+> 詳細清單請看後方附錄：[Git 常見錯誤與解法](#git-common-errors)。
 
 ---
 
@@ -615,10 +599,14 @@ git push origin main
 #### 🛠️ 任務：啟動 Playwright 自動化爬蟲環境
 
 ```bash
-# 安裝 Docker（在 WSL Ubuntu 內）
+# 安裝 Docker（系統套件安裝需要 sudo）
 sudo apt update
 sudo apt install docker.io -y
-sudo systemctl start docker
+
+# 啟動 Docker 服務（系統服務操作需要 sudo）
+sudo service docker start
+
+# 讓一般使用者可直接執行 docker（一次性設定）
 sudo usermod -aG docker $USER
 # 💡 指令拆解：
 # usermod: 修改使用者帳號屬性的指令
@@ -626,29 +614,29 @@ sudo usermod -aG docker $USER
 # $USER: 這是一個系統環境變數，代表「當前登入的使用者名稱」(例如 aaron)
 # 整句白話文：「把現在的我，加入到可以管理 docker 的群組裡，讓我之後能操作它。」
 
-# 重新登入後，測試 Docker 是否正常
-# 注意：Ubuntu 重視安全性，即便加入了 docker 群組，有時仍會因權限問題無法執行。
-# 因此建議在所有 docker 指令前都加上 sudo，既安全又保險。
+# 套用新群組（或重新開啟終端機）
+newgrp docker
 
-sudo docker --version
+docker --version
 # 執行官方的測試用迷你容器，如果你看到 "Hello from Docker!"
 # 就代表 Docker 引擎的心跳正常，安裝大成功！
-sudo docker run hello-world
+docker run hello-world
 
 # 啟動自動化測試與爬蟲環境 (Playwright)
 # 這裡我們下載並執行微軟官方提供的 Playwright 容器（內建瀏覽器驅動）
-sudo docker run -d -p 8080:8080 --name my-playwright-env mcr.microsoft.com/playwright:v1.40.0-jammy tail -f /dev/null
+# 注意：這個範例是「啟動可進入的開發容器」，不是啟動 Web 服務；8080 映射可先省略
+docker run -d --name my-playwright-env mcr.microsoft.com/playwright:v1.40.0-jammy tail -f /dev/null
 
 # 確認容器正在運行
-sudo docker ps
+docker ps
 
 # 進入容器內部逛逛 (這就是你未來的 MCP Server / Automation 執行基地)
-sudo docker exec -it my-playwright-env /bin/bash
+docker exec -it my-playwright-env /bin/bash
 # (逛完後輸入 exit 退出)
 
 # 停止並刪除容器
-sudo docker stop my-playwright-env
-sudo docker rm my-playwright-env
+docker stop my-playwright-env
+docker rm my-playwright-env
 ```
 
 > **🏠 深度探索：Docker 創造的東西到底存在哪？**
@@ -682,8 +670,13 @@ sudo docker rm my-playwright-env
      ```
   4. 重新開啟你的 Ubuntu 終端機，這時 `sudo systemctl start docker` 就能完美運作了！
 
+- **`permission denied while trying to connect to the Docker daemon socket`？**  
+  → 代表目前使用者尚未套用 `docker` 群組。  
+  → 先執行 `groups` 檢查是否包含 `docker`。若沒有，重新開終端機或執行 `newgrp docker`。
+  → 在你確認群組生效前，可以暫時對單一命令加 `sudo`，但不要養成「所有 docker 都加 sudo」的習慣。
+
 - **`port is already allocated`？**  
-  → 換一個 port：`docker run -d -p 8081:8080 mcr.microsoft.com/playwright:v1.40.0-jammy tail -f /dev/null`
+  → 這通常發生在你真的有映射 port 的情境，換一個 port：`docker run -d -p 8081:8080 --name my-playwright-env mcr.microsoft.com/playwright:v1.40.0-jammy tail -f /dev/null`
 
 ---
 
@@ -705,6 +698,11 @@ sudo docker rm my-playwright-env
 > **💡 為什麼範例用 Postgres 而不是 Supabase？**  
 > 這是個好問題！**Supabase 的核心其實就是 PostgreSQL。**  
 > 在 Chapter 6 我們先學習如何用 Docker 啟動一個「原味」的資料庫（像是在學開手排車）；到了 Chapter 7，我們會改用 Supabase（像是開自動駕駛的特斯拉），它會幫我們把資料庫、API、權限管理全部打包好。學會本章，你才能理解 Supabase 底部是在運作什麼。
+
+> **💡 為什麼教材會搭配 Nginx？**  
+> `postgresql://postgres:postgres@localhost:54322/postgres` 這種是「資料庫連線字串」，給程式或 CLI 用，不是瀏覽器網址。  
+> 課程先放一個 Web 入口（Nginx）是為了讓你確認：**Windows 瀏覽器可以透過 `localhost` 連到 WSL 內的容器服務**。  
+> 到 Chapter 7 的 Supabase 階段，真正用來檢視 PostgreSQL 的網頁管理介面會是 **Supabase Studio (`http://localhost:54323`)**。
 
 ---
 
@@ -774,6 +772,8 @@ docker compose logs -f
 docker compose down
 ```
 
+> 如果你看到 `docker: 'compose' is not a docker command`，請改用舊版指令：`docker-compose up -d` / `docker-compose down`。
+
 ---
 
 ## 第五階段：全端開發實戰 (Supabase & Web)
@@ -787,10 +787,14 @@ docker compose down
 #### 🛠️ 任務：安裝 Supabase CLI 並連線雲端
 
 ```bash
-# 方法一：使用 npm 安裝
+# 0. 前置檢查：Supabase 本地服務依賴 Docker
+docker --version
+docker ps >/dev/null
+
+# 方法一：使用 npm 安裝（需要先有 Node.js）
 npm install -g supabase
 
-# 方法二：使用官方安裝腳本（推薦）
+# 方法二：使用官方安裝腳本（不依賴 Node.js，二選一）
 curl -fsSL https://supabase.com/install.sh | sh
 
 # 確認安裝成功
@@ -799,17 +803,21 @@ supabase --version
 # 登入 Supabase（會開啟瀏覽器驗證）
 supabase login
 
-# 在專案目錄初始化
-mkdir my-supabase-project && cd my-supabase-project
+# 在你的作業 Repo 目錄初始化（範例：cli-notes/week03）
+cd ~/cli-notes
+mkdir -p week03
+cd week03
 supabase init
 
 # 💡 初始化後，你的目錄會長這樣：
-# your-project/
-# ├── [學習週別]/      # 你之前的作業區
-# └── supabase/         # 自動生成的 Supabase 控制中心
-#     ├── config.toml   # 核心設定檔 (API Key、Port 等)
-#     ├── migrations/   # 資料庫遷移紀錄 (Schema)
-#     └── seed.sql      # 初始資料快照
+# week03/
+# ├── docker-compose.yml   # 你的 Docker 練習設定檔
+# ├── config.json          # 你的 JSON 練習檔
+# ├── .env.example         # 變數範本
+# └── supabase/            # 自動生成的 Supabase 控制中心
+#     ├── config.toml
+#     ├── migrations/
+#     └── seed.sql
 
 # 連結到你的雲端專案
 supabase link --project-ref your-project-id
@@ -817,6 +825,17 @@ supabase link --project-ref your-project-id
 # 查看資料庫狀態
 supabase status
 ```
+
+#### ⚠️ 防呆區 (Wait, what?)
+
+- **`supabase login` 無法開啟瀏覽器？**  
+  → 可改用 Access Token：`supabase login --token <your-token>`。
+
+- **`failed to connect to Docker daemon`？**  
+  → 先確認 Docker 有啟動：`sudo service docker start`，再重跑 `supabase start`。
+
+- **`Project ref not found`？**  
+  → 到 Supabase 專案 Dashboard 的 `Settings -> General` 複製正確 `Reference ID`。
 
 ---
 
@@ -846,6 +865,10 @@ supabase start
 
 # 本地資料庫 URL 會顯示在終端機
 # postgresql://postgres:postgres@localhost:54322/postgres
+# 注意：這是給 psql / ORM / 程式碼用的連線字串，不是給瀏覽器開的網址。
+
+# 若要用 Windows 瀏覽器檢視 PostgreSQL 的網頁管理介面，請開：
+# http://localhost:54323   (Supabase Studio)
 
 # 將本地 Schema 推送到雲端
 supabase db push
@@ -881,7 +904,7 @@ supabase stop
 在開發 Supabase 或串接其他第三方服務時，你一定會拿到「API Key」或資料庫密碼。
 **絕對不要把這把鑰匙直接寫在程式碼中，更不要被 `git push` 上傳到 GitHub！** (否則不僅是資安外洩，有些服務甚至會把你帳號停權)。
 
-**開發業界標準實務 (3 步防護)：**
+**開發業界標準實務 (3+1 步防護)：**
 1. **建立 `.env` 檔案（真正的鑰匙）：**
    此檔案會存放真實密碼，而且**只會存在你的本機**。
 2. **建立 `.env.example` 檔案（空鑰匙盒）：**
@@ -893,16 +916,22 @@ supabase stop
 # 在你即將推送到 GitHub 的專案目錄中操作 (例如 week03/)
 
 # 1. 產生真實環境變數檔 (放真 Key)
-echo 'SUPABASE_API_KEY="eyJhbG..."' > .env
+# 建議用編輯器手動輸入，避免把金鑰留在 shell history
+nano .env
+# 填入：SUPABASE_API_KEY="eyJhbG..."
 
 # 2. 產生範本檔 (讓看 Repo 的人知道要填這欄)
-echo 'SUPABASE_API_KEY=""' > .env.example
+nano .env.example
+# 填入：SUPABASE_API_KEY=""
 
 # 3. 把 .env 列入 Git 黑名單！！！
 echo ".env" >> .gitignore
 
 # 此時如果做 git add .
 # Git 就會自動忽略 .env！恭喜你已經擁有了真正的資安觀念。
+
+# 4. 如果你曾經誤加過 .env，立刻取消追蹤（不刪本機檔案）
+git rm --cached .env
 ```
 
 ---
@@ -1101,6 +1130,80 @@ tldr git
 
 ---
 
+<a id="git-common-errors"></a>
+## 🔧 附錄：Git 常見錯誤與解法
+
+### 1. `ssh: connect to host github.com port 22: Connection timed out`
+
+**可能原因：** 你所在的網路（學校/公司）封鎖了 SSH 22 port。  
+**解法：**
+1. 改用 HTTPS 網址進行 clone / push。
+2. 或讓 SSH 走 443 port，在 `~/.ssh/config` 新增：
+
+```sshconfig
+Host github.com
+    Hostname ssh.github.com
+    Port 443
+    User git
+```
+
+3. 重新測試連線：
+
+```bash
+ssh -T git@github.com
+```
+
+### 2. `403 Forbidden` 或 `Permission denied (publickey)`
+
+**可能原因：** GitHub 拒絕存取（身分驗證或授權不足）。  
+**解法：**
+1. 執行 `ssh -T git@github.com`，確認 SSH 公鑰已正確綁定。
+2. 若你使用 HTTPS，請確認 PAT 權杖權限包含 repo 存取。
+3. 確認你對該 repository 具備 Write 權限。
+
+### 3. 重複執行 `ssh-keygen`，導致舊金鑰失效
+
+**現象：** 原本可用，重新產生金鑰後突然無法 push。  
+**解法：**
+1. 重新取得新公鑰：
+
+```bash
+cat ~/.ssh/id_ed25519.pub
+```
+
+2. 到 GitHub `Settings -> SSH and GPG keys`。
+3. 刪除舊金鑰，新增剛複製的新公鑰。
+4. 再次測試：
+
+```bash
+ssh -T git@github.com
+```
+
+### 4. `remote: Support for password authentication was removed`
+
+**原因：** GitHub 已不支援帳號密碼直接推送。  
+**解法：**
+1. 使用 SSH（推薦）。
+2. 若走 HTTPS，改用 PAT（Personal Access Token）。  
+   路徑：GitHub `Settings -> Developer settings -> Personal access tokens`。
+
+### 5. `error: failed to push some refs`
+
+**可能原因：** 遠端分支有新提交，本地落後。  
+**解法：**
+
+```bash
+git pull origin main --rebase
+git push origin main
+```
+
+### 6. `nothing to commit, working tree clean`
+
+這不是錯誤，代表目前沒有未提交變更。  
+若你以為有改檔，先執行 `git status` 與 `git diff` 確認。
+
+---
+
 <a id="windows-admin-rights"></a>
 ## 🔑 補充說明：Windows 權限與系統管理員
 
@@ -1123,34 +1226,15 @@ whoami /groups
 ```
 如果看到 `BUILTIN\Administrators`，代表你是管理員。
 
-### 3. 啟用 Windows 隱藏的 Administrator 帳號
+### 3. 不建議：啟用 Windows 隱藏的 Administrator 帳號（除非 IT 要求）
 
-Windows 有一個預設被關閉的**內建 Administrator**。可以用管理員權限的 CMD 執行以下指令開啟：
-```cmd
-net user administrator /active:yes
-```
-設定密碼：
-```cmd
-net user administrator *
-```
-之後就能登入 `Administrator`，這個帳號具有**真正完整的管理權限**。
-*(若要關閉，請執行 `net user administrator /active:no`)*
+這個帳號權限非常高，課程一般情境不需要。  
+若你的電腦是學校/公司管理裝置，請優先找 IT 或助教協助，不要自行長期啟用。
 
-### 4. 取得更高權限：SYSTEM
+### 4. 不建議在課程中使用 SYSTEM 權限
 
-有些操作（例如 Docker、WSL、核心服務）其實是 SYSTEM 層級 (`SYSTEM > Administrator`)。
-
-開發者常用 PsExec 工具來取得：
-1. 下載 **PsExec** 工具。
-2. 執行指令：
-   ```cmd
-   psexec -i -s cmd.exe
-   ```
-3. 確認身份：你會得到 `NT AUTHORITY\SYSTEM`。
-   ```cmd
-   whoami
-   ```
-   會顯示 `nt authority\system`。
+`SYSTEM` 主要給系統維運與除錯用途，不是一般開發流程的一部分。  
+對本課程而言，通常只需要「臨時 Administrator + WSL 內單次 sudo」就足夠。
 
 ### 5. Windows 權限層級（由低到高）
 
@@ -1167,16 +1251,17 @@ TrustedInstaller
 
 ### 6. Windows + WSL 開發者實務權限組合
 
-如果在做 Docker、WSL、AI agent、Playwright、Supabase 等開發，**最佳模式其實是：**
+如果在做 Docker、WSL、AI agent、Playwright、Supabase 等開發，建議模式是：
 
-`Windows Admin + Windows Terminal + WSL root`
+`Windows 一般帳號 + 必要時以 Administrator 啟動 PowerShell + WSL 一般使用者（需要時單次 sudo）`
 
-而不是一直用 SYSTEM。
+而不是長時間使用 root 或 SYSTEM。
 架構建議如下：
 ```text
-Windows Admin
-   └─ WSL root (使用 sudo su)
-        └─ docker
+Windows User
+   └─ Windows PowerShell (Run as Administrator, 僅安裝階段)
+        └─ WSL User (日常開發)
+             └─ sudo <單次系統命令>
 ```
 
 ---
