@@ -44,6 +44,7 @@
 - [第五階段：全端開發實戰 (Supabase & Web)](#第五階段全端開發實戰-supabase--web)
   - [Chapter 7：Supabase CLI 與後端整合](#chapter-7supabase-cli-與後端整合)
   - [Chapter 8：開發者的護身符 (設定檔與資安)](#chapter-8開發者的護身符-設定檔與資安)
+- [🧭 最短排錯流程圖](#-最短排錯流程圖)
 - [🧠 教學小撇步 (Head First Style Tips)](#-教學小撇步-head-first-style-tips)
 
 ---
@@ -55,6 +56,10 @@
 ---
 
 ### Chapter 0：為什麼要用 WSL？
+
+#### ⏱️ 章節資訊
+- 預估時間：20-30 分鐘
+- 前置條件：Windows 10/11、可使用系統管理員權限的 PowerShell、穩定網路
 
 #### 🖼️ 視覺化：Windows 與 Linux 的關係
 
@@ -155,9 +160,18 @@ wsl --install
 - **WSL 版本不是 2？**  
   → 執行 `wsl --set-default-version 2` 更新預設版本
 
+#### ✅ 完成判準
+- 你可以在 Windows 終端機成功執行 `wsl` 進入 Ubuntu。
+- 你知道自己的 Linux 使用者名稱，且可用 `whoami` 驗證。
+- 你理解 WSL 與 Windows 的角色分工，知道何時在 PowerShell、何時在 Ubuntu 操作。
+
 ---
 
 ### Chapter 1：CLI 的第一課 (Navigation)
+
+#### ⏱️ 章節資訊
+- 預估時間：25 分鐘
+- 前置條件：已完成 Chapter 0，能進入 Ubuntu 終端機
 
 #### 🗺️ 檔案系統對應圖
 
@@ -257,6 +271,11 @@ rm -rf ~/.secret_vault
 2. 你在 `/home/student/documents/`，如何一步到達 `/home/student/projects/scripts/`？
 3. 從任何位置輸入 `cd ~`，你會到哪裡？
 
+#### ✅ 完成判準
+- 你可以不用複製貼上，自行完成 `pwd`、`ls -la`、`cd`、`cat` 的基本操作。
+- 你能清楚說出 `/home/...` 與 `/mnt/c/...` 的差異。
+- 你能獨立建立並刪除一個隱藏資料夾與檔案。
+
 ---
 
 ## 第二階段：Linux 的靈魂 (The Essence)
@@ -266,6 +285,10 @@ rm -rf ~/.secret_vault
 ---
 
 ### Chapter 2：權限與擁有者 (Permissions)
+
+#### ⏱️ 章節資訊
+- 預估時間：20 分鐘
+- 前置條件：已理解 `pwd`、`ls`、`cd` 與家目錄 `~`
 
 #### 🖼️ 視覺化：rwx 數字解碼圖
 
@@ -341,9 +364,18 @@ ls -la test.sh
 - **`chmod: invalid mode`？**  
   → 確認你輸入的是 3 位數字（例如 `755`，不是 `75`）
 
+#### ✅ 完成判準
+- 你能讀懂 `-rwxr-xr--` 這類權限字串。
+- 你知道何時應該用 `sudo`、何時不該用 `sudo`。
+- 你可以用 `chmod 755` 成功改變測試檔案權限並驗證結果。
+
 ---
 
 ### Chapter 3：管線與過濾 (Pipes & Filters)
+
+#### ⏱️ 章節資訊
+- 預估時間：25 分鐘
+- 前置條件：已能操作文字檔案並執行基本 CLI 指令
 
 #### 🧠 大腦體操：廚房水管比喻
 
@@ -417,6 +449,11 @@ grep "ERROR" app.log | sort | uniq > unique_errors.txt
 | `head -n` | 顯示前 n 行 | `head -20 log.txt` |
 | `tail -n` | 顯示後 n 行 | `tail -50 log.txt` |
 
+#### ✅ 完成判準
+- 你可以用 `grep` 找到指定關鍵字並限制輸出筆數。
+- 你可以用 `|`, `>`, `>>` 串接與保存結果。
+- 你可以產生 `unique_errors.txt` 並解釋為什麼要先 `sort` 再 `uniq`。
+
 ---
 
 ## 第三階段：開發者的時光機 (Git)
@@ -426,6 +463,10 @@ grep "ERROR" app.log | sort | uniq > unique_errors.txt
 ---
 
 ### Chapter 4：Git 基礎與遠端協作
+
+#### ⏱️ 章節資訊
+- 預估時間：40 分鐘
+- 前置條件：已完成 Chapter 1、已註冊 GitHub 帳號、可連網
 
 #### 🖼️ 視覺化：本地庫、暫存區、遠端倉庫的三角關係
 
@@ -560,6 +601,11 @@ git push -u origin main
 > 如果你 `git push` 或連線 GitHub 失敗，**不要慌**，讀最後那幾行錯誤訊息。
 > 詳細清單請看後方附錄：[Git 常見錯誤與解法](#git-common-errors)。
 
+#### ✅ 完成判準
+- 你能完成一次 `clone -> add -> commit -> push` 流程。
+- 你可以用 `git status` 說明目前在 working tree / staging 的狀態。
+- 你知道首次推送時應使用 `git push -u origin main`。
+
 ---
 
 ## 第四階段：開發者的標準配備 (Docker)
@@ -569,6 +615,10 @@ git push -u origin main
 ---
 
 ### Chapter 5：容器化思維
+
+#### ⏱️ 章節資訊
+- 預估時間：35 分鐘
+- 前置條件：已完成 Chapter 0、可在 WSL 中使用 `sudo`
 
 #### 🖼️ 視覺化：貨櫃船 vs. 虛擬機
 
@@ -678,9 +728,18 @@ docker rm my-playwright-env
 - **`port is already allocated`？**  
   → 這通常發生在你真的有映射 port 的情境，換一個 port：`docker run -d -p 8081:8080 --name my-playwright-env mcr.microsoft.com/playwright:v1.40.0-jammy tail -f /dev/null`
 
+#### ✅ 完成判準
+- 你可以啟動 Docker 服務並成功執行 `docker run hello-world`。
+- 你可以使用 `docker ps`、`docker exec`、`docker stop`、`docker rm` 完成容器生命週期操作。
+- 你知道 `permission denied ... docker daemon socket` 通常是群組權限未生效造成。
+
 ---
 
 ### Chapter 6：Docker Compose
+
+#### ⏱️ 章節資訊
+- 預估時間：30 分鐘
+- 前置條件：Chapter 5 完成，`docker run hello-world` 可成功
 
 #### 🌉 觀念橋樑：從單一容器到 Docker Compose
 
@@ -774,6 +833,11 @@ docker compose down
 
 > 如果你看到 `docker: 'compose' is not a docker command`，請改用舊版指令：`docker-compose up -d` / `docker-compose down`。
 
+#### ✅ 完成判準
+- 你可以從 `docker-compose.yml` 一鍵啟動並關閉多容器環境。
+- 你可以用 `docker compose ps` 與 `docker compose logs -f` 檢查服務狀態。
+- 你理解 Compose 相對於手動 `docker run` 的優勢。
+
 ---
 
 ## 第五階段：全端開發實戰 (Supabase & Web)
@@ -783,6 +847,10 @@ docker compose down
 ---
 
 ### Chapter 7：Supabase CLI 與後端整合
+
+#### ⏱️ 章節資訊
+- 預估時間：35 分鐘
+- 前置條件：Docker daemon 可運作、已建立 Supabase 帳號
 
 #### 🛠️ 任務：安裝 Supabase CLI 並連線雲端
 
@@ -877,9 +945,18 @@ supabase db push
 supabase stop
 ```
 
+#### ✅ 完成判準
+- 你可以完成 `supabase init`、`supabase link`、`supabase start` 基本流程。
+- 你知道 `postgresql://...` 是連線字串，瀏覽器要看的是 `http://localhost:54323`。
+- 你可以描述「本地開發」與「雲端 Supabase」在流程中的分工。
+
 ---
 
 ### Chapter 8：開發者的護身符 (設定檔與資安)
+
+#### ⏱️ 章節資訊
+- 預估時間：20 分鐘
+- 前置條件：已完成 Chapter 4 與 Chapter 7 的基本操作
 
 #### 📝 觀念 1：JSON 資料建模 (Configuration)
 在現代全端開發中，**JSON** 是最常見的資料交換與設定格式。它就像是 Python 的字典或 JavaScript 的物件。
@@ -933,6 +1010,30 @@ echo ".env" >> .gitignore
 # 4. 如果你曾經誤加過 .env，立刻取消追蹤（不刪本機檔案）
 git rm --cached .env
 ```
+
+#### ✅ 完成判準
+- 你能建立格式正確的 `config.json`。
+- 你能建立 `.env` 與 `.env.example`，並確保真實金鑰不進版控。
+- 你能說明為什麼 `.gitignore` 是資安基本習慣。
+
+---
+
+## 🧭 最短排錯流程圖
+
+卡住時請先走這 6 步，不要直接重灌：
+
+1. **看最後一行錯誤訊息**：先抓關鍵字（`permission denied`、`command not found`、`connection refused`、`publickey`）。
+2. **確認你在哪裡**：`pwd`、`whoami`、`ls`，確認目錄和使用者是否正確。
+3. **確認工具有安裝**：`git --version`、`docker --version`、`supabase --version`。
+4. **確認服務有啟動**：`docker ps`、`supabase status`（必要時 `sudo service docker start`）。
+5. **確認網路與認證**：`ssh -T git@github.com`、重看 token / key / 權限設定。
+6. **最後才做重置動作**：保留錯誤訊息截圖，帶著訊息請助教協助。
+
+快速對照：
+- `command not found`：通常是沒安裝或 PATH 問題。
+- `Permission denied`：先判斷是否系統層操作，再決定是否加 `sudo`。
+- `Connection refused`：服務沒啟動或 port 不對。
+- `failed to push some refs`：先 `git pull --rebase` 再 `git push`。
 
 ---
 
