@@ -1035,6 +1035,41 @@ git rm --cached .env
 - `Connection refused`：服務沒啟動或 port 不對。
 - `failed to push some refs`：先 `git pull --rebase` 再 `git push`。
 
+#### 🌐 補充：WSL2 網路連線故障排除（Connection Timeout）
+
+如果你發現 `ping` 正常，但 `curl` 或 `git push` 時常遇到逾時，這類問題在 WSL2 通常由以下三個原因引起，建議依序排除：
+
+**1. Windows 防火牆攔截 (最常見)**
+Windows 防火牆有時會將 WSL2 的虛擬網卡視為「公用網路」而阻擋其發出的 TCP 443 (HTTPS) 或 22 (SSH) 請求。
+
+- **測試方法**：暫時關閉 Windows Defender 防火牆，看 `curl` 是否恢復正常。
+- **解決方法**：如果關閉後就通了，請在 PowerShell (管理員) 執行以下指令開放權限：
+  ```powershell
+  New-NetFirewallRule -DisplayName "WSL2 Network Access" -Direction Inbound -InterfaceAlias "vEthernet (WSL)" -Action Allow
+  ```
+
+**2. MTU (最大傳輸單元) 設定過大**
+如果你身處的網路環境（例如某些公司 VPN、校園網或是特定路由器）對封包大小有限制，WSL2 預設的 MTU (1500) 可能過大，導致小封包 (Ping) 能過，但建立連線的大封包 (TCP) 被丟棄。
+
+- **嘗試修改 MTU**（在 WSL 內執行）：
+  ```bash
+  sudo ip link set dev eth0 mtu 1400
+  ```
+  修改後再試一次 `curl https://github.com`，如果通了，就是 MTU 的問題。
+
+**3. 代理伺服器 (Proxy) 或網路加速器衝突**
+如果你在 Windows 上有開啟任何代理工具（如系統代理、VPN 或遊戲加速器），它們常會攔截 WSL2 的流量卻處理失敗。
+
+- **檢查**：確保 Windows 代理設定中，沒有干擾到 WSL2 的虛擬橋接。
+
+> **💡 建議下一步操作**
+> 既然你已經測試過 IP 連線也會超時，我建議你優先嘗試調整 MTU：
+> 1. 在 WSL 終端機輸入：`sudo ip link set dev eth0 mtu 1350`
+> 2. 立即執行：`curl -I https://www.google.com`
+>
+> 如果 MTU 調整後依然無效，請確認你的筆電是否有安裝任何第三方防毒軟體或網路過濾軟體（如 Trend Micro, FortiClient 等），這些軟體經常與 WSL2 的虛擬交換器（vSwitch）八字不合。
+
+
 ---
 
 ## 🧠 教學小撇步 (Head First Style Tips)
