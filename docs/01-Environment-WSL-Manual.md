@@ -45,6 +45,8 @@
   - [Chapter 7：Supabase CLI 與後端整合](#chapter-7supabase-cli-與後端整合)
   - [Chapter 8：開發者的護身符 (設定檔與資安)](#chapter-8開發者的護身符-設定檔與資安)
 - [🧭 最短排錯流程圖](#-最短排錯流程圖)
+  - [🌐 Windows 瀏覽器無法連到 WSL2 容器服務](#wsl2-localhost-troubleshooting)
+  - [🪞 WSL2 鏡像模式網路](#-推薦方案wsl2-鏡像模式網路-mirrored-mode-networking)
 - [🧠 教學小撇步 (Head First Style Tips)](#-教學小撇步-head-first-style-tips)
 
 ---
@@ -833,9 +835,41 @@ docker compose down
 
 > 如果你看到 `docker: 'compose' is not a docker command`，請改用舊版指令：`docker-compose up -d` / `docker-compose down`。
 
+---
+
+#### 🌐 驗證：用 Windows 瀏覽器連到 WSL 容器服務
+
+啟動 Compose 後，最重要的一步是**確認 Windows 的 Chrome 能連到 WSL 內的服務**。
+這是後續所有開發工作的基礎（包括 Chapter 7 的 Supabase Studio）。
+
+```bash
+# 先確認容器確實在跑，且 port 有正確映射
+docker compose ps
+# 你應該看到類似：
+# NAME        ... PORTS
+# week03-web-1    0.0.0.0:8080->80/tcp
+# week03-db-1     0.0.0.0:5432->5432/tcp
+```
+
+**打開 Windows 的 Chrome，輸入 `http://localhost:8080`**，你應該看到 Nginx 的歡迎頁面。
+
+> **🚨 如果看到 `ERR_CONNECTION_REFUSED` 或頁面載入不出來？**
+> 這是 WSL2 初學者最常卡關的地方！請依照後方的 [🌐 補充：Windows 瀏覽器無法連到 WSL2 容器服務](#wsl2-localhost-troubleshooting) 逐步排除。
+
+---
+
+#### ⚠️ 防呆區 (Wait, what?)
+
+- **Chrome 打開 `localhost:8080` 顯示 `ERR_CONNECTION_REFUSED`？**
+  → 這是網路穿透問題，不是 Docker 壞掉！請跳到後方 [localhost 連線故障排除](#wsl2-localhost-troubleshooting)。
+
+- **Chrome 打開 `localhost:8080` 一直轉圈 (Loading) 最後逾時？**
+  → 可能是防火牆攔截，請跳到後方 [防火牆排除](#wsl2-localhost-troubleshooting)。
+
 #### ✅ 完成判準
 - 你可以從 `docker-compose.yml` 一鍵啟動並關閉多容器環境。
 - 你可以用 `docker compose ps` 與 `docker compose logs -f` 檢查服務狀態。
+- **你可以在 Windows 的 Chrome 瀏覽器打開 `http://localhost:8080` 看到 Nginx 歡迎頁面。**
 - 你理解 Compose 相對於手動 `docker run` 的優勢。
 
 ---
@@ -896,14 +930,18 @@ supabase status
 
 #### ⚠️ 防呆區 (Wait, what?)
 
-- **`supabase login` 無法開啟瀏覽器？**  
+- **`supabase login` 無法開啟瀏覽器？**
   → 可改用 Access Token：`supabase login --token <your-token>`。
 
-- **`failed to connect to Docker daemon`？**  
+- **`failed to connect to Docker daemon`？**
   → 先確認 Docker 有啟動：`sudo service docker start`，再重跑 `supabase start`。
 
-- **`Project ref not found`？**  
+- **`Project ref not found`？**
   → 到 Supabase 專案 Dashboard 的 `Settings -> General` 複製正確 `Reference ID`。
+
+- **Chrome 打開 `localhost:54323` (Supabase Studio) 顯示 `ERR_CONNECTION_REFUSED`？**
+  → 這是 Chapter 6 就需要解決的 WSL2 網路穿透問題。請回到 [🌐 localhost 連線故障排除](#wsl2-localhost-troubleshooting) 完成排除。
+  → 如果你用的是 Windows 11，最推薦直接啟用 [鏡像模式網路](#wsl2-localhost-troubleshooting) 一次解決。
 
 ---
 
@@ -1033,22 +1071,91 @@ git rm --cached .env
 - `command not found`：通常是沒安裝或 PATH 問題。
 - `Permission denied`：先判斷是否系統層操作，再決定是否加 `sudo`。
 - `Connection refused`：服務沒啟動或 port 不對。
+- `ERR_CONNECTION_REFUSED`（Chrome）：WSL2 網路穿透問題，見 [localhost 連線故障排除](#wsl2-localhost-troubleshooting)。
+- `Connection timeout`（curl / git）：防火牆或 MTU 問題，見 [網路故障排除](#wsl2-localhost-troubleshooting)。
 - `failed to push some refs`：先 `git pull --rebase` 再 `git push`。
 
-#### 🌐 補充：WSL2 網路連線故障排除（Connection Timeout）
+<a id="wsl2-localhost-troubleshooting"></a>
+#### 🌐 補充：Windows 瀏覽器無法連到 WSL2 容器服務（localhost 不通）
 
-如果你發現 `ping` 正常，但 `curl` 或 `git push` 時常遇到逾時，這類問題在 WSL2 通常由以下三個原因引起，建議依序排除：
+> **💡 為什麼這很重要？**
+> 在本課程中，Docker Compose (Chapter 6) 的 Nginx 要用 `localhost:8080` 驗證、Supabase Studio (Chapter 7) 要用 `localhost:54323` 操作資料庫 — 如果 Windows 瀏覽器連不到 WSL2 的服務，後面所有章節都會卡住。
 
-**1. Windows 防火牆攔截 (最常見)**
-Windows 防火牆有時會將 WSL2 的虛擬網卡視為「公用網路」而阻擋其發出的 TCP 443 (HTTPS) 或 22 (SSH) 請求。
+WSL2 內部跑的容器服務，要讓 Windows 的 Chrome 能透過 `localhost` 連到，必須經過一層**網路穿透**。以下是最完整的排除流程：
 
-- **測試方法**：暫時關閉 Windows Defender 防火牆，看 `curl` 是否恢復正常。
-- **解決方法**：如果關閉後就通了，請在 PowerShell (管理員) 執行以下指令開放權限：
+```
+Windows Chrome                WSL2 Ubuntu
+─────────────                ──────────────
+http://localhost:8080  ──?──→  Docker Nginx (port 80)
+                        ↑
+                   這一段可能斷掉！
+                   原因：防火牆 / NAT 模式 / port 衝突
+```
+
+**🔍 第 0 步：先確認容器有在跑（排除 Docker 本身問題）**
+
+```bash
+# 在 WSL 內執行
+docker compose ps
+# 確認 STATE 是 running，且 PORTS 欄位有顯示 0.0.0.0:8080->80/tcp
+
+# 從 WSL 內部測試服務是否正常
+curl -I http://localhost:8080
+# 如果這裡就失敗 → 是 Docker 問題，不是網路穿透問題
+# 如果這裡成功但 Chrome 打不開 → 繼續往下排除
+```
+
+**1. Windows 防火牆攔截 WSL2 流量（最常見！）**
+
+Windows Defender 防火牆可能將 WSL2 的虛擬網卡視為「公用網路」，**同時攔截進出兩個方向的流量**：
+- **出站攔截**：WSL 內 `curl`、`git push` 逾時
+- **入站攔截**：Windows Chrome 連 `localhost` 被拒絕（`ERR_CONNECTION_REFUSED`）
+
+```
+測試方法：
+1. 暫時關閉 Windows Defender 防火牆
+   （Windows 設定 → 隱私權與安全性 → Windows 安全性 → 防火牆與網路保護）
+2. 在 Chrome 重新打開 http://localhost:8080
+3. 如果這時通了 → 確認是防火牆的問題，請執行下方指令永久修復
+```
+
+- **解決方法**：在 PowerShell (管理員) 執行以下指令：
   ```powershell
-  New-NetFirewallRule -DisplayName "WSL2 Network Access" -Direction Inbound -InterfaceAlias "vEthernet (WSL)" -Action Allow
+  # 方法 A：允許 WSL 虛擬網卡的所有流量（最簡單）
+  New-NetFirewallRule -DisplayName "WSL2 Inbound" -Direction Inbound -InterfaceAlias "vEthernet (WSL)" -Action Allow
+  New-NetFirewallRule -DisplayName "WSL2 Outbound" -Direction Outbound -InterfaceAlias "vEthernet (WSL)" -Action Allow
   ```
 
-**2. MTU (最大傳輸單元) 設定過大**
+  ```powershell
+  # 方法 B：如果方法 A 報錯「找不到 vEthernet (WSL)」，改用以下指令
+  # （先查看你的 WSL 虛擬網卡實際名稱）
+  Get-NetAdapter | Where-Object { $_.InterfaceDescription -like "*Hyper-V*" }
+  # 用查到的名稱替換下方的 InterfaceAlias
+  ```
+
+  ```powershell
+  # 方法 C：如果你使用 Windows 11 22H2+ 且啟用了鏡像模式（見下方），
+  # 需要額外設定 Hyper-V 防火牆：
+  Set-NetFirewallHyperVVMSetting -Name '{40E0AC32-46A5-438A-A0B2-2B479E8F2E90}' -DefaultInboundAction Allow
+  ```
+
+> **⚠️ 第三方防毒軟體注意**：Trend Micro, FortiClient, ESET, Kaspersky, Norton 等防毒軟體有自己的防火牆，即使關閉 Windows Defender 防火牆也可能持續攔截。請在這些軟體中也檢查是否有阻擋 WSL 相關的規則。
+
+**2. Windows 上有其他程式佔用了相同 port**
+
+```powershell
+# 在 PowerShell 中檢查誰佔用了 8080 port
+netstat -ano | findstr :8080
+# 或
+Get-NetTCPConnection -LocalPort 8080
+```
+
+如果有其他程式佔用，選擇其中一個解法：
+- 關閉佔用 port 的程式
+- 修改 `docker-compose.yml` 的 port 映射（例如改成 `"8081:80"`），然後 Chrome 改連 `localhost:8081`
+
+**3. MTU (最大傳輸單元) 設定過大**
+
 如果你身處的網路環境（例如某些公司 VPN、校園網或是特定路由器）對封包大小有限制，WSL2 預設的 MTU (1500) 可能過大，導致小封包 (Ping) 能過，但建立連線的大封包 (TCP) 被丟棄。
 
 - **嘗試修改 MTU**（在 WSL 內執行）：
@@ -1057,18 +1164,108 @@ Windows 防火牆有時會將 WSL2 的虛擬網卡視為「公用網路」而阻
   ```
   修改後再試一次 `curl https://github.com`，如果通了，就是 MTU 的問題。
 
-**3. 代理伺服器 (Proxy) 或網路加速器衝突**
+> **💡 注意**：MTU 修改在 WSL 重啟後會失效。如果確認是 MTU 問題，可在 `~/.bashrc` 末尾加入：
+> ```bash
+> sudo ip link set dev eth0 mtu 1400 2>/dev/null
+> ```
+> 這樣每次開啟終端機就會自動套用。
+
+**4. 代理伺服器 (Proxy) 或網路加速器衝突**
+
 如果你在 Windows 上有開啟任何代理工具（如系統代理、VPN 或遊戲加速器），它們常會攔截 WSL2 的流量卻處理失敗。
 
 - **檢查**：確保 Windows 代理設定中，沒有干擾到 WSL2 的虛擬橋接。
+- **測試**：暫時關閉所有代理 / VPN / 加速器，再試一次。
 
-> **💡 建議下一步操作**
-> 既然你已經測試過 IP 連線也會超時，我建議你優先嘗試調整 MTU：
-> 1. 在 WSL 終端機輸入：`sudo ip link set dev eth0 mtu 1350`
-> 2. 立即執行：`curl -I https://www.google.com`
+**5. WSL2 的 localhost 轉發機制故障（重啟大法）**
+
+WSL2 預設的 NAT 模式有一個自動的 localhost 轉發機制，但它偶爾會「卡住」。最快的修復方式：
+
+```powershell
+# 在 PowerShell 中徹底重啟 WSL
+wsl --shutdown
+```
+
+然後重新開啟 Ubuntu，重新 `docker compose up -d`，再試 Chrome。
+
+---
+
+#### 🪞 推薦方案：WSL2 鏡像模式網路 (Mirrored Mode Networking)
+
+> **適用版本**：Windows 11 22H2 以上
 >
-> 如果 MTU 調整後依然無效，請確認你的筆電是否有安裝任何第三方防毒軟體或網路過濾軟體（如 Trend Micro, FortiClient 等），這些軟體經常與 WSL2 的虛擬交換器（vSwitch）八字不合。
+> **💡 如果你正在使用 Windows 11，強烈建議直接啟用鏡像模式**，它能從根本上解決上面大部分的 localhost 連線問題。
 
+WSL2 預設使用 **NAT 模式**，Windows 和 WSL 之間隔了一層虛擬 NAT 閘道，localhost 的穿透靠的是一個不太穩定的自動轉發機制。**鏡像模式**則是將 Windows 的網路介面直接「鏡像」到 Linux，讓兩邊共享同一套網路堆疊：
+
+```
+NAT 模式（預設，容易出問題）：
+Windows ──NAT閘道──→ WSL2 VM（獨立 IP）
+  ↑ localhost 轉發可能斷掉
+
+鏡像模式（推薦）：
+Windows ←──共享網路介面──→ WSL2
+  ↑ localhost 直接互通，不需要轉發
+```
+
+**鏡像模式的優點**：
+- **localhost 直接互通**：Chrome 連 `localhost:8080` 不再經過 NAT 轉發，穩定度大幅提升
+- **改善 VPN 相容性**：傳統 NAT 模式下 VPN 常與 WSL2 衝突，鏡像模式能大幅緩解
+- **IPv6 支援**：原生支援 IPv6 網路
+- **LAN 直連**：區域網路內其他設備可直接連入 WSL2 的服務
+- **多播 (Multicast) 支援**
+
+**啟用方式**：
+
+1. 在 Windows 使用者目錄下建立或編輯 `.wslconfig` 檔案：
+   ```powershell
+   # 在 PowerShell 中執行
+   notepad "$env:USERPROFILE\.wslconfig"
+   ```
+
+2. 加入以下設定：
+   ```ini
+   [wsl2]
+   networkingMode=mirrored
+   dnsTunneling=true
+   autoProxy=true
+   ```
+   > **設定說明**：
+   > - `networkingMode=mirrored`：啟用鏡像模式，Windows 與 WSL 共享網路介面
+   > - `dnsTunneling=true`：透過虛擬化處理 DNS 請求，改善 VPN 環境下的 DNS 解析（Windows 11 22H2+ 預設已開啟）
+   > - `autoProxy=true`：自動將 Windows 的代理伺服器設定同步到 WSL，不需要手動設定 `http_proxy` 等環境變數
+
+3. 重新啟動 WSL：
+   ```powershell
+   wsl --shutdown
+   ```
+
+4. 重新開啟 Ubuntu 終端機，驗證網路：
+   ```bash
+   # 測試對外連線
+   curl -I https://www.google.com
+
+   # 啟動 Docker 服務後，測試 localhost 穿透
+   # (如果你的 docker compose 還在跑)
+   curl -I http://localhost:8080
+   ```
+
+5. 回到 Windows Chrome，打開 `http://localhost:8080`，應該能順利看到頁面。
+
+**⚠️ 啟用鏡像模式後仍需注意**：
+- 如果區域網路內其他設備要連入你的 WSL 服務，需額外設定 Hyper-V 防火牆：
+  ```powershell
+  # 在 PowerShell (管理員) 執行
+  Set-NetFirewallHyperVVMSetting -Name '{40E0AC32-46A5-438A-A0B2-2B479E8F2E90}' -DefaultInboundAction Allow
+  ```
+  或僅開放特定 port（更安全）：
+  ```powershell
+  New-NetFirewallHyperVRule -Name "WSL-Web" -DisplayName "WSL Web Services" -Direction Inbound -VMCreatorId '{40E0AC32-46A5-438A-A0B2-2B479E8F2E90}' -Protocol TCP -LocalPorts 8080,5432,54322,54323
+  ```
+- Windows 10 不支援鏡像模式，請使用前面的防火牆修復方法
+- 如果你有用到 `ip addr` 取得 WSL IP 的腳本，鏡像模式下 IP 會與 Windows 相同，可能需要調整
+
+> 📖 **參考資料**：[微軟官方文件 — WSL 鏡像模式網路](https://learn.microsoft.com/zh-tw/windows/wsl/networking#mirrored-mode-networking)
 
 ---
 
