@@ -936,7 +936,7 @@ docker compose ps
 
 #### ⏱️ 章節資訊
 - 預估時間：35 分鐘
-- 前置條件：Docker daemon 可運作、已建立 Supabase 帳號
+- 前置條件：Docker Desktop 已安裝且 WSL Integration 已啟用（見 Chapter 5）、已建立 Supabase 帳號
 
 #### 🛠️ 任務：安裝 Supabase CLI 並連線雲端
 
@@ -986,7 +986,7 @@ supabase status
   → 可改用 Access Token：`supabase login --token <your-token>`。
 
 - **`failed to connect to Docker daemon`？**
-  → 先確認 Docker 有啟動：`sudo service docker start`，再重跑 `supabase start`。
+  → 先確認 Docker Desktop 有在 Windows 端啟動（系統匣應該有鯨魚圖示），且 WSL Integration 已勾選你的 Ubuntu（見 [Chapter 5](#chapter-5容器化思維)）。確認後重跑 `supabase start`。
 
 - **`Project ref not found`？**
   → 到 Supabase 專案 Dashboard 的 `Settings -> General` 複製正確 `Reference ID`。
@@ -1115,7 +1115,7 @@ git rm --cached .env
 1. **看最後一行錯誤訊息**：先抓關鍵字（`permission denied`、`command not found`、`connection refused`、`publickey`）。
 2. **確認你在哪裡**：`pwd`、`whoami`、`ls`，確認目錄和使用者是否正確。
 3. **確認工具有安裝**：`git --version`、`docker --version`、`supabase --version`。
-4. **確認服務有啟動**：`docker ps`、`supabase status`（必要時 `sudo service docker start`）。
+4. **確認服務有啟動**：`docker ps`、`supabase status`（Docker 不通？確認 Docker Desktop 有在 Windows 端啟動）。
 5. **確認網路與認證**：`ssh -T git@github.com`、重看 token / key / 權限設定。
 6. **最後才做重置動作**：保留錯誤訊息截圖，帶著訊息請助教協助。
 
