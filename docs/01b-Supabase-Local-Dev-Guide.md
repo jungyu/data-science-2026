@@ -223,7 +223,7 @@ config.toml 就像是一張「本地 Supabase 的設定清單」
   - 要不要啟用 Auth？（auth.enabled = true）
 ```
 
-> 💡 **通常不需要改** — 預設值就能用。但如果你的 port 被佔了，這裡可以換。
+> 💡 **通常不需要改** — 預設值就能用。但如果你的 port 被佔了（例如同時跑 Chapter 6 的 compose），可以在這裡換成不同的 port。詳見下方[故障排除：port already in use](#supabase-start-報錯port-already-in-use)。
 
 ---
 
@@ -592,14 +592,97 @@ docker images | grep supabase
 
 ### `supabase start` 報錯：port already in use
 
-某個 port（54321/54322/54323）被其他程式佔了。
+**症狀**：
+```
+Bind for 0.0.0.0:54322 failed: port is already allocated
+```
+
+這代表 Supabase 預設的 port（`54322`）已經被其他容器或服務佔住了。**不是 Supabase 壞掉，是 port 衝突。**
+
+#### 🔍 Step 1：找出誰佔了 port
 
 ```bash
-# 看誰佔了 port
-sudo lsof -i :54322
+# 看所有正在跑的容器及其 port
+docker ps --format "table {{.Names}}\t{{.Ports}}"
 
-# 解法一：停掉佔用的程式
-# 解法二：修改 supabase/config.toml 裡的 port 設定
+# 直接找佔用 54322 的容器
+docker ps --filter "publish=54322"
+
+# 也可以從 Linux 端查
+sudo ss -ltnp | grep 54322
+```
+
+#### 最常見的兩種情境
+
+**情境 A：你自己的 `docker compose` 裡有 PostgreSQL**
+
+你在 Chapter 6 跑了 `docker compose up -d`，那個 compose 裡的 PostgreSQL 可能佔了 `5432` port。雖然不是 `54322`，但如果你之前改過 port 設定就可能撞到。
+
+```bash
+# 查看你的 compose 專案狀態
+docker compose ps
+```
+
+**情境 B：上一次 `supabase start` 沒收乾淨**
+
+`supabase stop` 有時沒完全清掉殘留容器，再次 `supabase start` 就會撞到自己。
+
+#### ⚡ 快速修復：停掉佔用者
+
+```bash
+# 停掉佔用 54322 的容器
+docker stop $(docker ps -q --filter "publish=54322")
+
+# 如果想連容器一起刪除
+docker rm -f $(docker ps -aq --filter "publish=54322")
+
+# 然後重新啟動
+supabase start
+```
+
+#### 🔧 更穩的解法：改 Supabase 本地 port
+
+如果你打算**同時跑**自己的 `docker compose`（Chapter 6 的 Postgres + Adminer）和 Supabase local stack，
+建議直接改 `supabase/config.toml`，讓兩組服務用不同 port，一勞永逸：
+
+```toml
+# supabase/config.toml
+
+[api]
+port = 64321          # API 端點（預設 54321）
+
+[db]
+port = 64322          # PostgreSQL（預設 54322）
+shadow_port = 64320   # Migration 用的影子資料庫（預設 54320）
+major_version = 15
+
+[studio]
+port = 64323          # Studio 管理介面（預設 54323）
+```
+
+改完後：
+
+```bash
+supabase start
+supabase status    # 確認新的 port 有正確生效
+```
+
+> 💡 **改完 port 後，連線資訊也會跟著變**：
+> - Studio 改開 `http://localhost:64323`
+> - 資料庫連線字串改成 `postgresql://postgres:postgres@localhost:64322/postgres`
+> - API 端點改成 `http://localhost:64321`
+
+```
+🧠 大腦體操：Chapter 6 的 compose 和 Supabase 的 port 分配
+
+Chapter 6（你自己的 compose）     Supabase（改過 port 後）
+──────────────────────────       ──────────────────────────
+PostgreSQL   → 5432              PostgreSQL   → 64322
+Adminer      → 8080              Studio       → 64323
+Nginx        → 8088              API          → 64321
+                                 Inbucket     → 64324
+
+👉 完全不衝突，可以同時跑！
 ```
 
 ---
