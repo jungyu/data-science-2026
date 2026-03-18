@@ -841,13 +841,11 @@ nano docker-compose.yml
 **(進入 Nano 編輯畫面後，右鍵貼上以下內容，然後 Ctrl+O -> Enter -> Ctrl+X 存檔離開！)**
 
 ```yaml
-# 建立 docker-compose.yml
-version: '3.8'
-
+# docker-compose.yml
 services:
   # 資料庫服務 (Supabase 的核心就是它！)
   db:
-    image: postgres:15
+    image: postgres:15    # Supabase 預設使用 PostgreSQL 15，保持一致
     environment:
       POSTGRES_USER: student
       POSTGRES_PASSWORD: password123
@@ -857,7 +855,7 @@ services:
     volumes:
       - db_data:/var/lib/postgresql/data
 
-  # 簡單的 Web 應用程式
+  # 簡單的 Web 應用程式（用來驗證 localhost 穿透是否正常）
   web:
     image: nginx:latest
     ports:
@@ -868,6 +866,9 @@ services:
 volumes:
   db_data:
 ```
+
+> **💡 為什麼沒有寫 `version: '3.8'`？**
+> Docker Compose V2（也就是 `docker compose` 指令）已經不需要 `version` 欄位，加了反而會跳出過時警告。如果你在網路上看到範例有寫 `version:`，那是舊版的寫法，可以安全地移除。
 
 ```bash
 # 一鍵啟動所有服務
