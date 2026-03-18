@@ -234,30 +234,50 @@ Docker Compose 有兩個版本，現在只需要知道**新版**：
 ### docker-compose.yml 基本結構
 
 ```yaml
-# docker-compose.yml（檔名不變，只是不需要 version 欄位了）
-services:
-  # 資料庫服務
-  db:
-    image: postgres:15    # 使用的 Docker Image
-    environment:          # 環境變數（設定帳號密碼等）
-      POSTGRES_USER: student
-      POSTGRES_PASSWORD: password123
-      POSTGRES_DB: myapp
-    ports:
-      - "5432:5432"       # 主機 port : 容器 port
-    volumes:
-      - db_data:/var/lib/postgresql/data  # 持久化儲存
+# docker-compose.yml
+name: week03-stack               # 幫容器統一命名前綴
 
-  # Web 伺服器
-  web:
-    image: nginx:latest
+services:
+  postgres:
+    image: postgres:15           # 使用的 Docker Image
+    container_name: week03-postgres
+    restart: unless-stopped      # 意外掛掉自動重啟
+    environment:                 # 環境變數（設定帳號密碼等）
+      POSTGRES_DB: appdb
+      POSTGRES_USER: appuser
+      POSTGRES_PASSWORD: apppassword
+      TZ: Asia/Taipei
     ports:
-      - "8080:80"
-    depends_on:           # 啟動順序：先啟動 db
-      - db
+      - "5432:5432"              # 主機 port : 容器 port
+    volumes:
+      - postgres_data:/var/lib/postgresql/data  # 持久化儲存
+    healthcheck:                 # 讓其他服務確認 DB 已就緒
+      test: ["CMD-SHELL", "pg_isready -U appuser -d appdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  adminer:
+    image: adminer:latest        # 輕量級 DB 管理介面
+    container_name: week03-adminer
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy  # 等 DB 健康檢查通過才啟動
+    ports:
+      - "8080:8080"
+
+  nginx:
+    image: nginx:latest          # 靜態網頁伺服器
+    container_name: week03-nginx
+    restart: unless-stopped
+    ports:
+      - "8088:80"
+    volumes:
+      - ./html:/usr/share/nginx/html:ro  # 掛載本地目錄（唯讀）
 
 volumes:
-  db_data:                # 命名 volume（資料不會因容器刪除而消失）
+  postgres_data:                 # 命名 volume（資料不會因容器刪除而消失）
 ```
 
 > **💡 為什麼沒有寫 `version: '3.8'`？**

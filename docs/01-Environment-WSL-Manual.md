@@ -737,10 +737,10 @@ docker stop my-playwright-env && docker rm my-playwright-env
 > 這是個好問題！**Supabase 的核心其實就是 PostgreSQL。**  
 > 在 Chapter 6 我們先學習如何用 Docker 啟動一個「原味」的資料庫（像是在學開手排車）；到了 Chapter 7，我們會改用 Supabase（像是開自動駕駛的特斯拉），它會幫我們把資料庫、API、權限管理全部打包好。學會本章，你才能理解 Supabase 底部是在運作什麼。
 
-> **💡 為什麼教材會搭配 Nginx？**  
-> `postgresql://postgres:postgres@localhost:54322/postgres` 這種是「資料庫連線字串」，給程式或 CLI 用，不是瀏覽器網址。  
-> 課程先放一個 Web 入口（Nginx）是為了讓你確認：**Windows 瀏覽器可以透過 `localhost` 連到 WSL 內的容器服務**。  
-> 到 Chapter 7 的 Supabase 階段，真正用來檢視 PostgreSQL 的網頁管理介面會是 **Supabase Studio (`http://localhost:54323`)**。
+> **💡 為什麼教材會搭配 Nginx 和 Adminer？**
+> - **Nginx**：讓你用 Chrome 打開 `localhost:8088`，確認 **Windows 瀏覽器可以透過 `localhost` 連到 WSL 內的容器服務**。
+> - **Adminer**：輕量級的資料庫管理介面（只有一個檔案！），讓你用 Chrome 打開 `localhost:8080` 就能瀏覽和操作 PostgreSQL，**不需要學 SQL 指令也能看資料表**。
+> - 到 Chapter 7 的 Supabase 階段，管理介面會換成功能更完整的 **Supabase Studio (`http://localhost:54323`)**。
 
 ---
 
@@ -758,10 +758,22 @@ docker stop my-playwright-env && docker rm my-playwright-env
 有了這些基本功，就可以來建立我們的第一張設定清單了！
 
 ```bash
-# 1. 依照作業規範建立資料夾並進入 (例如 week03)
-mkdir week03 && cd week03
+# 1. 依照作業規範建立資料夾結構
+mkdir -p week03/html && cd week03
 
-# 2. 開啟 Nano 準備撰寫 yaml 設定檔
+# 2. 建立一個簡單的首頁（用來測試 Nginx 是否正常）
+cat > html/index.html << 'EOF'
+<!doctype html>
+<html lang="zh-Hant">
+<head><meta charset="utf-8"><title>week03 local stack</title></head>
+<body>
+  <h1>Docker Compose 啟動成功 🎉</h1>
+  <p>Nginx 正常運作。接下來可以打開 <a href="http://localhost:8080">Adminer</a> 操作資料庫。</p>
+</body>
+</html>
+EOF
+
+# 3. 開啟 Nano 準備撰寫 yaml 設定檔
 nano docker-compose.yml
 ```
 
@@ -769,33 +781,62 @@ nano docker-compose.yml
 
 ```yaml
 # docker-compose.yml
+name: week03-stack
+
 services:
   # 資料庫服務 (Supabase 的核心就是它！)
-  db:
-    image: postgres:15    # Supabase 預設使用 PostgreSQL 15，保持一致
+  postgres:
+    image: postgres:15          # Supabase 預設使用 PostgreSQL 15，保持一致
+    container_name: week03-postgres
+    restart: unless-stopped
     environment:
-      POSTGRES_USER: student
-      POSTGRES_PASSWORD: password123
-      POSTGRES_DB: myapp
+      POSTGRES_DB: appdb
+      POSTGRES_USER: appuser
+      POSTGRES_PASSWORD: apppassword
+      TZ: Asia/Taipei
     ports:
       - "5432:5432"
     volumes:
-      - db_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:                # 讓其他服務確認 DB 真的啟動好了才開始
+      test: ["CMD-SHELL", "pg_isready -U appuser -d appdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  # 簡單的 Web 應用程式（用來驗證 localhost 穿透是否正常）
-  web:
-    image: nginx:latest
-    ports:
-      - "8080:80"
+  # 資料庫管理介面（用瀏覽器操作 PostgreSQL）
+  adminer:
+    image: adminer:latest
+    container_name: week03-adminer
+    restart: unless-stopped
     depends_on:
-      - db
+      postgres:
+        condition: service_healthy   # 等 DB 健康檢查通過才啟動
+    ports:
+      - "8080:8080"
+
+  # 靜態網頁伺服器（驗證 localhost 穿透是否正常）
+  nginx:
+    image: nginx:latest
+    container_name: week03-nginx
+    restart: unless-stopped
+    ports:
+      - "8088:80"
+    volumes:
+      - ./html:/usr/share/nginx/html:ro   # 掛載本地 html/ 目錄（唯讀）
 
 volumes:
-  db_data:
+  postgres_data:
 ```
 
-> **💡 為什麼沒有寫 `version: '3.8'`？**
-> Docker Compose V2（也就是 `docker compose` 指令）已經不需要 `version` 欄位，加了反而會跳出過時警告。如果你在網路上看到範例有寫 `version:`，那是舊版的寫法，可以安全地移除。
+> **💡 這份設定比上一版多了什麼？**
+> - **`name: week03-stack`**：幫容器統一命名前綴，`docker compose ps` 看得更清楚
+> - **`healthcheck`**：PostgreSQL 會先做健康檢查，確認**真的啟動好了** Adminer 才開始連
+> - **`Adminer`**：輕量級 DB 管理介面，用瀏覽器就能操作資料庫，取代原本什麼都看不到的黑盒子
+> - **Nginx bind mount**：你修改 `html/index.html` 後刷新瀏覽器就能即時看到變化
+> - **`restart: unless-stopped`**：容器意外掛掉會自動重啟
+>
+> 為什麼沒有寫 `version: '3.8'`？Docker Compose V2 已經不需要 `version` 欄位，加了反而會跳出 `WARN the attribute 'version' is obsolete` 的過時警告。
 
 ```bash
 # 一鍵啟動所有服務
@@ -828,12 +869,27 @@ docker compose down
 # 先確認容器確實在跑，且 port 有正確映射
 docker compose ps
 # 你應該看到類似：
-# NAME        ... PORTS
-# week03-web-1    0.0.0.0:8080->80/tcp
-# week03-db-1     0.0.0.0:5432->5432/tcp
+# NAME              ... STATE     PORTS
+# week03-postgres       running   0.0.0.0:5432->5432/tcp
+# week03-adminer        running   0.0.0.0:8080->8080/tcp
+# week03-nginx          running   0.0.0.0:8088->80/tcp
 ```
 
-**打開 Windows 的 Chrome，輸入 `http://localhost:8080`**，你應該看到 Nginx 的歡迎頁面。
+**打開 Windows 的 Chrome，驗證這三個服務：**
+
+| 服務 | 網址 | 你應該看到 |
+|------|------|-----------|
+| Nginx | `http://localhost:8088` | 你寫的 HTML 頁面（「Docker Compose 啟動成功」） |
+| Adminer | `http://localhost:8080` | 資料庫登入畫面 |
+| PostgreSQL | （不能用瀏覽器開） | 用 Adminer 或 `psql` 連線 |
+
+> **💡 用 Adminer 連到 PostgreSQL**
+> 打開 `http://localhost:8080` 後，登入資訊如下：
+> - System：**PostgreSQL**
+> - Server：**postgres**（⚠️ 注意：這裡填的是**容器名稱**，不是 `localhost`！因為 Adminer 和 PostgreSQL 在同一個 Docker 網路內）
+> - Username：**appuser**
+> - Password：**apppassword**
+> - Database：**appdb**
 
 > **🚨 如果看到 `ERR_CONNECTION_REFUSED` 或頁面載入不出來？**
 > 這是 WSL2 初學者最常卡關的地方！請依照後方的 [🌐 補充：Windows 瀏覽器無法連到 WSL2 容器服務](#wsl2-localhost-troubleshooting) 逐步排除。
@@ -842,16 +898,20 @@ docker compose ps
 
 #### ⚠️ 防呆區 (Wait, what?)
 
-- **Chrome 打開 `localhost:8080` 顯示 `ERR_CONNECTION_REFUSED`？**
+- **Chrome 打開 `localhost:8088` 或 `localhost:8080` 顯示 `ERR_CONNECTION_REFUSED`？**
   → 這是網路穿透問題，不是 Docker 壞掉！請跳到後方 [localhost 連線故障排除](#wsl2-localhost-troubleshooting)。
 
-- **Chrome 打開 `localhost:8080` 一直轉圈 (Loading) 最後逾時？**
+- **Chrome 一直轉圈 (Loading) 最後逾時？**
   → 可能是防火牆攔截，請跳到後方 [防火牆排除](#wsl2-localhost-troubleshooting)。
+
+- **Adminer 登入後報錯 `connection refused` 或 `could not connect`？**
+  → Server 欄位應該填 **`postgres`**（容器名稱），不是 `localhost`。因為 Adminer 是從 Docker 內部連 DB，要用容器間的網路名稱。
 
 #### ✅ 完成判準
 - 你可以從 `docker-compose.yml` 一鍵啟動並關閉多容器環境。
 - 你可以用 `docker compose ps` 與 `docker compose logs -f` 檢查服務狀態。
-- **你可以在 Windows 的 Chrome 瀏覽器打開 `http://localhost:8080` 看到 Nginx 歡迎頁面。**
+- **你可以在 Chrome 打開 `http://localhost:8088` 看到你寫的 HTML 頁面。**
+- **你可以在 Chrome 打開 `http://localhost:8080` 用 Adminer 登入並看到 PostgreSQL 資料庫。**
 - 你理解 Compose 相對於手動 `docker run` 的優勢。
 
 ---
@@ -1063,14 +1123,15 @@ git rm --cached .env
 #### 🌐 補充：Windows 瀏覽器無法連到 WSL2 容器服務（localhost 不通）
 
 > **💡 為什麼這很重要？**
-> 在本課程中，Docker Compose (Chapter 6) 的 Nginx 要用 `localhost:8080` 驗證、Supabase Studio (Chapter 7) 要用 `localhost:54323` 操作資料庫 — 如果 Windows 瀏覽器連不到 WSL2 的服務，後面所有章節都會卡住。
+> 在本課程中，Docker Compose (Chapter 6) 的 Adminer 要用 `localhost:8080` 管理資料庫、Nginx 要用 `localhost:8088` 驗證網頁、Supabase Studio (Chapter 7) 要用 `localhost:54323` 操作資料庫 — 如果 Windows 瀏覽器連不到 WSL2 的服務，後面所有章節都會卡住。
 
 WSL2 內部跑的容器服務，要讓 Windows 的 Chrome 能透過 `localhost` 連到，必須經過一層**網路穿透**。以下是最完整的排除流程：
 
 ```
 Windows Chrome                WSL2 Ubuntu
 ─────────────                ──────────────
-http://localhost:8080  ──?──→  Docker Nginx (port 80)
+http://localhost:8088  ──?──→  Docker Nginx (port 80)
+http://localhost:8080  ──?──→  Docker Adminer (port 8080)
                         ↑
                    這一段可能斷掉！
                    原因：防火牆 / NAT 模式 / port 衝突
@@ -1084,7 +1145,7 @@ docker compose ps
 # 確認 STATE 是 running，且 PORTS 欄位有顯示 0.0.0.0:8080->80/tcp
 
 # 從 WSL 內部測試服務是否正常
-curl -I http://localhost:8080
+curl -I http://localhost:8088
 # 如果這裡就失敗 → 是 Docker 問題，不是網路穿透問題
 # 如果這裡成功但 Chrome 打不開 → 繼續往下排除
 ```
@@ -1099,7 +1160,7 @@ Windows Defender 防火牆可能將 WSL2 的虛擬網卡視為「公用網路」
 測試方法：
 1. 暫時關閉 Windows Defender 防火牆
    （Windows 設定 → 隱私權與安全性 → Windows 安全性 → 防火牆與網路保護）
-2. 在 Chrome 重新打開 http://localhost:8080
+2. 在 Chrome 重新打開 http://localhost:8088（Nginx）或 http://localhost:8080（Adminer）
 3. 如果這時通了 → 確認是防火牆的問題，請執行下方指令永久修復
 ```
 
@@ -1193,7 +1254,7 @@ Windows ←──共享網路介面──→ WSL2
 ```
 
 **鏡像模式的優點**：
-- **localhost 直接互通**：Chrome 連 `localhost:8080` 不再經過 NAT 轉發，穩定度大幅提升
+- **localhost 直接互通**：Chrome 連 `localhost:8080`、`localhost:8088` 不再經過 NAT 轉發，穩定度大幅提升
 - **改善 VPN 相容性**：傳統 NAT 模式下 VPN 常與 WSL2 衝突，鏡像模式能大幅緩解
 - **IPv6 支援**：原生支援 IPv6 網路
 - **LAN 直連**：區域網路內其他設備可直接連入 WSL2 的服務
@@ -1231,10 +1292,10 @@ Windows ←──共享網路介面──→ WSL2
 
    # 啟動 Docker 服務後，測試 localhost 穿透
    # (如果你的 docker compose 還在跑)
-   curl -I http://localhost:8080
+   curl -I http://localhost:8088
    ```
 
-5. 回到 Windows Chrome，打開 `http://localhost:8080`，應該能順利看到頁面。
+5. 回到 Windows Chrome，打開 `http://localhost:8088`（Nginx）和 `http://localhost:8080`（Adminer），應該都能順利看到頁面。
 
 **⚠️ 啟用鏡像模式後仍需注意**：
 - 如果區域網路內其他設備要連入你的 WSL 服務，需額外設定 Hyper-V 防火牆：
@@ -1244,7 +1305,7 @@ Windows ←──共享網路介面──→ WSL2
   ```
   或僅開放特定 port（更安全）：
   ```powershell
-  New-NetFirewallHyperVRule -Name "WSL-Web" -DisplayName "WSL Web Services" -Direction Inbound -VMCreatorId '{40E0AC32-46A5-438A-A0B2-2B479E8F2E90}' -Protocol TCP -LocalPorts 8080,5432,54322,54323
+  New-NetFirewallHyperVRule -Name "WSL-Web" -DisplayName "WSL Web Services" -Direction Inbound -VMCreatorId '{40E0AC32-46A5-438A-A0B2-2B479E8F2E90}' -Protocol TCP -LocalPorts 8080,8088,5432,54322,54323
   ```
 - Windows 10 不支援鏡像模式，請使用前面的防火牆修復方法
 - 如果你有用到 `ip addr` 取得 WSL IP 的腳本，鏡像模式下 IP 會與 Windows 相同，可能需要調整
