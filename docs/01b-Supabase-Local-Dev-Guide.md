@@ -107,22 +107,33 @@ Supabase   = 整間餐廳
 
 ## 安裝 Supabase CLI
 
-在 WSL Ubuntu 中，選擇一種方式安裝：
+在 WSL Ubuntu 中，從 GitHub Release 直接下載（不依賴 Node.js）：
 
 ```bash
-# 方法一：使用 npm（如果你已經有 Node.js）
-npm install -g supabase
+# 建立個人 bin 目錄（放自己安裝的執行檔）
+mkdir -p ~/bin
+cd /tmp
 
-# 方法二：官方安裝腳本（不依賴 Node.js）
-curl -fsSL https://supabase.com/install.sh | sh
-```
+# 下載最新版 Supabase CLI
+curl -L https://github.com/supabase/cli/releases/latest/download/supabase_linux_amd64.tar.gz -o supabase.tar.gz
 
-驗證安裝：
+# 解壓縮並安裝
+tar -xzf supabase.tar.gz
+chmod +x supabase
+mv supabase ~/bin/supabase
 
-```bash
+# 把 ~/bin 加入 PATH（只需要做一次）
+echo 'export PATH="$HOME/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+
+# 驗證安裝
 supabase --version
-# 👉 應該顯示版本號，例如：1.200.x
+# 👉 應該顯示版本號，例如：2.x.x
 ```
+
+> 💡 **為什麼不用 `npm install -g supabase`？**
+> npm 安裝方式需要先有 Node.js，而且有時會遇到版本衝突或權限問題。
+> 直接從 GitHub 下載 binary 最乾淨、最不容易出問題。
 
 ### 登入 Supabase
 

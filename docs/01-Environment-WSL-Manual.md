@@ -937,11 +937,15 @@ docker compose ps
 docker --version
 docker ps >/dev/null
 
-# 方法一：使用 npm 安裝（需要先有 Node.js）
-npm install -g supabase
-
-# 方法二：使用官方安裝腳本（不依賴 Node.js，二選一）
-curl -fsSL https://supabase.com/install.sh | sh
+# 安裝 Supabase CLI（從 GitHub Release 直接下載，不依賴 Node.js）
+mkdir -p ~/bin
+cd /tmp
+curl -L https://github.com/supabase/cli/releases/latest/download/supabase_linux_amd64.tar.gz -o supabase.tar.gz
+tar -xzf supabase.tar.gz
+chmod +x supabase
+mv supabase ~/bin/supabase
+echo 'export PATH="$HOME/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
 
 # 確認安裝成功
 supabase --version

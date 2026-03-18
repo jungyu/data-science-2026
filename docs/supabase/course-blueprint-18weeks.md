@@ -95,7 +95,12 @@ docker --version
 #### 安裝 Supabase CLI
 
 ```bash
-npm install -g supabase
+# 從 GitHub Release 直接下載（不依賴 Node.js）
+mkdir -p ~/bin && cd /tmp
+curl -L https://github.com/supabase/cli/releases/latest/download/supabase_linux_amd64.tar.gz -o supabase.tar.gz
+tar -xzf supabase.tar.gz && chmod +x supabase && mv supabase ~/bin/supabase
+echo 'export PATH="$HOME/bin:$PATH"' >> ~/.bashrc && source ~/.bashrc
+supabase --version
 ```
 
 #### 初始化專案
