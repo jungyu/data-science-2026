@@ -48,6 +48,7 @@
   - [🌐 Windows 瀏覽器無法連到 WSL2 容器服務](#wsl2-localhost-troubleshooting)
   - [🪞 WSL2 鏡像模式網路](#-推薦方案wsl2-鏡像模式網路-mirrored-mode-networking)
 - [🧠 教學小撇步 (Head First Style Tips)](#-教學小撇步-head-first-style-tips)
+- [🧹 附錄：WSL 完整重置與重新安裝指南](#wsl-reset-reinstall)
 
 ---
 
@@ -620,7 +621,7 @@ git push -u origin main
 
 #### ⏱️ 章節資訊
 - 預估時間：35 分鐘
-- 前置條件：已完成 Chapter 0、可在 WSL 中使用 `sudo`
+- 前置條件：已完成 Chapter 0、可在 WSL 中使用 `sudo`、有 Windows 管理員權限（安裝 Docker Desktop 需要）
 
 #### 🖼️ 視覺化：貨櫃船 vs. 虛擬機
 
@@ -648,32 +649,61 @@ git push -u origin main
 
 ---
 
-#### 🛠️ 任務：啟動 Playwright 自動化爬蟲環境
+#### 🛠️ 任務：安裝 Docker 並啟動 Playwright 自動化爬蟲環境
+
+> **🚨 關鍵觀念：WSL 時代的 Docker 正確安裝方式**
+>
+> ```
+> ❌ 不要在 Ubuntu 裡裝 Docker（sudo apt install docker.io）
+> ✅ 一律用 Docker Desktop + WSL Integration
+> ```
+>
+> 在 WSL 裡自己用 `apt` 裝 Docker 會導致：daemon 跑不起來、沒有 Compose V2 plugin、權限混亂、網路異常等一連串問題。**Docker Desktop 會自動把完整的 `docker` 和 `docker compose` 指令注入 WSL，不需要你手動安裝任何東西。**
+
+##### Step 1：安裝 Docker Desktop（在 Windows 端）
+
+1. 前往 [Docker Desktop 官方下載頁面](https://www.docker.com/products/docker-desktop/) 下載並安裝
+2. 安裝過程中，確認勾選 **Use WSL 2 based engine**
+3. 安裝完成後啟動 Docker Desktop
+
+##### Step 2：開啟 WSL Integration
+
+1. 打開 Docker Desktop → **Settings** → **Resources** → **WSL Integration**
+2. 勾選你的 Ubuntu 發行版（例如 `Ubuntu`）
+3. 點擊 **Apply & Restart**
+
+##### Step 3：重新開啟 WSL 並驗證
+
+```powershell
+# 在 PowerShell 中重啟 WSL
+wsl --shutdown
+```
+
+重新開啟 Ubuntu 終端機，然後執行：
 
 ```bash
-# 安裝 Docker（系統套件安裝需要 sudo）
-sudo apt update
-sudo apt install docker.io -y
+# 確認 docker 指令來自 Docker Desktop（不是 apt 裝的）
+which docker
+# 👉 正常應該顯示：/usr/bin/docker（由 Docker Desktop 注入）
 
-# 啟動 Docker 服務（系統服務操作需要 sudo）
-sudo service docker start
+# 確認版本
+docker version
 
-# 讓一般使用者可直接執行 docker（一次性設定）
-sudo usermod -aG docker $USER
-# 💡 指令拆解：
-# usermod: 修改使用者帳號屬性的指令
-# -aG docker: `-a` (append 附加) 和 `-G` (Group 群組)，意思是「附加到 docker 這個群組中」
-# $USER: 這是一個系統環境變數，代表「當前登入的使用者名稱」(例如 aaron)
-# 整句白話文：「把現在的我，加入到可以管理 docker 的群組裡，讓我之後能操作它。」
+# 確認 Compose V2 plugin 可用（這是關鍵！）
+docker compose version
+# 👉 正常應該顯示：Docker Compose version v2.x.x
 
-# 套用新群組（或重新開啟終端機）
-newgrp docker
-
-docker --version
 # 執行官方的測試用迷你容器，如果你看到 "Hello from Docker!"
 # 就代表 Docker 引擎的心跳正常，安裝大成功！
 docker run hello-world
+```
 
+> **⚠️ 如果 `docker compose version` 報錯 `unknown shorthand flag: 'd' in -d` 或 `'compose' is not a docker command`？**
+> 這代表你的 WSL 裡可能殘留了舊版的 Docker。請參考下方防呆區的 [清除殘留 Docker](#docker-cleanup) 步驟。
+
+##### Step 4：啟動 Playwright 自動化爬蟲環境
+
+```bash
 # 啟動自動化測試與爬蟲環境 (Playwright)
 # 這裡我們下載並執行微軟官方提供的 Playwright 容器（內建瀏覽器驅動）
 # 注意：這個範例是「啟動可進入的開發容器」，不是啟動 Web 服務；8080 映射可先省略
@@ -701,39 +731,59 @@ docker rm my-playwright-env
 
 #### ⚠️ 防呆區 (Wait, what?)
 
-- **`Cannot connect to the Docker daemon` 或遇到 `System has not been booted with systemd` 錯誤？**  
-  如果是前者，通常執行 `sudo service docker start` 就能啟動。  
-  *(💡 觀念補充：`systemctl` 是 Ubuntu 現代的背景服務系統 (systemd)，而 WSL 早期沒啟用它。)*  
+<a id="docker-cleanup"></a>
+- **`unknown shorthand flag: 'd' in -d` 或 `docker: 'compose' is not a docker command`？**
 
-  **🚀 進階解法：在 WSL (Ubuntu 24.04.4 LTS) 中徹底啟用 systemd**  
-  現在的 WSL 已經原生支援 systemd，強烈建議啟用它，這樣才能正常使用 `systemctl`！  
-  1. 編輯設定檔：  
-     ```bash
-     sudo nano /etc/wsl.conf
-     ```
-  2. 貼上這兩行設定，然後存檔離開 (`Ctrl+O`, `Enter`, `Ctrl+X`)：  
-     ```ini
-     [boot]
-     systemd=true
-     ```
-  3. 回到 **Windows PowerShell (系統管理員)**，徹底關閉 WSL：  
-     ```powershell
-     wsl --shutdown
-     ```
-  4. 重新開啟你的 Ubuntu 終端機，這時 `sudo systemctl start docker` 就能完美運作了！
+  > 🚨 **這是最常見的 Docker 問題！** 代表你的 WSL 裡可能殘留了舊版或錯誤的 Docker。
 
-- **`permission denied while trying to connect to the Docker daemon socket`？**  
-  → 代表目前使用者尚未套用 `docker` 群組。  
-  → 先執行 `groups` 檢查是否包含 `docker`。若沒有，重新開終端機或執行 `newgrp docker`。
-  → 在你確認群組生效前，可以暫時對單一命令加 `sudo`，但不要養成「所有 docker 都加 sudo」的習慣。
+  **先診斷：確認你的 docker 是誰**
+  ```bash
+  which docker          # 看 docker 指令來自哪裡
+  docker version        # 看版本資訊
+  docker compose version  # 看 Compose V2 是否可用
+  ```
 
-- **`port is already allocated`？**  
+  **如果 `docker compose version` 報錯，請清除殘留 Docker 後重新整合：**
+  ```bash
+  # 在 WSL Ubuntu 中移除所有殘留的 Docker 套件
+  sudo apt remove -y docker docker.io docker-ce docker-ce-cli containerd runc 2>/dev/null
+  sudo apt autoremove -y
+
+  # 確認沒有殘留
+  which docker
+  # 如果還有殘留的 binary：
+  # sudo rm -f /usr/bin/docker
+  ```
+  然後回到 Docker Desktop → Settings → Resources → WSL Integration，確認你的 Ubuntu 有勾選，點 **Apply & Restart**，最後重啟 WSL（`wsl --shutdown`）再重新進入。
+
+  > 💡 **根本原因**：在 WSL 裡用 `sudo apt install docker.io` 裝的是舊版 Docker，不包含 Compose V2 plugin。Docker Desktop 會自動把完整的 `docker` + `docker compose` 注入 WSL，兩者衝突時會優先用到舊版，導致各種奇怪錯誤。
+
+  **新舊 Compose 指令對照**（了解即可）：
+
+  | 舊版（已淘汰） | 新版（官方標準） |
+  |---------------|----------------|
+  | `docker-compose up -d` | `docker compose up -d` |
+  | 獨立 Python binary | Docker CLI plugin (Go) |
+  | 需另外安裝 | Docker Desktop 內建 |
+
+- **`Cannot connect to the Docker daemon`？**
+  → 確認 Docker Desktop 有在 Windows 端啟動（系統匣應該有鯨魚圖示）。
+  → 確認 WSL Integration 已勾選你的 Ubuntu。
+  → 嘗試重啟：`wsl --shutdown` 後重新進入。
+
+- **`permission denied while trying to connect to the Docker daemon socket`？**
+  → 使用 Docker Desktop 時通常不需要額外設定群組權限。
+  → 先確認 Docker Desktop 的 WSL Integration 有正確啟用。
+  → 如果仍然遇到，嘗試重啟 Docker Desktop 和 WSL。
+
+- **`port is already allocated`？**
   → 這通常發生在你真的有映射 port 的情境，換一個 port：`docker run -d -p 8081:8080 --name my-playwright-env mcr.microsoft.com/playwright:v1.40.0-jammy tail -f /dev/null`
 
 #### ✅ 完成判準
-- 你可以啟動 Docker 服務並成功執行 `docker run hello-world`。
+- Docker Desktop 已安裝，且 WSL Integration 已啟用。
+- 在 WSL 中執行 `docker compose version` 可以看到 `v2.x.x`。
+- 你可以成功執行 `docker run hello-world`。
 - 你可以使用 `docker ps`、`docker exec`、`docker stop`、`docker rm` 完成容器生命週期操作。
-- 你知道 `permission denied ... docker daemon socket` 通常是群組權限未生效造成。
 
 ---
 
@@ -833,7 +883,9 @@ docker compose logs -f
 docker compose down
 ```
 
-> 如果你看到 `docker: 'compose' is not a docker command`，請改用舊版指令：`docker-compose up -d` / `docker-compose down`。
+> **⚠️ 如果你看到 `docker: 'compose' is not a docker command` 或 `unknown shorthand flag: 'd' in -d`？**
+> 這代表你的 Docker 環境不完整。**請不要改用舊版 `docker-compose` 指令**（那是已淘汰的做法）。
+> 請回到 [Chapter 5 防呆區](#docker-cleanup) 按照步驟清除殘留 Docker，確認使用 Docker Desktop + WSL Integration。
 
 ---
 
@@ -1599,5 +1651,205 @@ Windows User
 
 ---
 
-*本手冊採用 Head First 教學風格設計，強調視覺化學習、動手實作與錯誤友善。*  
+<a id="wsl-reset-reinstall"></a>
+## 🧹 附錄：WSL 完整重置與重新安裝指南
+
+> **💡 什麼時候該重裝 WSL？**
+> 如果你的 WSL 環境已經「不可理解」— 例如 Docker daemon 怎麼都啟動不了、套件衝突解不掉、`apt` 壞掉、或開發環境被各種實驗汙染到難以復原 — **重裝是正確的選擇，不是失敗**。
+>
+> 這在玩 Docker / AI / PostgreSQL / Supabase 等複雜開發環境時非常常見。以下是一個**乾淨、可重現的完整流程**。
+
+---
+
+### 第 1 步：確認目前 WSL 狀態
+
+先在 **PowerShell** 列出所有已安裝的子系統：
+
+```powershell
+wsl -l -v
+```
+
+你會看到類似：
+
+```
+NAME      STATE           VERSION
+Ubuntu    Running         2
+```
+
+---
+
+### 第 2 步：備份資料（⚠️ 非常重要！）
+
+> **🚨 一旦移除 = 整個 Linux 檔案系統刪光（包括 `/home` 下的所有檔案、資料庫、Docker volume、設定檔）。**
+
+如果你有重要的東西要保留：
+
+```powershell
+# 匯出整個 Ubuntu 為備份檔（可能需要幾分鐘）
+wsl --export Ubuntu ubuntu-backup.tar
+```
+
+> 💡 **備份存放位置**：這個 `.tar` 檔案會儲存在你執行指令時的當前目錄（通常是 `C:\Users\你的名字\`）。
+> 你也可以指定完整路徑，例如 `wsl --export Ubuntu D:\Backups\ubuntu-backup.tar`。
+
+---
+
+### 第 3 步：停止 WSL
+
+```powershell
+wsl --shutdown
+```
+
+---
+
+### 第 4 步：徹底移除 Ubuntu 子系統
+
+```powershell
+wsl --unregister Ubuntu
+```
+
+這一步會：
+- 刪掉整個 Linux 檔案系統（`/home`、`/etc`、所有安裝的套件）
+- 清空 Docker 映像檔、容器、volume
+- 清空資料庫資料、開發設定
+- 回到「完全沒裝」的狀態
+
+---
+
+### 第 5 步：（選做）清理殘留快取
+
+有時候會殘留 cache 或損壞的 layer，建議做：
+
+```powershell
+# 確認是否還有殘留的發行版
+wsl --list --online
+
+# 刪除 Microsoft Store 的下載快取（選做，有時能修復奇怪 bug）
+Remove-Item "$env:LOCALAPPDATA\Packages\Canonical*" -Recurse -Force
+```
+
+> 💡 如果你之前有遇到 Docker 網路異常、Mount 失敗、或其他怪異 bug，這步清理特別有幫助。
+
+---
+
+### 第 6 步：重新安裝 Ubuntu
+
+```powershell
+# 方法 1（推薦）：安裝預設最新版 Ubuntu
+wsl --install -d Ubuntu
+
+# 方法 2：指定特定版本（例如 22.04 LTS）
+wsl --install -d Ubuntu-22.04
+```
+
+安裝後會自動開啟 Ubuntu 視窗，要求設定：
+- **Username**：你的 Linux 使用者名稱
+- **Password**：你的 Linux 密碼（輸入時不會顯示字元，這是正常的）
+
+> ⚠️ **請務必記住這組帳號密碼！** 之後 `sudo` 指令會用到。
+
+---
+
+### 第 7 步：基本初始化
+
+進入新的 Ubuntu 後，先更新系統套件：
+
+```bash
+sudo apt update && sudo apt upgrade -y
+```
+
+---
+
+### 第 8 步：重建開發環境（建議安裝清單）
+
+如果你是本課程的學生（Docker + Supabase + AI + 全端開發），重建時建議依序安裝：
+
+```bash
+# 基本開發工具
+sudo apt install -y build-essential git curl unzip
+
+# Python
+sudo apt install -y python3 python3-pip
+
+# Node.js（使用 nvm 管理版本，比直接 apt install 更彈性）
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+# 安裝完後重新開啟終端機，再執行：
+# nvm install --lts
+```
+
+**Docker**：
+
+> ```
+> ❌ 不要在 Ubuntu 裡裝 Docker（sudo apt install docker.io）
+> ✅ 一律用 Docker Desktop + WSL Integration
+> ```
+
+Docker **不需要在 WSL 內安裝**。請在 Windows 端安裝 [Docker Desktop](https://www.docker.com/products/docker-desktop/)，然後進入 `Settings → Resources → WSL Integration`，勾選你的 Ubuntu 發行版即可。Docker Desktop 會自動把 `docker` 和 `docker compose` 指令注入 WSL。
+
+詳細步驟請參考 [Chapter 5：容器化思維](#chapter-5容器化思維)。
+
+---
+
+### ⚠️ 重建後的常見注意事項
+
+#### 1. Docker 整合方式
+- **唯一正確做法**：使用 Docker Desktop + WSL Integration
+- **不要在 Ubuntu 裡裝 Docker**（`sudo apt install docker.io` 是錯的）— 會導致沒有 Compose V2、daemon 跑不起來、權限混亂等問題
+- 重裝 WSL 後，只需回到 Docker Desktop → Settings → Resources → WSL Integration，重新勾選新的 Ubuntu 即可
+
+#### 2. PostgreSQL / Supabase
+重裝後所有資料庫資料會清空，包括：
+- Port 映射設定
+- Volume 資料
+- 使用者權限
+
+> 這其實是好事 — 等於你拿到一個乾淨的環境重新開始，不會被舊的設定汙染。
+
+#### 3. 檔案系統效能（重要！）
+你的程式碼**一定要放在 Linux 檔案系統內**：
+
+```
+✅ 正確：/home/你的名字/projects/
+❌ 錯誤：/mnt/c/Users/你的名字/projects/
+```
+
+放在 `/mnt/c/` 下的檔案會因為跨檔案系統存取而**嚴重拖慢**編譯速度、Docker build、`git` 操作等。
+
+---
+
+### 🔥 進階：建立可快速重建的「乾淨基底映像」
+
+如果你之後會常做重裝（或想在不同電腦快速複製環境），可以在設定好基本開發環境後，匯出一份「乾淨基底」：
+
+```powershell
+# 設定好基本環境後，匯出為基底映像
+wsl --export Ubuntu clean-base.tar
+```
+
+之後可以用這個基底**秒級重建**環境：
+
+```powershell
+# 匯入為新的發行版（可取不同名字，多套並存）
+wsl --import UbuntuDev C:\WSL\UbuntuDev clean-base.tar
+
+# 啟動
+wsl -d UbuntuDev
+```
+
+> 💡 **這招超實用！** 你可以維護多個用途不同的環境（開發用、實驗用、乾淨測試用），壞了隨時從基底重建。
+
+---
+
+### 📋 最短版速查（給熟手用）
+
+```powershell
+wsl --shutdown
+wsl --unregister Ubuntu
+wsl --install -d Ubuntu
+# → 設定帳號密碼 → sudo apt update && sudo apt upgrade -y → 完成
+```
+
+---
+
+*本手冊採用 Head First 教學風格設計，強調視覺化學習、動手實作與錯誤友善。*
 *版本：1.0 | 最後更新：2026 年 3 月*
