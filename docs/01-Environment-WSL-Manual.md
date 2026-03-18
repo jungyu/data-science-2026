@@ -38,7 +38,7 @@
   - [Chapter 3：管線與過濾 (Pipes & Filters)](#chapter-3管線與過濾-pipes--filters)
 - [第三階段：開發者的時光機 (Git)](#第三階段開發者的時光機-git)
   - [Chapter 4：Git 基礎與遠端協作](#chapter-4git-基礎與遠端協作)
-- [第四階段：開發者的標準配備 (Docker)](#第四階段開發者的標準配備-docker)
+- [第四階段：開發者的標準配備 (Docker)](#第四階段開發者的標準配備-docker) → 📖 [完整 Docker 指南](01a-Docker-Desktop-WSL-Guide.md)
   - [Chapter 5：容器化思維](#chapter-5容器化思維)
   - [Chapter 6：Docker Compose](#chapter-6docker-compose)
 - [第五階段：全端開發實戰 (Supabase & Web)](#第五階段全端開發實戰-supabase--web)
@@ -649,7 +649,7 @@ git push -u origin main
 
 ---
 
-#### 🛠️ 任務：安裝 Docker 並啟動 Playwright 自動化爬蟲環境
+#### 🛠️ 任務：安裝 Docker Desktop 並驗證
 
 > **🚨 關鍵觀念：WSL 時代的 Docker 正確安裝方式**
 >
@@ -658,126 +658,53 @@ git push -u origin main
 > ✅ 一律用 Docker Desktop + WSL Integration
 > ```
 >
-> 在 WSL 裡自己用 `apt` 裝 Docker 會導致：daemon 跑不起來、沒有 Compose V2 plugin、權限混亂、網路異常等一連串問題。**Docker Desktop 會自動把完整的 `docker` 和 `docker compose` 指令注入 WSL，不需要你手動安裝任何東西。**
+> 在 WSL 裡用 `apt` 裝 Docker 會導致：daemon 跑不起來、沒有 Compose V2 plugin、權限混亂、網路異常。
+> **Docker Desktop 會自動把完整的 `docker` 和 `docker compose` 指令注入 WSL，不需要你在 Linux 裡安裝任何東西。**
 
-##### Step 1：安裝 Docker Desktop（在 Windows 端）
+**請依照 [Docker Desktop 與 WSL 整合使用指南](01a-Docker-Desktop-WSL-Guide.md) 完成以下步驟：**
 
-1. 前往 [Docker Desktop 官方下載頁面](https://www.docker.com/products/docker-desktop/) 下載並安裝
-2. 安裝過程中，確認勾選 **Use WSL 2 based engine**
-3. 安裝完成後啟動 Docker Desktop
+1. [安裝 Docker Desktop](01a-Docker-Desktop-WSL-Guide.md#安裝-docker-desktop)（在 Windows 端，[官方下載頁面](https://www.docker.com/products/docker-desktop/)）
+2. [開啟 WSL Integration](01a-Docker-Desktop-WSL-Guide.md#開啟-wsl-integration)（Docker Desktop → Settings → Resources → WSL Integration → 勾選 Ubuntu）
+3. [驗證安裝](01a-Docker-Desktop-WSL-Guide.md#驗證安裝)（在 WSL 中執行 `docker compose version` 確認看到 `v2.x.x`）
 
-##### Step 2：開啟 WSL Integration
-
-1. 打開 Docker Desktop → **Settings** → **Resources** → **WSL Integration**
-2. 勾選你的 Ubuntu 發行版（例如 `Ubuntu`）
-3. 點擊 **Apply & Restart**
-
-##### Step 3：重新開啟 WSL 並驗證
-
-```powershell
-# 在 PowerShell 中重啟 WSL
-wsl --shutdown
-```
-
-重新開啟 Ubuntu 終端機，然後執行：
+安裝驗證完成後，試跑你的第一個容器：
 
 ```bash
-# 確認 docker 指令來自 Docker Desktop（不是 apt 裝的）
-which docker
-# 👉 正常應該顯示：/usr/bin/docker（由 Docker Desktop 注入）
-
-# 確認版本
-docker version
-
-# 確認 Compose V2 plugin 可用（這是關鍵！）
-docker compose version
-# 👉 正常應該顯示：Docker Compose version v2.x.x
-
-# 執行官方的測試用迷你容器，如果你看到 "Hello from Docker!"
-# 就代表 Docker 引擎的心跳正常，安裝大成功！
+# 執行官方測試容器，看到 "Hello from Docker!" 就代表成功！
 docker run hello-world
-```
 
-> **⚠️ 如果 `docker compose version` 報錯 `unknown shorthand flag: 'd' in -d` 或 `'compose' is not a docker command`？**
-> 這代表你的 WSL 裡可能殘留了舊版的 Docker。請參考下方防呆區的 [清除殘留 Docker](#docker-cleanup) 步驟。
-
-##### Step 4：啟動 Playwright 自動化爬蟲環境
-
-```bash
-# 啟動自動化測試與爬蟲環境 (Playwright)
-# 這裡我們下載並執行微軟官方提供的 Playwright 容器（內建瀏覽器驅動）
-# 注意：這個範例是「啟動可進入的開發容器」，不是啟動 Web 服務；8080 映射可先省略
+# 啟動 Playwright 自動化測試環境（微軟官方容器，內建瀏覽器驅動）
 docker run -d --name my-playwright-env mcr.microsoft.com/playwright:v1.40.0-jammy tail -f /dev/null
 
 # 確認容器正在運行
 docker ps
 
-# 進入容器內部逛逛 (這就是你未來的 MCP Server / Automation 執行基地)
+# 進入容器內部逛逛（這就是你未來的 Automation 執行基地）
 docker exec -it my-playwright-env /bin/bash
 # (逛完後輸入 exit 退出)
 
 # 停止並刪除容器
-docker stop my-playwright-env
-docker rm my-playwright-env
+docker stop my-playwright-env && docker rm my-playwright-env
 ```
-
-> **🏠 深度探索：Docker 創造的東西到底存在哪？**
->
-> 這是最多人問的問題！既然我沒看到檔案夾，那 Docker 把資料藏哪了？
-> 1. **容器與映像檔**：它們存放在一個由 Docker 管理的「虛擬硬碟」中。在 Windows WSL 中，這個檔案通常藏在 `%LOCALAPPDATA%/Docker/wsl/data/ext4.vhdx`。這是一個大黑盒子，為了效能，Docker 不建議你直接去翻它。
-> 2. **持久化的資料 (Volumes)**：我們在 `docker-compose.yml` 寫的 `volumes`。如果你想要檔案直接「掉」在你的 Windows 資料夾裡方便你讀取，那就要用 **Bind Mount (路徑映射)**，把 Linux 某個路徑與 Windows 目錄連起來。我們在後續專案會用到！
 
 ---
 
 #### ⚠️ 防呆區 (Wait, what?)
 
 <a id="docker-cleanup"></a>
-- **`unknown shorthand flag: 'd' in -d` 或 `docker: 'compose' is not a docker command`？**
+> 完整的故障排除流程請見 [Docker Desktop 故障排除](01a-Docker-Desktop-WSL-Guide.md#故障排除)，以下是快速摘要：
 
-  > 🚨 **這是最常見的 Docker 問題！** 代表你的 WSL 裡可能殘留了舊版或錯誤的 Docker。
-
-  **先診斷：確認你的 docker 是誰**
-  ```bash
-  which docker          # 看 docker 指令來自哪裡
-  docker version        # 看版本資訊
-  docker compose version  # 看 Compose V2 是否可用
-  ```
-
-  **如果 `docker compose version` 報錯，請清除殘留 Docker 後重新整合：**
-  ```bash
-  # 在 WSL Ubuntu 中移除所有殘留的 Docker 套件
-  sudo apt remove -y docker docker.io docker-ce docker-ce-cli containerd runc 2>/dev/null
-  sudo apt autoremove -y
-
-  # 確認沒有殘留
-  which docker
-  # 如果還有殘留的 binary：
-  # sudo rm -f /usr/bin/docker
-  ```
-  然後回到 Docker Desktop → Settings → Resources → WSL Integration，確認你的 Ubuntu 有勾選，點 **Apply & Restart**，最後重啟 WSL（`wsl --shutdown`）再重新進入。
-
-  > 💡 **根本原因**：在 WSL 裡用 `sudo apt install docker.io` 裝的是舊版 Docker，不包含 Compose V2 plugin。Docker Desktop 會自動把完整的 `docker` + `docker compose` 注入 WSL，兩者衝突時會優先用到舊版，導致各種奇怪錯誤。
-
-  **新舊 Compose 指令對照**（了解即可）：
-
-  | 舊版（已淘汰） | 新版（官方標準） |
-  |---------------|----------------|
-  | `docker-compose up -d` | `docker compose up -d` |
-  | 獨立 Python binary | Docker CLI plugin (Go) |
-  | 需另外安裝 | Docker Desktop 內建 |
+- **`unknown shorthand flag: 'd' in -d` 或 `'compose' is not a docker command`？**
+  → WSL 裡殘留了舊版 Docker。請照 [清除步驟](01a-Docker-Desktop-WSL-Guide.md#殘留舊版-docker-清除) 移除後重啟。
 
 - **`Cannot connect to the Docker daemon`？**
-  → 確認 Docker Desktop 有在 Windows 端啟動（系統匣應該有鯨魚圖示）。
-  → 確認 WSL Integration 已勾選你的 Ubuntu。
-  → 嘗試重啟：`wsl --shutdown` 後重新進入。
+  → 確認 Docker Desktop 有在 Windows 端啟動（系統匣有鯨魚圖示 🐳），且 WSL Integration 已勾選。
 
-- **`permission denied while trying to connect to the Docker daemon socket`？**
-  → 使用 Docker Desktop 時通常不需要額外設定群組權限。
-  → 先確認 Docker Desktop 的 WSL Integration 有正確啟用。
-  → 如果仍然遇到，嘗試重啟 Docker Desktop 和 WSL。
+- **`permission denied ... docker daemon socket`？**
+  → 使用 Docker Desktop 時不需要設定群組權限，重啟 Docker Desktop 和 WSL 即可。
 
 - **`port is already allocated`？**
-  → 這通常發生在你真的有映射 port 的情境，換一個 port：`docker run -d -p 8081:8080 --name my-playwright-env mcr.microsoft.com/playwright:v1.40.0-jammy tail -f /dev/null`
+  → 換一個 port，例如 `-p 8081:8080`。
 
 #### ✅ 完成判準
 - Docker Desktop 已安裝，且 WSL Integration 已啟用。
@@ -887,6 +814,8 @@ docker compose down
 > **⚠️ 如果你看到 `docker: 'compose' is not a docker command` 或 `unknown shorthand flag: 'd' in -d`？**
 > 這代表你的 Docker 環境不完整。**請不要改用舊版 `docker-compose` 指令**（那是已淘汰的做法）。
 > 請回到 [Chapter 5 防呆區](#docker-cleanup) 按照步驟清除殘留 Docker，確認使用 Docker Desktop + WSL Integration。
+
+> 📖 **想深入了解？** 更多 Compose 日常操作指令、Image 下載過程說明、資料存放位置等，請參考 [Docker Desktop 與 WSL 整合使用指南](01a-Docker-Desktop-WSL-Guide.md)。
 
 ---
 
