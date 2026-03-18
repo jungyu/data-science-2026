@@ -15,6 +15,7 @@
 
 - [Supabase 到底是什麼？（30 秒版）](#supabase-到底是什麼30-秒版)
 - [你的本地開發架構長什麼樣？](#你的本地開發架構長什麼樣)
+- [前置安裝：Node.js v20+](#前置安裝nodejs-v20)
 - [安裝 Supabase CLI](#安裝-supabase-cli)
 - [初始化專案：supabase init](#初始化專案supabase-init)
 - [啟動本地服務：supabase start](#啟動本地服務supabase-start)
@@ -102,6 +103,39 @@ Supabase   = 整間餐廳
 > **為什麼需要 Docker？**
 > `supabase start` 會在背後用 Docker 啟動一整組容器（PostgreSQL、PostgREST、GoTrue、Studio 等），
 > 讓你在**完全離線**的情況下也能開發，不需要連到雲端。
+
+---
+
+## 前置安裝：Node.js v20+
+
+Supabase CLI 本身不需要 Node.js，但後續的前端開發（Next.js / React）和 `supabase gen types` 等工具鏈會用到。建議在安裝 Supabase CLI 之前先把 Node.js 準備好。
+
+> **⚠️ 不要用 `sudo apt install nodejs`！**
+> Ubuntu 套件庫裡的 Node.js 版本通常很舊（v12 ~ v18），而且升級不方便。
+> 使用 **nvm（Node Version Manager）** 可以輕鬆安裝、切換任意版本。
+
+```bash
+# 1. 安裝 nvm（Node 版本管理工具）
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+
+# 2. 載入 nvm（或重新開啟終端機）
+source ~/.bashrc
+
+# 3. 安裝 Node.js v20（目前 LTS 穩定版）
+nvm install 20
+
+# 4. 驗證
+node -v    # 👉 應該顯示 v20.x.x
+npm -v     # 👉 應該顯示 10.x.x
+```
+
+> 💡 **nvm 常用指令速查**：
+> ```bash
+> nvm ls              # 列出已安裝的版本
+> nvm install 22      # 安裝 Node.js v22
+> nvm use 20          # 切換到 v20
+> nvm alias default 20  # 設定預設版本（每次開終端機自動用這個）
+> ```
 
 ---
 

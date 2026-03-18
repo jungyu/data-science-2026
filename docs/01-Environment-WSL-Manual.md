@@ -1768,10 +1768,12 @@ sudo apt install -y build-essential git curl unzip
 # Python
 sudo apt install -y python3 python3-pip
 
-# Node.js（使用 nvm 管理版本，比直接 apt install 更彈性）
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
-# 安裝完後重新開啟終端機，再執行：
-# nvm install --lts
+# Node.js v20+（使用 nvm 管理版本，比直接 apt install 更彈性）
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+source ~/.bashrc
+nvm install 20
+node -v   # 應該顯示 v20.x.x
+npm -v    # 應該顯示 10.x.x
 ```
 
 **Docker**：
