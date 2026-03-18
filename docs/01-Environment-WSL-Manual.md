@@ -41,7 +41,7 @@
 - [第四階段：開發者的標準配備 (Docker)](#第四階段開發者的標準配備-docker) → 📖 [完整 Docker 指南](01a-Docker-Desktop-WSL-Guide.md)
   - [Chapter 5：容器化思維](#chapter-5容器化思維)
   - [Chapter 6：Docker Compose](#chapter-6docker-compose)
-- [第五階段：全端開發實戰 (Supabase & Web)](#第五階段全端開發實戰-supabase--web)
+- [第五階段：全端開發實戰 (Supabase & Web)](#第五階段全端開發實戰-supabase--web) → 📖 [完整 Supabase 指南](01b-Supabase-Local-Dev-Guide.md)
   - [Chapter 7：Supabase CLI 與後端整合](#chapter-7supabase-cli-與後端整合)
   - [Chapter 8：開發者的護身符 (設定檔與資安)](#chapter-8開發者的護身符-設定檔與資安)
 - [🧭 最短排錯流程圖](#-最短排錯流程圖)
@@ -863,6 +863,8 @@ docker compose ps
 ---
 
 ### Chapter 7：Supabase CLI 與後端整合
+
+> 📖 **完整教學**：本章提供入門概覽。完整的安裝流程、日常開發工作流、Migration 管理、故障排除，請見 [Supabase 本地開發與 Docker + WSL 實務指南](01b-Supabase-Local-Dev-Guide.md)。
 
 #### ⏱️ 章節資訊
 - 預估時間：35 分鐘
