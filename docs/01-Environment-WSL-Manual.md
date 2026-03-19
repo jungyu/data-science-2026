@@ -868,14 +868,10 @@ docker compose ps
   → `./crawler` 目錄還不存在。建立一個佔位 Dockerfile 讓 compose 可以正常啟動：
   ```bash
   mkdir -p ~/week03/crawler
-  cat > ~/week03/crawler/Dockerfile << 'EOF'
-  FROM mcr.microsoft.com/playwright/python:v1.49.0-noble
-  WORKDIR /app
-  CMD ["sleep", "infinity"]
-  EOF
+  printf 'FROM python:3.11-slim\nCMD ["sleep", "infinity"]\n' > ~/week03/crawler/Dockerfile
   docker compose up -d
   ```
-  爬蟲章節會再替換這個 Dockerfile 為正式版本。
+  這是輕量佔位用途（不含 Playwright），爬蟲章節會替換為正式版本。
 
 #### ✅ 完成判準
 - 你可以從 `docker-compose.yml` 一鍵啟動並關閉多容器環境。
