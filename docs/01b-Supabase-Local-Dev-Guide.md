@@ -22,7 +22,7 @@
 - [啟動本地服務：supabase start](#啟動本地服務supabase-start)
   - [第一次啟動會很慢（這很正常！）](#第一次啟動會很慢這很正常)
   - [啟動完成後你會拿到什麼？](#啟動完成後你會拿到什麼)
-- [連結雲端專案：supabase link](#連結雲端專案supabase-link)
+- [連結雲端專案：supabase link](#連結雲端專案supabase-link)（部署用，非本地開發必要步驟）
 - [Supabase Studio：你的資料庫管理介面](#supabase-studio你的資料庫管理介面)
 - [日常開發工作流](#日常開發工作流)
   - [建立資料表（Migration）](#建立資料表migration)
@@ -211,18 +211,9 @@ supabase --version
 > npm 安裝方式需要先有 Node.js，而且有時會遇到版本衝突或權限問題。
 > 直接從 GitHub 下載 binary 最乾淨、最不容易出問題。
 
-### 登入 Supabase
-
-```bash
-supabase login
-```
-
-這會開啟瀏覽器讓你授權。
-
-> **⚠️ WSL 無法自動開啟瀏覽器？**
-> 這在 WSL 裡很常見。改用 Access Token 登入：
-> 1. 到 [Supabase Dashboard](https://supabase.com/dashboard) → 左下角齒輪 → Access Tokens → Generate New Token
-> 2. 執行：`supabase login --token <你的 token>`
+> **💡 本地開發不需要登入**
+> `supabase init` 和 `supabase start` 完全離線運作，不需要帳號、不需要 `supabase login`。
+> 登入只有在要把本地 Schema **同步到雲端**時才需要（見後面的[連結雲端專案](#連結雲端專案supabase-link)章節）。
 
 ---
 
@@ -363,21 +354,29 @@ service_role key: eyJhbG...（另一串）
 
 ## 連結雲端專案：supabase link
 
-如果你已經在 [Supabase Dashboard](https://supabase.com/dashboard) 建立了雲端專案，可以把本地和雲端連起來：
+> **⚠️ 這個章節是部署用途，本地開發不需要執行。**
+> 先確認 `supabase start` 能正常運作再來看這裡。
+
+本地開發完成後，想把 Schema 同步到雲端 Supabase 時：
 
 ```bash
-# 取得你的 Project Reference ID
-# 到 Supabase Dashboard → Settings → General → Reference ID
-# 它長這樣：abcdefghijklmnop
+# Step 1：登入（只需要做一次）
+supabase login
+# WSL 無法開啟瀏覽器？改用 Access Token：
+# supabase login --token <token>
+# （到 Dashboard → 左下角齒輪 → Access Tokens → Generate New Token）
 
+# Step 2：連結雲端專案
+# Project ref 在 Supabase Dashboard → Settings → General → Reference ID
 supabase link --project-ref <你的-reference-id>
-```
 
-連結後，你就可以在本地和雲端之間同步資料庫結構（Schema）。
+# Step 3：推送本地 Schema 到雲端
+supabase db push
+```
 
 > **⚠️ `Project ref not found`？**
 > 到 Supabase Dashboard 的 `Settings → General` 確認 Reference ID 有沒有複製對。
-> 不是專案名稱，是那串英文亂碼。
+> 不是專案名稱，是那串英文字母亂碼。
 
 ---
 
@@ -458,31 +457,36 @@ supabase db reset
 
 ### 本地 ↔ 雲端同步
 
+**開發流程概念**：在本地寫好、測好，再推上雲端。這樣雲端永遠是「已確認可以跑」的版本。
+
 ```
-🗺️ 同步流程圖：
+🗺️ 開發到部署的完整流程：
 
-  本地開發                              雲端 (Supabase Cloud)
-  ────────                              ──────────────────────
-  supabase/migrations/
-  ├── 001_create_users.sql
-  ├── 002_add_posts.sql               supabase db push
-  └── 003_add_comments.sql    ─────────────────────→   雲端資料庫
-                                                        (套用 Migration)
+  本地（supabase start）                 雲端（Supabase Cloud）
+  ──────────────────────                 ──────────────────────
+  1. 寫 migration SQL
+  2. supabase db reset（在本地測試）
+  3. 確認功能正確
+                          supabase db push
+  4. ─────────────────────────────────→  套用到雲端資料庫
+                                         （正式環境更新）
 
-  supabase db pull              ←─────────────────────
-  (把雲端變更拉回本地)                                   雲端上手動改的東西
+  如果有人在雲端 Dashboard 手動改了東西：
+  ←─────────────────────────────────────
+                          supabase db pull
+  （拉回本地，保持同步）
 ```
 
 ```bash
-# 把本地的 migration 推送到雲端
+# 推送本地 migration 到雲端（需先 supabase link）
 supabase db push
 
-# 把雲端的資料庫結構拉回本地（如果有人在雲端手動改了東西）
+# 把雲端結構拉回本地（有人在雲端手動改表結構時用）
 supabase db pull
 ```
 
 > **⚠️ 最佳實務**：永遠在本地寫 migration → push 到雲端。
-> 避免在雲端 Dashboard 手動改結構（會造成本地和雲端不同步）。
+> 避免在雲端 Dashboard 直接改結構——改完後本地和雲端會不同步，之後 `db push` 會出錯。
 
 ---
 
