@@ -238,47 +238,26 @@ Docker Compose 有兩個版本，現在只需要知道**新版**：
 name: week03-stack               # 幫容器統一命名前綴
 
 services:
-  postgres:
-    image: postgres:15           # 使用的 Docker Image
-    container_name: week03-postgres
-    restart: unless-stopped      # 意外掛掉自動重啟
-    environment:                 # 環境變數（設定帳號密碼等）
-      POSTGRES_DB: appdb
-      POSTGRES_USER: appuser
-      POSTGRES_PASSWORD: apppassword
-      TZ: Asia/Taipei
-    ports:
-      - "5432:5432"              # 主機 port : 容器 port
-    volumes:
-      - postgres_data:/var/lib/postgresql/data  # 持久化儲存
-    healthcheck:                 # 讓其他服務確認 DB 已就緒
-      test: ["CMD-SHELL", "pg_isready -U appuser -d appdb"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  adminer:
-    image: adminer:latest        # 輕量級 DB 管理介面
-    container_name: week03-adminer
-    restart: unless-stopped
-    depends_on:
-      postgres:
-        condition: service_healthy  # 等 DB 健康檢查通過才啟動
-    ports:
-      - "8080:8080"
-
   nginx:
-    image: nginx:latest          # 靜態網頁伺服器
+    image: nginx:alpine          # 靜態網頁伺服器 / 反向代理
     container_name: week03-nginx
-    restart: unless-stopped
+    restart: unless-stopped      # 意外掛掉自動重啟
     ports:
-      - "8088:80"
+      - "8080:80"                # 主機 port : 容器 port
     volumes:
       - ./html:/usr/share/nginx/html:ro  # 掛載本地目錄（唯讀）
 
-volumes:
-  postgres_data:                 # 命名 volume（資料不會因容器刪除而消失）
+  crawler:
+    build: ./crawler             # 從本地 Dockerfile 建置
+    container_name: week03-crawler
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:                 # 環境變數
+      QDRANT_URL: http://qdrant:6333
 ```
+
+> **💡 完整專案模板**（含 qdrant、mcp-server）請見 [`_project-fullstack/docker-compose.yml`](../_project-fullstack/docker-compose.yml)。
 
 > **💡 為什麼沒有寫 `version: '3.8'`？**
 > Docker Compose V2 已經不需要 `version` 欄位，加了反而會跳出過時警告：

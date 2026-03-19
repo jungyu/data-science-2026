@@ -15,6 +15,7 @@
 
 - [Supabase 到底是什麼？（30 秒版）](#supabase-到底是什麼30-秒版)
 - [你的本地開發架構長什麼樣？](#你的本地開發架構長什麼樣)
+  - [為什麼 Supabase 不放進 docker-compose.yml？](#-等等它用-docker為什麼不直接放進我的-docker-composeyml)
 - [前置安裝：Node.js v20+](#前置安裝nodejs-v20)
 - [安裝 Supabase CLI](#安裝-supabase-cli)
 - [初始化專案：supabase init](#初始化專案supabase-init)
@@ -103,6 +104,47 @@ Supabase   = 整間餐廳
 > **為什麼需要 Docker？**
 > `supabase start` 會在背後用 Docker 啟動一整組容器（PostgreSQL、PostgREST、GoTrue、Studio 等），
 > 讓你在**完全離線**的情況下也能開發，不需要連到雲端。
+
+---
+
+### 🤔 等等，它用 Docker，為什麼不直接放進我的 docker-compose.yml？
+
+這是個很好的問題。答案是：**它有自己的 docker-compose.yml，而且比你想像的複雜很多。**
+
+執行 `supabase start` 時，CLI 會在背後自動生成並執行一份內建的 compose 設定，啟動超過 10 個容器：
+
+```
+supabase_db          PostgreSQL 15（含 pgvector）
+supabase_auth        GoTrue（認證服務）
+supabase_rest        PostgREST（自動生成 REST API）
+supabase_realtime    Elixir 即時推播引擎
+supabase_storage     物件儲存服務
+supabase_imgproxy    圖片處理代理
+supabase_inbucket    本地 Email 測試服務
+supabase_studio      Studio 管理介面
+supabase_kong        API Gateway（統一入口）
+supabase_vector      日誌收集
+...（還有更多）
+```
+
+如果要自己把這些寫進 `docker-compose.yml`，等於要自己維護 Supabase 的整個基礎設施——版本升級、設定同步、服務互依都要自己處理。
+
+**Supabase CLI 做的事**，就是把這份複雜度完全封裝起來，讓你只需要一個指令：
+
+```bash
+supabase start   # 背後幫你跑好所有 10+ 個容器
+supabase stop    # 全部關掉
+supabase status  # 查看所有服務狀態與連線資訊
+```
+
+**結論：兩套 Docker 系統並行，各管各的**
+
+```
+supabase start        → 管理 Supabase 的 10+ 個容器（你不需要碰）
+docker compose up -d  → 管理你自己的容器（nginx、crawler、qdrant…）
+```
+
+它們都跑在同一個 Docker Desktop 上，互不衝突。你的容器要連 Supabase 的 PostgreSQL，透過 `host.docker.internal:54322` 就能做到。
 
 ---
 
@@ -602,21 +644,21 @@ Bind for 0.0.0.0:54322 failed: port is already allocated
 #### 🔍 Step 1：找出誰佔了 port
 
 ```bash
-# 看所有正在跑的容器及其 port
+# 看所有正在跑的容器及其 port（含 supabase 容器）
 docker ps --format "table {{.Names}}\t{{.Ports}}"
 
-# 直接找佔用 54322 的容器
-docker ps --filter "publish=54322"
+# 用容器名稱篩選 supabase 相關容器（比 publish filter 更可靠）
+docker ps --filter "name=supabase"
 
-# 也可以從 Linux 端查
+# 從 Linux 端查哪個 PID 佔了 54322
 sudo ss -ltnp | grep 54322
 ```
 
 #### 最常見的兩種情境
 
-**情境 A：你自己的 `docker compose` 裡有 PostgreSQL**
+**情境 A：你自己的 `docker compose` 有服務佔用相關 port**
 
-你在 Chapter 6 跑了 `docker compose up -d`，那個 compose 裡的 PostgreSQL 可能佔了 `5432` port。雖然不是 `54322`，但如果你之前改過 port 設定就可能撞到。
+你在 Chapter 6 跑了 `docker compose up -d`（nginx:8080、crawler:3001），通常不會佔到 Supabase 的 port（54321~54325）。但如果你曾經修改過 port 設定，可能會撞到。
 
 ```bash
 # 查看你的 compose 專案狀態
@@ -629,21 +671,41 @@ docker compose ps
 
 #### ⚡ 快速修復：停掉佔用者
 
-```bash
-# 停掉佔用 54322 的容器
-docker stop $(docker ps -q --filter "publish=54322")
+> **⚠️ `--filter "publish=54322"` 不可靠**：這個 Docker 篩選器只比對 port mapping 字串格式，Supabase 容器有時不符合條件，回傳空值導致指令無效。請用下方方法替代。
 
-# 如果想連容器一起刪除
-docker rm -f $(docker ps -aq --filter "publish=54322")
+**方法 1：用 `supabase stop` 直接清乾淨（最推薦）**
+```bash
+supabase stop --no-backup
+supabase start
+```
+
+**方法 2：用容器名稱找到並刪除**
+```bash
+# Supabase 容器名稱都有 "supabase_" 前綴
+docker ps | grep supabase
+
+# 看到容器後，用名稱刪除（支援部分名稱匹配）
+docker rm -f $(docker ps -aq --filter "name=supabase")
 
 # 然後重新啟動
 supabase start
 ```
 
+**方法 3：從 port 反查容器（最精確）**
+```bash
+# 在 WSL 內查出佔用 54322 的 PID
+sudo ss -ltnp | grep 54322
+
+# 或用 lsof（需要先安裝：sudo apt install lsof）
+sudo lsof -i :54322
+
+# 找到 PID 後，再查是哪個容器
+docker ps -q | xargs docker inspect --format '{{.State.Pid}} {{.Name}}' | grep <PID>
+```
+
 #### 🔧 更穩的解法：改 Supabase 本地 port
 
-如果你打算**同時跑**自己的 `docker compose`（Chapter 6 的 Postgres + Adminer）和 Supabase local stack，
-建議直接改 `supabase/config.toml`，讓兩組服務用不同 port，一勞永逸：
+如果你打算**同時跑**自己的 `docker compose`（Chapter 6 的 nginx + crawler）和 Supabase local stack，兩組服務預設 port 不重疊，通常不需要改。但若遇到衝突，可改 `supabase/config.toml` 讓 Supabase 改用不同 port：
 
 ```toml
 # supabase/config.toml
@@ -675,14 +737,15 @@ supabase status    # 確認新的 port 有正確生效
 ```
 🧠 大腦體操：Chapter 6 的 compose 和 Supabase 的 port 分配
 
-Chapter 6（你自己的 compose）     Supabase（改過 port 後）
-──────────────────────────       ──────────────────────────
-PostgreSQL   → 5432              PostgreSQL   → 64322
-Adminer      → 8080              Studio       → 64323
-Nginx        → 8088              API          → 64321
-                                 Inbucket     → 64324
+你自己的 docker compose          Supabase（supabase start 預設）
+──────────────────────────       ──────────────────────────────
+Nginx        → 8080              PostgreSQL   → 54322
+Crawler      → 3001              Studio       → 54323
+Qdrant       → 6333 (Stage 2)   API          → 54321
+MCP Server   → 3000 (Stage 3)   Inbucket     → 54324
 
 👉 完全不衝突，可以同時跑！
+（若改過 config.toml，Supabase port 前綴從 54 改 64）
 ```
 
 ---
