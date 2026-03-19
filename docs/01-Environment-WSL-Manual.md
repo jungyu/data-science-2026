@@ -903,10 +903,12 @@ docker compose ps
 > 你的 API 之後會同時連這兩套（Supabase 提供 DB + Auth，Qdrant 提供向量搜尋）。
 
 #### ⏱️ 章節資訊
-- 預估時間：35 分鐘
-- 前置條件：Docker Desktop 已安裝且 WSL Integration 已啟用（見 Chapter 5）、已建立 Supabase 帳號
+- 預估時間：40 分鐘
+- 前置條件：Docker Desktop 已安裝且 WSL Integration 已啟用（見 Chapter 5）
 
-#### 🛠️ 任務：安裝 Supabase CLI 並連線雲端
+---
+
+#### 🛠️ 任務 A：安裝 CLI 並啟動本地開發環境（主要學習目標）
 
 ```bash
 # 0. 前置檢查：Supabase 本地服務依賴 Docker
@@ -926,91 +928,97 @@ source ~/.bashrc
 # 確認安裝成功
 supabase --version
 
-# 登入 Supabase（會開啟瀏覽器驗證）
-supabase login
-
-# 在你的作業 Repo 目錄初始化（範例：cli-notes/week03）
-cd ~/cli-notes
-mkdir -p week03
-cd week03
+# 在你的作業 Repo 目錄初始化
+cd ~/week03
 supabase init
 
 # 💡 初始化後，你的目錄會長這樣：
 # week03/
-# ├── docker-compose.yml   # Qdrant + Nginx（專案基礎設施，之後會繼續擴充）
-# ├── config.json          # 你的 JSON 練習檔
-# ├── .env.example         # 變數範本
+# ├── docker-compose.yml   # nginx + crawler（Chapter 6 建的）
+# ├── crawler/             # 佔位 Dockerfile
 # └── supabase/            # 自動生成的 Supabase 控制中心
 #     ├── config.toml
 #     ├── migrations/
 #     └── seed.sql
 
-# 連結到你的雲端專案
-supabase link --project-ref your-project-id
-
-# 查看資料庫狀態
-supabase status
+# 啟動本地 Supabase（第一次會下載 Docker image，需要幾分鐘）
+supabase start
 ```
 
-#### ⚠️ 防呆區 (Wait, what?)
-
-- **`supabase login` 無法開啟瀏覽器？**
-  → 可改用 Access Token：`supabase login --token <your-token>`。
-
-- **`failed to connect to Docker daemon`？**
-  → 先確認 Docker Desktop 有在 Windows 端啟動（系統匣應該有鯨魚圖示），且 WSL Integration 已勾選你的 Ubuntu（見 [Chapter 5](#chapter-5容器化思維)）。確認後重跑 `supabase start`。
-
-- **`Project ref not found`？**
-  → 到 Supabase 專案 Dashboard 的 `Settings -> General` 複製正確 `Reference ID`。
-
-- **Chrome 打開 `localhost:54323` (Supabase Studio) 顯示 `ERR_CONNECTION_REFUSED`？**
-  → 這是 Chapter 6 就需要解決的 WSL2 網路穿透問題。請回到 [🌐 localhost 連線故障排除](#wsl2-localhost-troubleshooting) 完成排除。
-  → 如果你用的是 Windows 11，最推薦直接啟用 [鏡像模式網路](#wsl2-localhost-troubleshooting) 一次解決。
-
----
-
-#### 🔗 整合：本地開發 + 雲端佈署架構
+啟動完成後，終端機會印出連線資訊：
 
 ```
-開發環境 (WSL)
-─────────────────────────────────────────
-┌─────────────────────────────────────┐
-│  你的應用程式 (Next.js / React)     │
-│                                     │
-│  開發時 ─→ Docker 本地 Postgres     │
-│  佈署時 ─→ Supabase 雲端資料庫      │
-└─────────────────────────────────────┘
-         │
-         │ supabase db push (同步 Schema)
-         ▼
-┌─────────────────────────────────────┐
-│         Supabase Cloud              │
-│   (PostgreSQL + Auth + Storage)     │
-└─────────────────────────────────────┘
+         API URL: http://127.0.0.1:54321
+          DB URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+      Studio URL: http://127.0.0.1:54323
 ```
+
+> **💡 這三個 URL 分別是什麼？**
+> - `54321`：API 端點，給你的程式碼呼叫
+> - `54322`：資料庫連線字串，給 psql / ORM 用，**不能用瀏覽器開**
+> - `54323`：Supabase Studio 管理介面，**用 Chrome 開這個**
 
 ```bash
-# 啟動本地 Supabase（包含完整服務）
-supabase start
+# 用 Windows Chrome 打開 Studio
+# http://localhost:54323
 
-# 本地資料庫 URL 會顯示在終端機
-# postgresql://postgres:postgres@localhost:54322/postgres
-# 注意：這是給 psql / ORM / 程式碼用的連線字串，不是給瀏覽器開的網址。
-
-# 若要用 Windows 瀏覽器檢視 PostgreSQL 的網頁管理介面，請開：
-# http://localhost:54323   (Supabase Studio)
-
-# 將本地 Schema 推送到雲端
-supabase db push
+# 查看所有服務狀態
+supabase status
 
 # 停止本地服務
 supabase stop
 ```
 
+---
+
+#### 🛠️ 任務 B：連結雲端專案（部署用，需要 Supabase 帳號）
+
+> 本地開發不需要帳號。這個步驟是在你想把本地 Schema 同步到雲端時才需要。
+
+```bash
+# 登入 Supabase（會開啟瀏覽器驗證）
+supabase login
+
+# 連結到你的雲端專案
+# Project ref 在 Supabase Dashboard → Settings → General 取得
+supabase link --project-ref your-project-id
+
+# 將本地 Schema 推送到雲端
+supabase db push
+```
+
+```
+本地開發環境（WSL）          雲端
+────────────────            ──────────────────────
+supabase start              Supabase Cloud
+（本機 DB :54322）   ──→    （PostgreSQL + Auth + Storage）
+                   db push
+```
+
+---
+
+#### ⚠️ 防呆區 (Wait, what?)
+
+- **`failed to connect to Docker daemon`？**
+  → 先確認 Docker Desktop 有在 Windows 端啟動（系統匣應該有鯨魚圖示），且 WSL Integration 已勾選你的 Ubuntu（見 [Chapter 5](#chapter-5容器化思維)）。
+
+- **`supabase start` 跑很久或卡住？**
+  → 第一次啟動需要下載多個 Docker image（共約 1~2 GB），視網速而定。用 `docker ps` 確認容器有陸續出現就是正常的。
+
+- **`supabase login` 無法開啟瀏覽器？**
+  → 可改用 Access Token：`supabase login --token <your-token>`（到 Supabase Dashboard → Account → Access Tokens 產生）。
+
+- **`Project ref not found`？**
+  → 到 Supabase 專案 Dashboard 的 `Settings → General` 複製正確 `Reference ID`。
+
+- **Chrome 打開 `localhost:54323` 顯示 `ERR_CONNECTION_REFUSED`？**
+  → 這是 Chapter 6 就需要解決的 WSL2 網路穿透問題。請回到 [🌐 localhost 連線故障排除](#wsl2-localhost-troubleshooting) 完成排除。
+
 #### ✅ 完成判準
-- 你可以完成 `supabase init`、`supabase link`、`supabase start` 基本流程。
-- 你知道 `postgresql://...` 是連線字串，瀏覽器要看的是 `http://localhost:54323`。
-- 你可以描述「本地開發」與「雲端 Supabase」在流程中的分工。
+- **`supabase start` 能成功啟動**，終端機印出連線資訊。
+- **Chrome 能打開 `http://localhost:54323`** 看到 Supabase Studio。
+- 你知道 `54322` 是程式連的、`54323` 是瀏覽器開的。
+- 你能描述「本地開發」與「連結雲端」的差別及各自用途。
 
 ---
 
