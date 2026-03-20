@@ -16,9 +16,10 @@ Ch01 → Ch02 → Ch03 → Ch04 → Ch05 → Ch06
   ↓
 第二部分：整合上線
 ─────────────────────────────────────
-Module A → Module B
-MCP Server  Dashboard
-（必修）    （必修，擇一出口）
+Pre-A  →  Module A  →  Module B
+爬蟲       MCP Server   Dashboard
+存資料      包裝工具     視覺化介面
+（必修）   （必修）     （必修，擇一出口）
   ↓
 期末作品：RAG + MCP + 可展示的視覺化介面
 ```
@@ -42,6 +43,7 @@ MCP Server  Dashboard
 
 | 模組 | 標題 | 核心技術 | 狀態 |
 |------|------|----------|------|
+| [Pre-A](module-pre-a-crawler.md) | ETL Pipeline — 把知識存進 Qdrant | Playwright、Chunking、Embedding | 必修 |
 | [Module A](module-a-mcp-server.md) | MCP Server | FastAPI、MCP 協議、SSE | 必修 |
 | [Module B](module-b-dashboard.md) | Dashboard + AI 側欄 | Next.js、Chart.js、Mermaid | 必修 |
 
