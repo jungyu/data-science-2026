@@ -10,8 +10,21 @@ name: ds-project
 
 services:
 
+  # ── [STAGE 4 解鎖] Next.js Dashboard ─────────────────────────
+  # 整合方式：將 _project-nextjs/ 複製到 ./frontend/，取消下方註解
+  # frontend:
+  #   build: ./frontend
+  #   container_name: ds-frontend
+  #   restart: unless-stopped
+  #   environment:
+  #     MCP_SERVER_URL: http://mcp-server:3000   # 容器內網路，不需 localhost
+  #     OPENAI_API_KEY: ${OPENAI_API_KEY}
+  #   depends_on:
+  #     - mcp-server
+
   # 反向代理：統一對外入口
-  # / → 前端靜態檔，/api/ → mcp-server，/webhook/ → Bot webhook
+  # Stage 1-3：/ → 靜態檔（frontend/dist）
+  # Stage 4 解鎖後：/ → Next.js 服務（frontend:4000）
   # 路由規則見 nginx/default.conf
   nginx:
     image: nginx:alpine

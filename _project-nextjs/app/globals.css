@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Mermaid 圖表容器 */
+.mermaid-container svg {
+  max-width: 100%;
+  height: auto;
+}
+
+/* 聊天訊息中的程式碼區塊 */
+.chat-content pre {
+  @apply bg-base-300 rounded-lg p-3 my-2 overflow-x-auto text-sm;
+}
+
+/* Streaming 游標動畫 */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+.cursor-blink::after {
+  content: '▋';
+  animation: blink 1s step-end infinite;
+  @apply text-primary;
+}
