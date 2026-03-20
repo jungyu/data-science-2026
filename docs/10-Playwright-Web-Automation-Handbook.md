@@ -5,6 +5,51 @@
 
 ---
 
+## 與 RAG 課程的銜接
+
+> 本手冊是**通用爬蟲參考書**（Unit 3），與 RAG 課程的爬蟲服務定位不同。以下說明兩者關係。
+
+```
+本手冊（Unit 3）                    RAG Pre-A（整合上線）
+─────────────────────               ─────────────────────────────
+通用爬蟲技術                  →     直接使用：crawler.py 的 /crawl 端點
+反偵測 / Session / 代理        →     升級路徑：當 /crawl 被封鎖時
+DataScout playwright_base      →     對應：原生 async_playwright
+sync_playwright（同步 API）    →     對應：async_playwright（非同步 API）
+```
+
+**API 對照**：RAG 爬蟲服務（`_project-fullstack/crawler/crawler.py`）使用非同步 API：
+
+```python
+# 本手冊的寫法（同步）
+from playwright.sync_api import sync_playwright
+with sync_playwright() as p:
+    browser = p.chromium.launch()
+    page = browser.new_page()
+    page.goto(url)
+    text = page.inner_text("body")
+
+# RAG crawler.py 的寫法（非同步，FastAPI 相容）
+from playwright.async_api import async_playwright
+async def fetch_page_text(url: str) -> str:
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        page = await browser.new_page()
+        await page.goto(url, wait_until="networkidle")
+        text = await page.inner_text("body")
+        await browser.close()
+        return text
+```
+
+**學習建議**：
+- 先跑通 Pre-A 的 `/crawl` 端點（已內建 Playwright）
+- 遇到「頁面抓不到」時，回到本手冊查對應章節（第五章反偵測、第八章代理）
+- 需要批次抓取複雜網站時，參考本手冊的 `playwright_base` 框架，再接回 `/crawl/text` 端點
+
+> 📎 相關文件：[RAG Pre-A — ETL Pipeline](RAG/module-pre-a-crawler.md)
+
+---
+
 ## 這本手冊適合誰？
 
 ✅ 用 `requests` 抓不到資料，因為頁面是 JavaScript 動態渲染的

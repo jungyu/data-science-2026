@@ -45,6 +45,8 @@
 | 編號 | 教材 | 對應 Unit | 說明 |
 |------|------|-----------|------|
 | 01 | [WSL 環境手冊](01-Environment-WSL-Manual.md) | Unit 0 | Windows 子系統 Linux 開發環境建置 |
+| 01a | [Docker Desktop + WSL 指南](01a-Docker-Desktop-WSL-Guide.md) | Unit 0 | Docker Desktop 搭配 WSL2 完整設定 |
+| 01b | [Supabase 本地開發指南](01b-Supabase-Local-Dev-Guide.md) | Unit 7 | Supabase CLI 本地環境與 port 衝突排解 |
 | 02 | [Git 版本控制手冊](02-Git-Version-Control-Manual.md) | Unit 5 | Git 完整操作指南 |
 | 03 | [Markdown & Frontmatter](03-Markdown-Frontmatter-Handbook.md) | Unit 0 | 文檔寫作規範與 YAML 前導區 |
 | 04 | [Chrome DevTools](04-Chrome-DevTools-Manual.md) | Unit 3 | 瀏覽器開發者工具偵錯指南 |
@@ -53,7 +55,7 @@
 | 07 | [CSV / JSON 格式](07-CSV-JSON-Data-Formats-Manual.md) | Unit 3 | 資料交換格式完整指南 |
 | 08 | [資料收集策略](08-Data-Collection-Strategy-Handbook.md) | Unit 8 | 資料收集方法論與原則 |
 | 09 | [資料資源總覽](09-Data-Resource-Inventory-Handbook.md) | Unit 8 | 台灣與國際開放資料來源清單 |
-| 10 | [Playwright 自動化](10-Playwright-Web-Automation-Handbook.md) | Unit 3 | 瀏覽器自動化爬蟲與反偵測 |
+| 10 | [Playwright 自動化](10-Playwright-Web-Automation-Handbook.md) | Unit 3 | 瀏覽器自動化爬蟲與反偵測（含 RAG 銜接說明） |
 | 12 | [AI Agent Skills](12-AI-Agent-Skills-Handbook.md) | Unit 12 | AI Agent 技能系統設計 |
 | 13 | [Supabase vs PostgreSQL](13-Database-Supabase-vs-PostgreSQL.md) | Unit 7 | 資料庫平台選型比較 |
 | 14 | [PostgreSQL 核心架構](14-PostgreSQL-Kernel-Architecture.md) | Unit 7 | PostgreSQL 底層架構深度解析 |
@@ -61,19 +63,37 @@
 
 ### 系列教材（子目錄）
 
-| 目錄 | 主題 | 對應 Unit | 章節數 |
-|------|------|-----------|--------|
+| 目錄 | 主題 | 對應 Unit | 內容 |
+|------|------|-----------|------|
 | [`pandas/`](pandas/) | pandas 資料分析完整課程 | Unit 8 | 11 章 + 附錄 |
 | [`altair/`](altair/) | Altair 視覺化與 Vega-Lite | Unit 8 | 10+ 章 |
 | [`supabase/`](supabase/) | Supabase 雲端資料庫實戰 | Unit 7 | 多章 + 作業 |
 | [`scikit-learn/`](scikit-learn/) | scikit-learn 機器學習入門 | Unit 12 | 多章 + 速查表 |
 | [`ai-agent/`](ai-agent/) | AI Agent 設計與治理 | Unit 12 | 13 章 + 附錄 |
-| [`RAG/`](RAG/) | RAG 完全實戰課程（含 MCP Server + Dashboard） | Unit 12 | 6 章 + Module A/B |
-| [`MCP-Server/`](MCP-Server/) | MCP Server 完全實戰課程（Tools / Resources / Prompts / 部署） | Unit 12 | 5 章 |
+| [`RAG/`](RAG/) | RAG 完全實戰課程 | Unit 12 | 6 章（理論）+ Pre-A / A / B（整合上線） |
+| [`MCP-Server/`](MCP-Server/) | MCP Server 完全實戰課程 | Unit 12 | 5 章（Tools / Resources / Prompts / 安全 / 部署） |
 | [`methodology/`](methodology/) | 資料科學研究方法論 | Unit 8 | 按週進度 |
 | [`architect/`](architect/) | 系統架構師思維 | Unit 6 | 多章 |
 | [`project-first/`](project-first/) | Project-First 教學法 | Unit 0 | 多章 |
 | [`homework/`](homework/) | 作業範本與規格 | 全課程 | 依需要 |
+
+---
+
+## 期末專題路徑（Unit 12 核心）
+
+```
+RAG 課程 ch01–ch06（理論）
+          ↓
+Pre-A：爬蟲 ETL → Qdrant  （_project-fullstack/crawler/）
+          ↓
+Module A：MCP Server       （_project-fullstack/mcp-server/）
+          ↓
+Module B：Dashboard        （_project-nextjs/）
+          ↓
+期末作品：RAG 知識庫 + MCP + 可展示視覺化介面
+```
+
+> 想深入 MCP 協議（Tools / Resources / Prompts / 部署）→ 另見 [`MCP-Server/`](MCP-Server/) 完整概念課
 
 ---
 
