@@ -300,6 +300,64 @@ CHUNK_OVERLAP = 50    # ← 改這裡
 **⭐⭐⭐ 挑戰**
 6. 調整 `CHUNK_TOKENS` 和 `CHUNK_OVERLAP`，重新匯入同一份文件，比較搜尋品質差異
 
+7. **自動化挑戰：讓爬蟲每天自動執行一次**
+
+   知識庫不應該是靜態的。選擇以下任一方法，讓爬蟲定時更新你的 Qdrant：
+
+   **方法 A（最簡）— crontab + curl**
+
+   ```bash
+   # 編輯 crontab
+   crontab -e
+
+   # 加入以下這行（每天凌晨 2 點執行）
+   0 2 * * * curl -s -X POST http://localhost:3001/crawl \
+     -H "Content-Type: application/json" \
+     -d '{"url":"https://你的目標網頁","collection":"knowledge"}' \
+     >> ~/crawler.log 2>&1
+   ```
+
+   驗收：`crontab -l` 看到設定，`cat ~/crawler.log` 看到執行記錄。
+
+   **方法 B（Python 原生）— APScheduler**
+
+   ```python
+   # scheduler.py
+   import requests
+   from apscheduler.schedulers.blocking import BlockingScheduler
+
+   CRAWLER_URL = "http://localhost:3001"
+   TARGETS = [
+       {"url": "https://你的目標網頁", "collection": "knowledge"},
+       # 加更多來源...
+   ]
+
+   def crawl_all():
+       for target in TARGETS:
+           res = requests.post(f"{CRAWLER_URL}/crawl", json=target)
+           data = res.json()
+           print(f"✓ {target['url']} → {data.get('chunks', '?')} 塊")
+
+   scheduler = BlockingScheduler()
+   scheduler.add_job(crawl_all, "cron", hour=2)  # 每天凌晨 2 點
+   print("排程啟動，Ctrl+C 停止")
+   scheduler.start()
+   ```
+
+   ```bash
+   pip install apscheduler requests
+   python scheduler.py
+   ```
+
+   **方法 C（自選）**
+
+   用任何你熟悉的工具（GitHub Actions、Airflow、系統服務⋯），實現「每天自動更新知識庫」。
+
+   提交時需說明：
+   - 你選擇哪個工具？為什麼？
+   - 排程頻率是多少？依據是什麼？
+   - 失敗時怎麼處理（重試？通知？）
+
 ---
 
 ## 常見問題
