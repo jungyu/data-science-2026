@@ -1,6 +1,5 @@
 # MCP Server 完全實戰課程
 
-> **O'Reilly Head First 風格 · 繁體中文 · Python + FastMCP**
 >
 > 本課程是 **MCP（Model Context Protocol）的完整概念課**，不限於 RAG 情境。
 > 完成後你能設計、測試並部署一個生產就緒的 MCP Server。
