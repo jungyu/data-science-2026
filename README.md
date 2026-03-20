@@ -71,9 +71,17 @@ Data Layer (DB / KB / Logs)
 
 ```text
 .
+├── _project-fullstack/  # 期末專題基礎設施模板（nginx + crawler + qdrant + mcp-server）
+├── _project-nextjs/     # Next.js + DaisyUI Dashboard 起始模板（Chart.js + Mermaid + AI 側欄）
 ├── agent-init/          # AI Agent 治理初始化範本（可移植）
 ├── books/               # 核心手冊（資管完全手冊、Skills 手冊）
-├── docs/                # 課程教材（Pandas / scikit-learn / AI架構師 / AI Agent協作 / Altair / project-first / methodology / supabase）
+├── docs/                # 課程教材
+│   ├── RAG/             # RAG 完全實戰課程（ch01–ch06 + Module A/B）
+│   ├── pandas/          # pandas 資料分析
+│   ├── scikit-learn/    # 機器學習入門
+│   ├── ai-agent/        # AI Agent 設計與治理
+│   ├── altair/          # 資料視覺化
+│   └── ...              # 其他教材
 ├── project-first/       # 企業 RAG × MCP × Skills 專案程式碼
 ├── project-forcasting/  # 預測任務專案（Forecasting）
 ├── project-playwright/  # 自動化測試與代理工作流專案
@@ -85,6 +93,12 @@ Data Layer (DB / KB / Logs)
 
 ## 快速入口
 
+### 期末專題（起點在這裡）
+- [RAG 完全實戰課程](docs/RAG/README.md) — ch01–ch06 + Module A/B，從 RAG 到可展示作品
+- [_project-fullstack 基礎設施模板](_project-fullstack/README.md) — Docker：nginx + qdrant + MCP Server
+- [_project-nextjs Dashboard 模板](_project-nextjs/README.md) — Next.js + DaisyUI + Chart.js + AI 側欄
+
+### 課程教材
 - [資訊管理系完全學習手冊](docs/IM-Complete-Lesson-Handbook.md)
 - [Agent Skills 完全手冊](docs/Skills-Handbook.md)
 - [Pandas 教材](docs/pandas/README.md)
@@ -101,10 +115,10 @@ Data Layer (DB / KB / Logs)
 
 ## 建議學習路徑（資管 AI + 資料科學）
 
-1. **先建資料分析基本功**  
+1. **先建資料分析基本功**
    先讀 `docs/pandas`，建立資料清理與分析能力。
 
-2. **補上 ML 方法論與評估能力**  
+2. **補上 ML 方法論與評估能力**
    讀 `docs/scikit-learn`，特別是交叉驗證、模型比較與治理章節。
 
 3. **建立 AI 架構師思維**
@@ -113,13 +127,21 @@ Data Layer (DB / KB / Logs)
 4. **學習資料視覺化**
    讀 `docs/altair`，掌握宣告式視覺化與互動圖表技術。
 
-5. **進入 AI Agent 協作與企業級 RAG**
+5. **RAG 完全實戰課程**（核心期末專題路徑）
+   依序完成 `docs/RAG/` 的 ch01–ch06，建立 RAG Pipeline 並以 Ragas 評估品質。
+
+6. **整合上線：MCP Server + Dashboard**
+   完成 Module A（MCP Server）讓 Claude Desktop 可呼叫你的 RAG；
+   完成 Module B（Dashboard）用 `_project-nextjs/` 模板建立視覺化介面；
+   透過 `_project-fullstack/` 的 docker-compose 整合所有服務，交出期末作品。
+
+7. **進入 AI Agent 協作**
    讀 `docs/ai-agent` 了解多 Agent 協作模式，再從 `project-first/index.md` 完成整套實作。
 
-6. **導入治理框架**
+8. **導入治理框架**
    參考 `agent-init/`，把 Constitution、HITL、Audit 機制套進自己的專案。
 
-7. **延伸到專題與作品集**
+9. **延伸到專題與作品集**
    使用 `project-forcasting/`、`project-playwright/` 擴充實戰範圍，形成完整 portfolio。
 
 ---
