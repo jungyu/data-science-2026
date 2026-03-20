@@ -69,6 +69,7 @@
 | [`scikit-learn/`](scikit-learn/) | scikit-learn 機器學習入門 | Unit 12 | 多章 + 速查表 |
 | [`ai-agent/`](ai-agent/) | AI Agent 設計與治理 | Unit 12 | 13 章 + 附錄 |
 | [`RAG/`](RAG/) | RAG 完全實戰課程（含 MCP Server + Dashboard） | Unit 12 | 6 章 + Module A/B |
+| [`MCP-Server/`](MCP-Server/) | MCP Server 完全實戰課程（Tools / Resources / Prompts / 部署） | Unit 12 | 5 章 |
 | [`methodology/`](methodology/) | 資料科學研究方法論 | Unit 8 | 按週進度 |
 | [`architect/`](architect/) | 系統架構師思維 | Unit 6 | 多章 |
 | [`project-first/`](project-first/) | Project-First 教學法 | Unit 0 | 多章 |

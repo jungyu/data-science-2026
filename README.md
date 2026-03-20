@@ -95,6 +95,7 @@ Data Layer (DB / KB / Logs)
 
 ### 期末專題（起點在這裡）
 - [RAG 完全實戰課程](docs/RAG/README.md) — ch01–ch06 + Module A/B，從 RAG 到可展示作品
+- [MCP Server 完全實戰課程](docs/MCP-Server/README.md) — 5 章，Tools / Resources / Prompts / 安全 / 部署
 - [_project-fullstack 基礎設施模板](_project-fullstack/README.md) — Docker：nginx + qdrant + MCP Server
 - [_project-nextjs Dashboard 模板](_project-nextjs/README.md) — Next.js + DaisyUI + Chart.js + AI 側欄
 
