@@ -3,9 +3,7 @@
 所有資料庫列/插入/更新型別皆以 Python `dataclass` 定義，與 `003_crawler_schema.sql` 對齊。
 
 > 從 `12_typescript-types.md` 轉換而來。此為權威性的 Python 版本。
-
-> **⚠️ ULID 遷移注意**：以下 `id` 和 `*_id` 欄位目前標記為 `int`，對應的是遷移前的 BIGINT 主鍵。
-> 完成 ULID 遷移（V-01/V-02）後，這些欄位應改為 `str`。其他數值欄位（`priority`、`retry_count` 等）維持 `int` 不變。
+> 已對齊 `003_crawler_schema.sql` v3.0（ULID text PK + project_id 多租戶）。
 
 ---
 
@@ -93,7 +91,8 @@ class FieldMapping:
 ```python
 @dataclass
 class SourceRow:
-    id: int
+    id: str
+    project_id: str
     code: str
     name: str
     description: str | None
@@ -106,12 +105,14 @@ class SourceRow:
     is_enabled: bool
     schedule_cron: str | None
     last_run_at: str | None
+    created_by: str | None
     created_at: str
     updated_at: str
 
 
 @dataclass
 class SourceInsert:
+    project_id: str
     code: str
     name: str
     config: SourceConfig = field(default_factory=SourceConfig)
@@ -124,6 +125,7 @@ class SourceInsert:
     crawler_url: str | None = None
     schedule_cron: str | None = None
     last_run_at: str | None = None
+    created_by: str | None = None
 
 
 @dataclass
@@ -178,8 +180,9 @@ class CrawlQueuePayload:
 
 @dataclass
 class CrawlQueueRow:
-    id: int
-    source_id: int
+    id: str
+    project_id: str
+    source_id: str
     url: str
     page_type: CrawlPageType
     priority: int
@@ -201,7 +204,8 @@ class CrawlQueueRow:
 
 @dataclass
 class CrawlQueueInsert:
-    source_id: int
+    project_id: str
+    source_id: str
     url: str
     page_type: CrawlPageType = CrawlPageType.ARTICLE
     priority: int = 100
@@ -235,8 +239,9 @@ class CrawlRunLog:
 
 @dataclass
 class CrawlRunRow:
-    id: int
-    source_id: int
+    id: str
+    project_id: str
+    source_id: str
     run_status: CrawlRunStatus
     started_at: str | None
     finished_at: str | None
@@ -246,11 +251,13 @@ class CrawlRunRow:
     error_count: int
     logs: list[CrawlRunLog]
     created_at: str
+    updated_at: str
 
 
 @dataclass
 class CrawlRunInsert:
-    source_id: int
+    project_id: str
+    source_id: str
     run_status: CrawlRunStatus = CrawlRunStatus.PENDING
     started_at: str | None = None
     finished_at: str | None = None
@@ -278,9 +285,10 @@ class SourcePageSnapshot:
 
 @dataclass
 class SourcePageRow:
-    id: int
-    source_id: int
-    crawl_run_id: int | None
+    id: str
+    project_id: str
+    source_id: str
+    crawl_run_id: str | None
     page_type: CrawlPageType
     topic: str | None
     url: str
@@ -298,10 +306,11 @@ class SourcePageRow:
 
 @dataclass
 class SourcePageInsert:
-    source_id: int
+    project_id: str
+    source_id: str
     url: str
     page_type: CrawlPageType = CrawlPageType.ARTICLE
-    crawl_run_id: int | None = None
+    crawl_run_id: str | None = None
     topic: str | None = None
     canonical_url: str | None = None
     title: str | None = None
@@ -348,9 +357,10 @@ class ArticleExtractionData:
 ```python
 @dataclass
 class ArticleRow:
-    id: int
-    source_id: int
-    source_page_id: int | None
+    id: str
+    project_id: str
+    source_id: str
+    source_page_id: str | None
     external_id: str | None
     title: str
     slug: str | None
@@ -375,10 +385,11 @@ class ArticleRow:
 
 @dataclass
 class ArticleInsert:
-    source_id: int
+    project_id: str
+    source_id: str
     title: str
     source_url: str
-    source_page_id: int | None = None
+    source_page_id: str | None = None
     external_id: str | None = None
     slug: str | None = None
     author_name: str | None = None
@@ -411,9 +422,10 @@ class AssetType(str, enum.Enum):
 
 @dataclass
 class ArticleAssetRow:
-    id: int
-    article_id: int
-    source_page_id: int | None
+    id: str
+    project_id: str
+    article_id: str
+    source_page_id: str | None
     asset_type: AssetType
     original_url: str | None
     storage_bucket: str | None
@@ -431,9 +443,10 @@ class ArticleAssetRow:
 
 @dataclass
 class ArticleAssetInsert:
-    article_id: int
+    project_id: str
+    article_id: str
     asset_type: AssetType = AssetType.IMAGE
-    source_page_id: int | None = None
+    source_page_id: str | None = None
     original_url: str | None = None
     storage_bucket: str | None = None
     storage_path: str | None = None
@@ -467,30 +480,34 @@ class TagMeta:
 
 @dataclass
 class TagRow:
-    id: int
+    id: str
+    project_id: str
     taxonomy: TaxonomyType
     name: str
     slug: str | None
     description: str | None
-    parent_id: int | None
+    parent_id: str | None
     meta: TagMeta
     created_at: str
+    updated_at: str
 
 
 @dataclass
 class TagInsert:
+    project_id: str
     taxonomy: TaxonomyType
     name: str
     slug: str | None = None
     description: str | None = None
-    parent_id: int | None = None
+    parent_id: str | None = None
     meta: TagMeta = field(default_factory=TagMeta)
 
 
 @dataclass
 class ArticleTagRow:
-    article_id: int
-    tag_id: int
+    article_id: str
+    tag_id: str
+    created_at: str
 ```
 
 ---
@@ -524,41 +541,50 @@ class PublishTargetConfig:
 
 @dataclass
 class PublishTargetRow:
-    id: int
+    id: str
+    project_id: str
     code: str
     name: str
     target_type: PublishTargetType
     config: PublishTargetConfig
     is_enabled: bool
+    created_by: str | None
     created_at: str
+    updated_at: str
 
 
 @dataclass
 class PublishTargetInsert:
+    project_id: str
     code: str
     name: str
     target_type: PublishTargetType
     config: PublishTargetConfig = field(default_factory=PublishTargetConfig)
     is_enabled: bool = True
+    created_by: str | None = None
 
 
 @dataclass
 class ArticlePublicationRow:
-    id: int
-    article_id: int
-    target_id: int
+    id: str
+    project_id: str
+    article_id: str
+    target_id: str
     remote_id: str | None
     remote_url: str | None
     publish_status: PublishStatus
     last_published_at: str | None
     payload: dict[str, Any]
     result: dict[str, Any]
+    created_at: str
+    updated_at: str
 
 
 @dataclass
 class ArticlePublicationInsert:
-    article_id: int
-    target_id: int
+    project_id: str
+    article_id: str
+    target_id: str
     publish_status: PublishStatus = PublishStatus.PENDING
     remote_id: str | None = None
     remote_url: str | None = None

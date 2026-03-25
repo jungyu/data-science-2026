@@ -297,6 +297,32 @@ CREATE TABLE rag.embeddings (
 
 ```sql
 -- ============================================
+-- Step 3.5: 在 shop schema 建示範表
+-- ============================================
+CREATE TABLE shop.products (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  name TEXT NOT NULL,
+  price NUMERIC(10,2) NOT NULL CHECK (price >= 0),
+  stock INT NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE shop.orders (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  product_id BIGINT REFERENCES shop.products(id) ON DELETE RESTRICT,
+  quantity INT NOT NULL CHECK (quantity > 0),
+  total NUMERIC(10,2) NOT NULL,
+  status TEXT DEFAULT 'pending'
+    CHECK (status IN ('pending', 'paid', 'shipped', 'cancelled')),
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+```
+
+> **注意**：這裡用 `ON DELETE RESTRICT`（不是 CASCADE）。刪商品時如果還有訂單參照，
+> PostgreSQL 會拒絕刪除——這是商業邏輯上正確的行為：你不該刪掉有訂單紀錄的商品。
+
+```sql
+-- ============================================
 -- Step 4: 插入測試資料
 -- ============================================
 INSERT INTO crawler.jobs (url, status) VALUES
@@ -307,28 +333,17 @@ INSERT INTO crawler.jobs (url, status) VALUES
 INSERT INTO rag.documents (source, content) VALUES
   ('wiki/postgresql', '# PostgreSQL 是什麼？\n\nPostgreSQL 是一個開源的關聯式資料庫...'),
   ('wiki/supabase', '# Supabase 是什麼？\n\nSupabase 是開源的 Firebase 替代方案...');
+
+INSERT INTO shop.products (name, price, stock) VALUES
+  ('PostgreSQL 實戰手冊', 580.00, 50),
+  ('Supabase 入門套件', 1200.00, 20);
+
+INSERT INTO shop.orders (product_id, quantity, total, status) VALUES
+  (1, 2, 1160.00, 'paid'),
+  (2, 1, 1200.00, 'pending');
 ```
 
-現在，**切到 Table Editor**：
-
-```
-📝 關鍵步驟：在 Table Editor 查看你剛建的表
-
-1. 打開 Table Editor
-2. 看上方的 schema 選擇器 → 預設顯示 "public"
-3. 點擊下拉選單 → 選擇 "crawler"
-4. 你會看到三張表：jobs, results, configs
-5. 點進 jobs → 你剛插入的三筆測試資料就在那裡
-6. 切換到 "rag" schema → 看到 documents 和 embeddings
-```
-
-> ### 腦筋急轉彎 🧠
->
-> **Q：如果你在 Table Editor 看不到新建的表，第一件事檢查什麼？**
->
-> A：Schema 選擇器！預設只顯示 `public`。
-> 你剛建的表在 `crawler` 和 `rag` schema，不會出現在 `public` 的列表裡。
-> 切換 schema 選擇器就能看到了。
+現在，切到 Table Editor 驗證結果 → 詳細操作見下方 [Table Editor 操作不同 Schema](#table-editor-操作不同-schema) 段落。
 
 ---
 
@@ -380,6 +395,17 @@ $$;
 - `crawler.jobs` 本身沒有 REST API（安全）
 - 前端透過 `rpc('get_crawler_stats')` 呼叫這個 function（受控）
 - 你可以在 function 裡加邏輯，決定回傳什麼資料（靈活）
+
+> ⚠️ **`SECURITY DEFINER` 安全須知**
+>
+> `SECURITY DEFINER` 表示這個 function 用**建立者（owner）的權限**執行，而不是呼叫者的權限。
+> 這代表它會**繞過 RLS**。使用時必須注意：
+>
+> 1. **function 內部自己做權限檢查**（例如檢查 `auth.uid()`）
+> 2. **只回傳聚合/摘要資料**，不要回傳原始 row（上面的範例只回傳 count，是安全的）
+> 3. **不要在 function 裡接受使用者輸入直接拼 SQL**，避免 SQL injection
+>
+> 如果你的 function 不需要跨 schema 存取，用預設的 `SECURITY INVOKER` 就好。
 
 **測試一下**：
 
@@ -438,8 +464,18 @@ SELECT * FROM public.get_crawler_stats();
    - 修改資料（直接點格子編輯）
    - 查看欄位定義（點上方的欄位名稱）
 
-6. 試試切到 "rag" → 看到 documents 和 embeddings
+6. 切到 "shop" → 看到 products（2 筆）和 orders（2 筆）
+
+7. 切到 "rag" → 看到 documents（2 筆）和 embeddings（0 筆）
 ```
+
+> ### 腦筋急轉彎 🧠
+>
+> **Q：如果你在 Table Editor 看不到新建的表，第一件事檢查什麼？**
+>
+> A：Schema 選擇器！預設只顯示 `public`。
+> 你剛建的表在 `crawler`、`shop`、`rag` schema，不會出現在 `public` 的列表裡。
+> 切換 schema 選擇器就能看到了。
 
 > ### 你的大腦在想 🧠
 >
@@ -450,6 +486,7 @@ SELECT * FROM public.get_crawler_stats();
 >
 > 如果你在 Table Editor 建了一張表，然後跑 `supabase db diff`，它會幫你生成對應的 migration SQL。
 > 但最佳實踐還是：在 SQL Editor 寫好 SQL → 存成 migration 檔。
+> 完整的 migration 工作流請見 [06_migration-workflow.md](06_migration-workflow.md)。
 
 ---
 
@@ -485,6 +522,7 @@ Part 2：跨 schema 查詢（SQL Editor）
 Part 3：GUI 驗證（Table Editor）
 6. 切到 Table Editor → 用 schema 選擇器分別檢視
    - public：看有哪些預設表
+   - shop：應該有 2 張表（products, orders）
    - crawler：應該有 3 張表
    - rag：應該有 2 張表
    - analytics：應該有 1 張表
@@ -630,7 +668,7 @@ ALTER TABLE crawler.results
   FOREIGN KEY (job_id) REFERENCES crawler.jobs(id) ON DELETE CASCADE;
 ```
 
-#### 怎麼選？
+#### FK 解法對照
 
 | 情境 | 推薦解法 |
 |------|---------|
@@ -655,14 +693,15 @@ ALTER TABLE crawler.results
 
 ---
 
-### 怎麼選？
+### 重置方法總整理
 
 | 情境 | 推薦方法 |
 |------|---------|
 | 練習搞砸了，想整個重來 | 方法 1（單一 schema）或方法 2（public） |
-| 只是資料亂了，結構沒問題 | `TRUNCATE` 個別表就好 |
+| 只是資料亂了，結構沒問題 | `TRUNCATE` 個別表就好（有 FK 參考上方解法） |
 | 想保留 function，只砍表 | 方法 3 |
 | 想重置整個 project（包含 auth） | Supabase Dashboard → Settings → General → Delete project |
+| 重建 schema 後記得重跑 | Step 1.5 的 `GRANT USAGE` + `ALTER DEFAULT PRIVILEGES` |
 
 > ### 腦筋急轉彎 🧠
 >
@@ -722,7 +761,22 @@ ALTER TABLE crawler.results
 | `analytics` | 跨域 | 5 表 + 3 MATVIEW + 20 functions | [analytics/](../migrations/005_analytics_schema.sql) |
 
 > **注意**：電商 Schema 使用獨立的 `shop` schema。
-> PostgREST 預設只暴露 `public`，需在 Supabase Dashboard 的 API Settings 加入 `shop` 到 `db-schemas`，或透過 Database Function 橋接。
+> PostgREST 預設只暴露 `public`，如果你希望 `shop` 的表也有 REST API，有兩種做法：
+>
+> **做法 A：修改 PostgREST 暴露的 schema（Supabase Cloud）**
+> 1. Dashboard → Settings → API → Schema Settings
+> 2. 在 `Exposed schemas` 加入 `shop`
+> 3. 儲存後，`shop.products` 就會出現在 REST API
+>
+> **做法 B：本地開發用 `config.toml`**
+> ```toml
+> # supabase/config.toml
+> [api]
+> schemas = ["public", "shop"]
+> ```
+> 重啟 `supabase stop && supabase start` 生效。
+>
+> **做法 C：不暴露 schema，用 Database Function 橋接**（本文前面示範的方式）
 
 ```
 現在的你                         未來的你
@@ -741,6 +795,10 @@ ALTER TABLE crawler.results
 ✅ 用 Schema 分區，不要建多個 DB
 ✅ public schema 會被 PostgREST 暴露成 REST API
 ✅ 非 public schema 的表需要透過 Database Function 存取
+✅ 自訂 schema 必須 GRANT USAGE 給 anon/authenticated，否則存取不了
+✅ ALTER DEFAULT PRIVILEGES 確保未來建的表自動有權限
+✅ search_path 決定查詢時 PostgreSQL 去哪些 schema 找表
+✅ SECURITY DEFINER function 會繞過 RLS，要小心使用
 ✅ Table Editor 的 schema 選擇器可以切換不同 schema
 ✅ 正式結構變更用 SQL Editor + migration，不要只用 GUI
 ```

@@ -90,6 +90,56 @@
 
 **這就是我們要做的事。**
 
+### 但等等——全部塞進 public schema？
+
+把所有 RAG 表都堆在 PostgreSQL 預設的 `public` schema，就像把所有書都堆在客廳地板上。能用？能用。找得到？……看運氣。
+
+**我們的做法：建一個專屬的 `rag` schema。**
+
+```
+Schema 命名空間
+═══════════════════════════════════════
+
+  PostgreSQL 預設
+  ┌─────────────────────────────────┐
+  │ public                          │
+  │ ├── users（認證相關）            │
+  │ ├── profiles（使用者資料）       │
+  │ └── generate_ulid()（公用函式）  │
+  └─────────────────────────────────┘
+
+  RAG 專屬
+  ┌─────────────────────────────────┐
+  │ rag                             │
+  │ ├── collections                 │
+  │ ├── documents                   │
+  │ ├── chunks  /  chunks_safe      │
+  │ ├── tags  /  chunk_tags         │
+  │ ├── query_logs                  │
+  │ ├── query_log_results           │
+  │ └── embedding_models            │
+  └─────────────────────────────────┘
+
+  好處：
+  ✅ 不污染 public schema
+  ✅ 一眼就知道哪些表屬於 RAG
+  ✅ 可以用 GRANT ON SCHEMA 統一管權限
+  ✅ 未來整合其他系統時不會撞名
+```
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                                                         │
+│  📌 本指南的 SQL 範例都在 rag schema 下。               │
+│  開始操作前，請先執行：                                  │
+│                                                         │
+│    SET search_path = rag, public;                       │
+│                                                         │
+│  或者在每個表名前加上 rag. 前綴（如 rag.chunks）。      │
+│                                                         │
+└─────────────────────────────────────────────────────────┘
+```
+
 ---
 
 ## 開始之前：你需要知道的三個觀念
@@ -251,6 +301,8 @@ SELECT generate_ulid() AS id_2;
 └─────────────────────────────────────────────────────────┘
 ```
 
+> **Stage 1 收穫**：所有 PK 用 `TEXT + generate_ulid()`，所有 FK 用 `TEXT`。不混用 BIGINT 和 UUID。
+
 ---
 
 ## Stage 2：建立你的第一個知識庫
@@ -302,6 +354,8 @@ WHERE name = 'text-embedding-3-small';
 >
 > 如果真的需要 3072 維，`text-embedding-3-large` 支援 Matryoshka Embedding——它可以被**降維到 1536** 而只損失很少的精度。
 
+> **Stage 2 收穫**：Collection = 知識庫 = tenant scope。建立時就要綁 embedding model，之後不能換。
+
 ---
 
 ## Stage 3：文件入庫與生產線
@@ -352,6 +406,42 @@ INSERT INTO documents (collection_id, title, ...)
 
 **為什麼？** 因為 owner_id 是 RLS（權限控制）用的。如果讓人手動設定，萬一設錯了，就會出現**跨租戶資料洩漏**——A 團隊能看到 B 團隊的文件。
 
+### 還有一個 trigger：moddatetime
+
+每張表都有 `updated_at` 欄位。你**不需要手動更新它**——Supabase 內建的 `moddatetime` extension 會幫你：
+
+```sql
+-- Schema 裡為每張表建了這個 trigger
+CREATE TRIGGER trg_documents_updated_at
+  BEFORE UPDATE ON rag.documents
+  FOR EACH ROW EXECUTE FUNCTION moddatetime(updated_at);
+
+-- 效果：每次 UPDATE 都自動把 updated_at 設為 NOW()
+-- 你只需要 UPDATE ... SET title = '新標題'
+-- updated_at 會自己變
+```
+
+```
+RAG Schema 裡的三類 trigger
+═══════════════════════════════════════
+
+  1. moddatetime       → 自動更新 updated_at（6 張表都有）
+  2. sync_document_owner → documents.owner_id ← collections.owner_id
+  3. sync_chunk_from_document → chunks.collection_id + owner_id ← documents
+```
+
+### 沒有笨問題 💡
+
+> **問：process_status 可以跳級嗎？比如直接從 uploaded 跳到 ready？**
+>
+> 答：資料庫不會阻止你（CHECK constraint 只驗證值是否合法，不驗證順序）。但這是壞主意——如果你跳過 chunked 直接設 ready，代表沒有 chunks 卻可被搜尋，搜尋結果會是空的。狀態機的順序是邏輯約束，由你的應用程式保證。
+>
+> **問：stale 狀態是誰設的？**
+>
+> 答：通常是你的應用程式。例如 Crawler 重新抓取了一份文件，發現 `content_hash` 和原本不同，就把舊文件標為 stale，觸發重新 chunking。
+
+> **Stage 3 收穫**：文件有 7 個狀態（uploaded → ready / failed / stale）。`owner_id` 永遠讓 trigger 填，不要手動設。
+
 ---
 
 ## Stage 4：切分 — 把大象裝進冰箱（Supabase 版）
@@ -384,6 +474,55 @@ INSERT INTO chunks (document_id, content, chunk_index, ...)
   → 跨租戶資料洩漏
   → 這是安全性 bug，不是程式錯誤
 ```
+
+> **Stage 4 收穫**：chunks 的 `collection_id` 和 `owner_id` 永遠不要手動填——trigger 會強制覆蓋成正確值。
+
+### 補充：給 Chunk 貼標籤
+
+切完之後，你可能想分類。Schema 裡有 `tags` + `chunk_tags` 兩張表：
+
+```
+標籤系統（N:M 多對多）
+═══════════════════════════════════════
+
+  tags 表                      chunk_tags（關聯表）
+  ┌──────────────────────┐     ┌─────────────────────┐
+  │ id: ULID             │     │ chunk_id ← chunks   │
+  │ taxonomy: 'city'     │◄────│ tag_id   ← tags     │
+  │ name: '台南'         │     │ PK = (chunk_id, tag_id)
+  │ parent_id: (自我參照)│     └─────────────────────┘
+  └──────────────────────┘
+
+  taxonomy 分類範例：
+  ├── 'city'   → 台北、台南、台中
+  ├── 'topic'  → 小吃、飲料、夜市
+  └── 'source' → 官方、部落格、維基
+```
+
+**為什麼不用 JSONB array？** 因為你想問「所有標記為台南的 chunks」——用正規化表可以建 index，用 JSONB array 要全表掃描。
+
+```sql
+-- 建立標籤
+INSERT INTO tags (taxonomy, name, slug) VALUES
+  ('city', '台北', 'taipei'),
+  ('city', '台南', 'tainan'),
+  ('city', '台中', 'taichung');
+
+-- 幫 chunk 貼標籤
+INSERT INTO chunk_tags (chunk_id, tag_id)
+SELECT c.id, t.id
+FROM chunks c, tags t
+WHERE c.content LIKE '%台南%' AND t.slug = 'tainan';
+
+-- 搜尋：所有台南相關的 chunks
+SELECT c.id, left(c.content, 50) || '...' AS preview
+FROM chunks c
+JOIN chunk_tags ct ON ct.chunk_id = c.id
+JOIN tags t ON t.id = ct.tag_id
+WHERE t.slug = 'tainan';
+```
+
+> 在 [04_lab](04_lab-rag-pipeline.md) 的挑戰題 1 有完整練習。
 
 ---
 
@@ -442,6 +581,52 @@ CREATE INDEX idx_chunks_fts ON chunks
 ```
 
 你可以用 `EXPLAIN ANALYZE` 驗證索引有在運作。如果看到 `Seq Scan` 而不是 `Bitmap Index Scan`，表示索引沒生效。
+
+### 為什麼有這麼多 Index？
+
+打開 `004_rag_schema.sql`，你會看到 **22 個 index**。「不就一張表嗎，為什麼要這麼多？」
+
+```
+Index 分類與用途
+═══════════════════════════════════════
+
+  🔑 FK Index（每個外鍵都要）
+  ├── idx_documents_collection    → WHERE collection_id = ?
+  ├── idx_chunks_document         → WHERE document_id = ?
+  ├── idx_query_log_results_query → WHERE query_id = ?
+  └── ...等 10 個
+  沒有 FK index → JOIN 時全表掃描 → 效能災難
+
+  👤 RLS 用 Index
+  ├── idx_collections_owner   → owner_id 比對
+  ├── idx_documents_owner     → owner_id 比對
+  └── idx_chunks_owner        → owner_id 比對
+  每次查詢都要過 RLS → 這些 index 攸關每一次讀取速度
+
+  🔍 搜尋用特殊 Index
+  ├── idx_chunks_embedding_hnsw  → HNSW 向量搜尋（cosine）
+  ├── idx_chunks_fts             → GIN 全文搜尋
+  └── idx_chunks_metadata        → GIN JSONB 查詢
+
+  📊 分析用複合 Index
+  ├── idx_query_logs_collection  → (collection_id, created_at DESC)
+  └── idx_query_log_results_chunk_score → (chunk_id, score DESC)
+  複合 index：一次 index 回答兩個條件
+```
+
+### Partial Index：只索引需要的列
+
+你會注意到很多 index 長這樣：
+
+```sql
+CREATE INDEX idx_documents_hash ON documents(content_hash)
+  WHERE content_hash IS NOT NULL;
+--    ^^^^^^^^^^^^^^^^^^^^^^^^^ 只索引非 NULL 的列
+```
+
+**為什麼？** 如果 80% 的 `content_hash` 是 NULL，全部索引就浪費 80% 的空間。加上 `WHERE ... IS NOT NULL`，index 只存有值的列——又小又快。
+
+> **Stage 5 收穫**：三種搜尋函數各有用途——純語意用 `match_chunks`、要來源資訊用 `match_chunks_with_document`、關鍵字 + 語意用 `hybrid_search`。
 
 ---
 
@@ -506,6 +691,18 @@ Array 版本做不到的事：
   ✅ 有 index，查詢飛快
 ```
 
+### 沒有笨問題 💡
+
+> **問：query_embedding 佔多少空間？每次查詢都存一份向量，不會爆炸嗎？**
+>
+> 答：`vector(1536)` 大約 6KB。一天 1,000 次查詢 = 6MB/天 = 2GB/年。對 PostgreSQL 來說不算多。好處是分析查詢模式時不需要重新呼叫 OpenAI API（省錢 + 版本一致性）。如果空間真的吃緊，可以把 `query_embedding` 改成 nullable，只在需要分析時才存。
+>
+> **問：Ragas 四個指標都要填嗎？**
+>
+> 答：不一定。`eval_faithfulness` 和 `eval_answer_relevance` 是最重要的兩個——前者衡量答案是否忠於 context，後者衡量答案是否切題。其他兩個（`context_recall`、`context_precision`）需要 ground truth，不一定有。全部都是 nullable，填多少算多少。
+
+> **Stage 6 收穫**：查詢紀錄用正規化表（`query_log_results`）而非 array。記錄 Ragas 四大指標 + 使用者回饋，未來才能優化。
+
 ---
 
 ## Stage 7：你的知識庫健康嗎？
@@ -549,9 +746,37 @@ LEFT JOIN query_log_results r ON r.chunk_id = c.id
 WHERE r.id IS NULL;
 ```
 
+> **Stage 7 收穫**：`collection_stats()` 看整體健康、`top_hit_chunks()` 找高價值內容、零命中 chunks 是潛在的優化目標。
+
 ---
 
-## RLS：誰能看到什麼
+## 安全三層防線：RLS → GRANT → VIEW
+
+學完七個 Stage，你的 RAG 資料庫已經能運作了。但如果不設定安全性，**任何人都能看到所有資料**。
+
+接下來的三個章節是一組安全防線，缺一不可：
+
+```
+安全三層防線
+═══════════════════════════════════════
+
+  第一層：RLS（Row Level Security）
+  ├── 決定「你能看到哪些列」
+  └── 用 helper function 實現，不用 JOIN
+
+  第二層：GRANT
+  ├── 決定「你能不能進這張表」
+  └── 忘記 GRANT = 有 RLS 也進不了門
+
+  第三層：chunks_safe VIEW（Column Level）
+  ├── 決定「你能看到哪些欄位」
+  └── 隱藏 embedding 向量，防止智慧資產外洩
+
+  三層缺一不可：
+  ❌ 只有 RLS → 忘了 GRANT，進不了門
+  ❌ 只有 GRANT → 沒有 RLS，看到所有人的資料
+  ❌ 只有前兩層 → embedding 6KB 白傳 + 可被複製
+```
 
 ### 為什麼需要 RLS？
 
@@ -606,6 +831,51 @@ RLS（Row Level Security）確保每個使用者**只能看到自己的資料**�
 └─────────────────────────────────────────────────────────┘
 ```
 
+### 我們的四個 helper function
+
+Schema 裡定義了四個 `SECURITY DEFINER` + `STABLE` 函數，讓 RLS policy 保持乾淨：
+
+```sql
+-- 取得當前使用者 ID（包裝 auth.uid()，只算一次）
+rag.get_current_owner_id()
+
+-- 是否為該 collection 的擁有者？
+rag.is_collection_owner(p_collection_id TEXT)
+
+-- 該 collection 是否公開（is_active = true）？
+rag.is_collection_active(p_collection_id TEXT)
+
+-- 擁有者 OR 公開 → 可讀
+rag.can_read_collection(p_collection_id TEXT)
+```
+
+RLS policy 全部呼叫這些函數，不寫 inline 查詢：
+
+```sql
+-- documents / chunks 的 SELECT policy 長這樣：
+USING (
+  owner_id = rag.get_current_owner_id()        -- O(1) 直接比對
+  OR rag.is_collection_active(collection_id)    -- helper function
+)
+
+-- query_logs 的 SELECT policy：
+USING (rag.can_read_collection(collection_id))  -- 一個函數搞定
+```
+
+```
+為什麼不直接寫 auth.uid()？
+═══════════════════════════════════════
+
+  ❌  owner_id = auth.uid()::TEXT
+      → 每一列都呼叫 auth.uid()
+      → 100K 列 = 100K 次呼叫
+
+  ✅  owner_id = rag.get_current_owner_id()
+      → 函數內用 (SELECT auth.uid())
+      → PostgreSQL initPlan，整個查詢只算一次
+      → 100K 列 = 1 次呼叫
+```
+
 ---
 
 ## GRANT：別忘了打開門
@@ -614,15 +884,97 @@ RLS 是鎖，GRANT 是鑰匙。你可以把 RLS 設得完美，但如果忘記 G
 
 ```sql
 -- 每張表都需要（schema 裡已經寫好了）
-GRANT SELECT ON public.chunks TO authenticated, anon;
-GRANT INSERT, UPDATE, DELETE ON public.chunks TO authenticated;
-GRANT ALL ON public.chunks TO service_role;
+GRANT SELECT ON rag.chunks TO authenticated, anon;
+GRANT INSERT, UPDATE, DELETE ON rag.chunks TO authenticated;
+GRANT ALL ON rag.chunks TO service_role;
 ```
 
 **新手最常忘記的兩件事：**
 
 1. 忘記 `GRANT EXECUTE ON FUNCTION` → 使用者無法呼叫搜尋函數
 2. 忘記 `service_role` policy → ETL pipeline 寫入失敗
+
+### 沒有笨問題 💡
+
+> **問：`service_role` 不就是繞過 RLS 嗎？那設 RLS 還有什麼意義？**
+>
+> 答：`service_role` 只在後端（ETL pipeline、Cron Job）使用，**前端永遠拿不到 service_role key**。前端用 `anon` 或 `authenticated` 角色，這兩個角色受 RLS 約束。所以 RLS 保護的是前端使用者，service_role 是給你的後端管線用的「員工通道」。
+>
+> **問：`anon` 角色有 SELECT 權限，不是很危險嗎？**
+>
+> 答：`anon` + RLS = 只能看到公開資料（`is_active = true` 的 collection）。沒有 GRANT SELECT 的話，未登入使用者連公開知識庫都搜不到。GRANT 是「可以進門」，RLS 才決定「進門後能看到什麼」。
+
+---
+
+## 欄位級安全：你的前端不需要 6KB 的向量
+
+### 問題
+
+每個 chunk 的 `embedding` 欄位是 1536 個浮點數，大約佔 **6KB**。
+
+如果前端執行 `SELECT * FROM chunks`，每一筆結果都帶著 6KB 的向量回來。查 100 筆就是 600KB 的**無用資料**——前端根本不做向量計算。
+
+```
+前端用 SELECT * 的代價
+═══════════════════════════════════════
+
+  100 筆 chunks × 6KB embedding = 600KB 白傳
+  1000 筆 × 6KB = 6MB 白傳
+
+  更糟的是：embedding 是你的「智慧資產」
+  暴露給前端 = 任何人都能複製你的知識庫向量
+```
+
+### 解法：chunks_safe VIEW
+
+```sql
+-- Schema 裡已經定義好了
+CREATE OR REPLACE VIEW rag.chunks_safe
+  WITH (security_invoker = true)
+  AS
+  SELECT
+    id, document_id, collection_id,
+    content, chunk_index, token_count,
+    -- ⚠️ embedding 欄位被排除！
+    start_char, end_char, page_number,
+    chunking_method, overlap_prev, overlap_next,
+    owner_id, metadata, created_at, updated_at
+  FROM rag.chunks;
+```
+
+```
+類比：醫院病歷系統
+═══════════════════════════════════════
+
+  護理站螢幕（chunks_safe VIEW）：
+  ├── 病人姓名 ✅
+  ├── 房號 ✅
+  ├── 用藥時間 ✅
+  └── 完整病歷 ❌（看不到）
+
+  醫生工作站（chunks 原始表）：
+  ├── 所有護理站資訊 ✅
+  └── 完整病歷 ✅（有權限）
+
+  搜尋函數（SECURITY DEFINER）＝ 醫生
+  前端 REST API              ＝ 護理站
+```
+
+**規則**：前端查詢一律用 `chunks_safe`，只有搜尋函數（`match_chunks` 等，以 `SECURITY DEFINER` 執行）才能存取 `chunks` 裡的 `embedding`。
+
+### security_invoker = true 是什麼？
+
+一般 VIEW 用**建立者**的權限執行查詢。加上 `security_invoker = true` 後改為用**查詢者**的權限。效果：
+
+- `chunks_safe` 自動繼承 `chunks` 表的 RLS 規則
+- 不需要對 VIEW 單獨設 RLS
+- 使用者 A 查 `chunks_safe`，只看到自己有權存取的資料
+
+### 沒有笨問題 💡
+
+> **問：為什麼不直接在 RLS 裡擋 embedding 欄位？**
+>
+> 答：PostgreSQL 的 RLS 是 **Row-Level**（列層級），不是 Column-Level（欄位層級）。RLS 只能決定「你能不能看到這一整列」，沒辦法說「這列你可以看，但 embedding 欄位除外」。所以我們用 VIEW 來遮蔽欄位——這是 PostgreSQL 實現欄位級安全的標準做法。
 
 ---
 
@@ -649,6 +1001,8 @@ GRANT ALL ON public.chunks TO service_role;
   │ collection_id ← trigger     │ ← 安全護欄
   │ owner_id ← trigger          │ ← RLS 用
   └──────────────────────────────┘
+       │
+       ├── chunks_safe (VIEW)   │ ← 前端用，不含 embedding
        │
        ▼ 使用者提問
   ┌─ match_chunks() ───────────┐
@@ -706,6 +1060,7 @@ GRANT ALL ON public.chunks TO service_role;
 | `tags` / `chunk_tags` | 語意標籤 | Ch02 Metadata |
 | `query_logs` | 查詢紀錄 + 評估 | Ch06 |
 | `query_log_results` | 命中明細 | Ch06 |
+| `chunks_safe` (VIEW) | chunks 去除 embedding（前端用） | 安全 |
 
 ### 搜尋函數
 
@@ -716,6 +1071,7 @@ GRANT ALL ON public.chunks TO service_role;
 | `hybrid_search()` | 語意 + 全文混合 |
 | `collection_stats()` | 知識庫統計 |
 | `top_hit_chunks()` | 命中率分析 |
+| `chunks_safe` (VIEW) | 前端安全查詢（不含 embedding） |
 
 ### 狀態機
 
@@ -740,18 +1096,22 @@ uploaded → parsed → chunked → embedded → ready
 
 ```
 📝 驗證清單
-1. public schema → 確認核心 7 張表出現
-   (embedding_models, collections, documents, chunks, tags, chunk_tags, query_logs)
+1. rag schema → 確認核心 8 張表出現
+   (embedding_models, collections, documents, chunks, tags, chunk_tags, query_logs, query_log_results)
 2. 點進 chunks → 確認有 embedding VECTOR(1536) 欄位
 3. 點進 documents → 確認 process_status 欄位（7 態 FSM）
 4. 確認 collections → documents → chunks 的 FK 鏈
-5. 點進 collections 的設定 → 開啟 Realtime
+5. 確認 chunks_safe VIEW 存在（不含 embedding 欄位）
+6. 點進 collections 的設定 → 開啟 Realtime
    （讓前端即時顯示 ingestion 進度）
 ```
 
 ### SQL Editor 驗證
 
 ```sql
+-- ⚠️ 先切換 search_path（或在表名前加 rag. 前綴）
+SET search_path = rag, public;
+
 -- 確認 pgvector 已啟用
 SELECT * FROM pg_extension WHERE extname = 'vector';
 
@@ -761,14 +1121,19 @@ SELECT generate_ulid();
 -- 確認 HNSW index 存在
 SELECT indexname, indexdef
 FROM pg_indexes
-WHERE tablename = 'chunks' AND indexdef LIKE '%hnsw%';
+WHERE schemaname = 'rag' AND tablename = 'chunks' AND indexdef LIKE '%hnsw%';
 
--- 測試語意搜尋函數
--- (需要先有 embedding 資料)
+-- 確認 chunks_safe VIEW 存在且不含 embedding
+SELECT column_name FROM information_schema.columns
+WHERE table_schema = 'rag' AND table_name = 'chunks_safe'
+ORDER BY ordinal_position;
+-- 應該看不到 embedding 欄位
+
+-- 測試語意搜尋函數（需要先有 embedding 資料）
 SELECT * FROM match_chunks(
-  query_embedding := '[0.1, 0.2, ...]'::vector,  -- 替換為真實向量
-  match_count := 5,
-  filter_collection_id := 'YOUR_COLLECTION_ID'
+  '[0.1, 0.2, ...]'::vector(1536),
+  'YOUR_COLLECTION_ID',
+  5, 0.7
 );
 
 -- 查看 ingestion pipeline 狀態分佈
@@ -780,19 +1145,20 @@ GROUP BY process_status;
 ### RLS 驗證
 
 ```sql
--- 確認 RLS 已啟用
+-- 確認 RLS 已啟用（8 張表都應該為 true）
 SELECT tablename, rowsecurity
 FROM pg_tables
-WHERE schemaname = 'public' AND tablename IN
-  ('collections','documents','chunks','query_logs');
+WHERE schemaname = 'rag' AND tablename IN
+  ('embedding_models','collections','documents','chunks',
+   'tags','chunk_tags','query_logs','query_log_results');
 
 -- 測試 collection 隔離
 SET ROLE anon;
-SELECT count(*) FROM collections;  -- 應為 0
+SELECT count(*) FROM rag.collections;  -- 應只看到 is_active=true 的
 RESET ROLE;
 
 -- 測試 helper function
-SELECT get_current_user_id();  -- 無登入時應為 NULL
+SELECT rag.get_current_owner_id();  -- 無登入時應為 NULL
 ```
 
 ### 健康監控（上線後常用）

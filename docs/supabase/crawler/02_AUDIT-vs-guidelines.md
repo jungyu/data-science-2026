@@ -2,7 +2,10 @@
 
 Audit of `003_crawler_schema.sql` against `agent-init/skills/supabase/*.md`.
 
-> Verdict: **29 violations** across 7 categories. 6 Critical, 14 High, 8 Medium, 1 Info.
+> **⚠️ 歷史文件**：以下 29 項 violation 已於 `003_crawler_schema.sql` v3.0 全數修正。
+> 本文件保留作為設計決策紀錄與學習參考。現行 schema 教學請見 [01_HEAD-FIRST-crawler-db.md](01_HEAD-FIRST-crawler-db.md)。
+
+> Verdict (original): **29 violations** across 7 categories. 6 Critical, 14 High, 8 Medium, 1 Info.
 
 ---
 

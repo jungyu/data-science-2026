@@ -175,21 +175,21 @@ class SourceHealthTracker:
     """追蹤每個來源的健康狀態並套用冷卻機制。"""
 
     def __init__(self) -> None:
-        self._health: dict[int, SourceHealth] = {}
+        self._health: dict[str, SourceHealth] = {}
 
-    def get(self, source_id: int) -> SourceHealth:
+    def get(self, source_id: str) -> SourceHealth:
         if source_id not in self._health:
             self._health[source_id] = SourceHealth(source_id=source_id)
         return self._health[source_id]
 
-    def record_success(self, source_id: int) -> None:
+    def record_success(self, source_id: str) -> None:
         h = self.get(source_id)
         h.consecutive_failures = 0
         h.consecutive_429s = 0
         h.consecutive_403s = 0
         h.state = SourceHealthState.HEALTHY
 
-    def record_failure(self, source_id: int, error: WorkerError) -> None:
+    def record_failure(self, source_id: str, error: WorkerError) -> None:
         h = self.get(source_id)
         h.consecutive_failures += 1
 
@@ -209,7 +209,7 @@ class SourceHealthTracker:
         elif h.consecutive_failures >= 5:
             h.state = SourceHealthState.DEGRADED
 
-    def is_available(self, source_id: int) -> bool:
+    def is_available(self, source_id: str) -> bool:
         h = self.get(source_id)
         if h.state == SourceHealthState.BLOCKED:
             return False

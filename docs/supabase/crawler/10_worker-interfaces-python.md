@@ -5,7 +5,7 @@
 > 資料庫列型別從 `db_types` 模組匯入（參見 `08_db-types-python.md`）。
 > Worker 型別從 `types` 模組匯入（參見 `09_worker-types-python.md`）。
 >
-> **⚠️ ULID 遷移注意**：Protocol 方法中的 `int` 型別 ID 參數，遷移後應改為 `str`。詳見 `08_db-types-python.md` 說明。
+> 已對齊 `003_crawler_schema.sql` v3.0（ULID text PK）。所有 ID 參數皆為 `str`。
 
 ---
 
@@ -37,24 +37,24 @@ class QueueConsumer(Protocol):
         """原子性地租約下一個待處理的工作。佇列為空時回傳 None。"""
         ...
 
-    async def heartbeat(self, job_id: int, lease_token: str) -> None:
+    async def heartbeat(self, job_id: str, lease_token: str) -> None:
         """延長長時間執行工作的租約到期時間。"""
         ...
 
     async def complete_job(
-        self, job_id: int, lease_token: str, result: Json | None = None
+        self, job_id: str, lease_token: str, result: Json | None = None
     ) -> None:
         """將工作標記為完成。"""
         ...
 
     async def fail_job(
-        self, job_id: int, lease_token: str, error: WorkerError
+        self, job_id: str, lease_token: str, error: WorkerError
     ) -> None:
         """將工作標記為永久失敗。"""
         ...
 
     async def requeue_job(
-        self, job_id: int, lease_token: str, retry_at: str, error: WorkerError
+        self, job_id: str, lease_token: str, retry_at: str, error: WorkerError
     ) -> None:
         """將工作退回待處理狀態，並設定排程重試時間。"""
         ...
@@ -167,7 +167,7 @@ from .db_types import SourceRow
 
 
 class SourceRepository(Protocol):
-    async def find_by_id(self, source_id: int) -> SourceRow | None: ...
+    async def find_by_id(self, source_id: str) -> SourceRow | None: ...
     async def find_by_code(self, code: str) -> SourceRow | None: ...
     async def list_enabled(self) -> list[SourceRow]: ...
 ```
@@ -181,8 +181,8 @@ from .service_inputs import StartCrawlRunInput
 
 class CrawlRunRepository(Protocol):
     async def create(self, input: StartCrawlRunInput) -> CrawlRunRow: ...
-    async def finish(self, run_id: int, patch: dict) -> None: ...
-    async def append_log(self, run_id: int, log: CrawlRunLog) -> None: ...
+    async def finish(self, run_id: str, patch: dict) -> None: ...
+    async def append_log(self, run_id: str, log: CrawlRunLog) -> None: ...
 ```
 
 ### Source Page Repository
@@ -205,7 +205,7 @@ from .service_inputs import UpsertArticleInput
 
 class ArticleRepository(Protocol):
     async def upsert_article(self, input: UpsertArticleInput) -> ArticleRow: ...
-    async def get_aggregate_by_id(self, article_id: int) -> ArticleAggregate | None: ...
+    async def get_aggregate_by_id(self, article_id: str) -> ArticleAggregate | None: ...
 
 
 @dataclass
@@ -225,7 +225,7 @@ from .db_types import ArticleAssetInsert
 
 class ArticleAssetRepository(Protocol):
     async def replace_assets(
-        self, article_id: int, assets: list[ArticleAssetInsert]
+        self, article_id: str, assets: list[ArticleAssetInsert]
     ) -> None: ...
 ```
 
@@ -241,7 +241,7 @@ class TagRepository(Protocol):
     ) -> list[TagRow]: ...
 
     async def attach_tags(
-        self, article_id: int, tag_ids: list[int]
+        self, article_id: str, tag_ids: list[str]
     ) -> None: ...
 ```
 
@@ -261,7 +261,8 @@ from .types import ExtractedArticleDraft
 
 @dataclass
 class EnqueueUrlInput:
-    source_id: int
+    project_id: str
+    source_id: str
     url: str
     page_type: CrawlPageType = CrawlPageType.ARTICLE
     priority: int = 100
@@ -270,15 +271,17 @@ class EnqueueUrlInput:
 
 @dataclass
 class StartCrawlRunInput:
-    source_id: int
+    project_id: str
+    source_id: str
 
 
 @dataclass
 class SaveFetchedPageInput:
-    source_id: int
+    project_id: str
+    source_id: str
     page_type: CrawlPageType
     url: str
-    crawl_run_id: int | None = None
+    crawl_run_id: str | None = None
     canonical_url: str | None = None
     title: str | None = None
     raw_html: str | None = None
@@ -289,10 +292,11 @@ class SaveFetchedPageInput:
 
 @dataclass
 class UpsertArticleInput:
-    source_id: int
+    project_id: str
+    source_id: str
     source_url: str
     draft: ExtractedArticleDraft
-    source_page_id: int | None = None
+    source_page_id: str | None = None
     content_hash: str | None = None
 ```
 

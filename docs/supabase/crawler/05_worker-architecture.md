@@ -113,6 +113,7 @@ worker/
   persistence/
     __init__.py
     source_repo.py       # SupabaseSourceRepo
+    queue_repo.py        # SupabaseQueueConsumer
     source_page_repo.py  # SupabaseSourcePageRepo
     article_repo.py      # SupabaseArticleRepo
   policies/

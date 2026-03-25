@@ -205,29 +205,32 @@ EXISTS (SELECT 1 FROM collections WHERE id = chunks.collection_id AND ...)
 ### v2.0 修正
 
 1. `owner_id` 從 collections → documents → chunks 逐層傳播（trigger 自動）
-2. RLS policy 對 owner 的檢查直接比對 `owner_id = auth.uid()`（O(1)）
+2. RLS policy 對 owner 的檢查直接比對 `owner_id = rag.get_current_owner_id()`（O(1)）
 
 ### v2.1 修正（performance-linter compliance）
 
 v2.0 仍在部分 RLS policy 中使用 `EXISTS`（公開集合檢查），違反 performance-linter Rule Group 2。
 
-改為 3 個 helper function：
+改為 4 個 helper function（全部定義在 `rag` schema，`SECURITY DEFINER` + `STABLE`）：
 
 ```sql
+-- 取得當前使用者 ID（包裝 auth.uid()，initPlan 只算一次）
+rag.get_current_owner_id()
+
 -- 直接查詢，PG 可快取結果
-public.is_collection_owner(p_collection_id)   -- owner 檢查
-public.is_collection_active(p_collection_id)  -- 公開檢查
-public.can_read_collection(p_collection_id)   -- owner 或公開
+rag.is_collection_owner(p_collection_id)   -- owner 檢查
+rag.is_collection_active(p_collection_id)  -- 公開檢查
+rag.can_read_collection(p_collection_id)   -- owner 或公開
 ```
 
 RLS policy 現在全部使用 function call：
 
 ```sql
 -- documents/chunks: owner_id 直接比對 + helper function
-USING (owner_id = auth.uid() OR public.is_collection_active(collection_id))
+USING (owner_id = rag.get_current_owner_id() OR rag.is_collection_active(collection_id))
 
 -- query_logs: helper function
-USING (public.can_read_collection(collection_id))
+USING (rag.can_read_collection(collection_id))
 ```
 
 **完全消除 RLS 中的 EXISTS/JOIN**，符合 performance-linter 規範。
@@ -332,7 +335,32 @@ USING (owner_id = (SELECT auth.uid())::TEXT)
 
 ---
 
-## 15. 未來擴展方向
+## 15. v3.0 chunks_safe VIEW — 欄位級安全
+
+### 為什麼加？
+
+`embedding vector(1536)` 每列佔 ~6KB。前端 REST API 查 `chunks` 時會回傳這個巨大欄位，造成：
+- **頻寬浪費**：前端不做向量計算，embedding 是純噪音
+- **安全風險**：暴露原始向量 = 暴露知識庫的「智慧指紋」
+
+### 解法
+
+```sql
+CREATE OR REPLACE VIEW rag.chunks_safe
+  WITH (security_invoker = true) AS
+  SELECT ... -- 排除 embedding 欄位
+  FROM rag.chunks;
+```
+
+- `security_invoker = true`：用查詢者身份檢查 RLS（不是 VIEW 建立者）
+- 搜尋函數（`match_chunks` 等）以 `SECURITY DEFINER` 執行，仍可存取 `embedding`
+- 前端一律查 `chunks_safe`，後端搜尋走函數
+
+**PostgreSQL 沒有原生 column-level RLS**，VIEW 遮蔽是標準做法。
+
+---
+
+## 16. 未來擴展方向
 
 | 功能 | 實作方式 | Phase |
 |------|---------|-------|
@@ -344,6 +372,39 @@ USING (owner_id = (SELECT auth.uid())::TEXT)
 | 向量壓縮 | pgvector 的 `halfvec` 類型（float16，節省 50% 空間） | v3.0 |
 | OLTP/Analytics 分離 | query_logs 移至獨立 analytics DB | v3.0 |
 | Document versioning | `document_versions` + `chunk_versions` 表 | v3.0 |
+
+---
+
+## 17. 教學 → Production 升級清單
+
+目前的 schema 是**教學版**。上 production 前，以下項目需要處理：
+
+| 項目 | 教學版現狀 | Production 應做 | 優先級 |
+|------|----------|----------------|--------|
+| **Auth Bridge** | `owner_id TEXT`，無 FK 到 `auth.users` | 建 `users` bridge 表 + `get_current_user_id()` 函式，owner_id FK 到 bridge | 🚨 必須 |
+| **query_logs Partition** | 單表 | 按月 range partition（`created_at`），自動建新分區 | ⚠️ 10K+ 查詢後 |
+| **Embedding 維度擴展** | 鎖死 1536 | 按維度建 `chunks_1536` / `chunks_3072`，搜尋函數路由 | ⚠️ 需要時 |
+| **Document Versioning** | 更新即覆蓋 | `document_versions` + `chunk_versions` 表 | ⚠️ 需要時 |
+| **向量壓縮** | `vector(1536)` float32 | 用 `halfvec(1536)` float16，省 50% 空間 | 💡 >1M chunks |
+| **HNSW 調參** | `m=16, ef_construction=64` | 根據實際 recall 需求調整 `m` 和 `ef_construction` | 💡 >100K chunks |
+| **Monitoring** | 手動跑 `collection_stats()` | pg_stat_statements + Grafana dashboard + alerting | ⚠️ 上線前 |
+| **Backup** | 依賴 Supabase 預設 | 設定 point-in-time recovery + 定期 pg_dump embedding 表 | 🚨 必須 |
+| **Rate Limiting** | 無 | RPC function 加 rate limit（或用 Supabase Edge Function） | ⚠️ 公開 API 時 |
+| **Content Hash** | 可選填 | 強制填入，用於 dedup + stale 偵測 | 💡 建議 |
+
+```
+教學版 vs Production 版
+═══════════════════════════════════════
+
+  教學版（現在）           Production（未來）
+  ┌──────────────────┐    ┌──────────────────┐
+  │ owner_id = TEXT   │    │ owner_id FK users │
+  │ 單表 query_logs   │    │ 分區 query_logs   │
+  │ 1536 only         │    │ 多維度路由         │
+  │ 手動監控          │    │ Grafana + alert   │
+  │ 無 rate limit     │    │ Edge Function     │
+  └──────────────────┘    └──────────────────┘
+```
 
 ---
 

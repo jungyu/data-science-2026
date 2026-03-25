@@ -13,7 +13,7 @@
 - **TEXT + ULID** — 所有 PK/FK 統一為 TEXT 型別 + ULID 生成
 - **RLS + Helper Functions** — 多租戶隔離，無 EXISTS/JOIN in policy
 - **GRANT + service_role** — 每張表完整權限設定
-- **Ingestion Pipeline** — 5 階段狀態機 + trigger 一致性護欄
+- **Ingestion Pipeline** — 7 狀態機（uploaded → parsed → chunked → embedded → ready / failed / stale）+ trigger 一致性護欄
 
 ---
 
@@ -40,6 +40,11 @@
    │ query_logs   │───→│ query_log_results  │    │ embedding_models │
    │ 查詢 + 評估  │    │ 檢索結果明細       │    │ 模型（1536 only）│
    └──────────────┘    └────────────────────┘    └──────────────────┘
+
+   ┌──────────────────────────────────────────┐
+   │ chunks_safe (VIEW) — 前端安全查詢        │
+   │ = chunks 去除 embedding 欄位             │
+   └──────────────────────────────────────────┘
 ```
 
 所有 PK = `TEXT DEFAULT generate_ulid()` · 所有 FK = `TEXT`
@@ -70,25 +75,56 @@
 | v1.0 | 初始設計（collection → document → chunk） |
 | v2.0 | 架構審查：維度鎖定、trigger 一致性、FTS index、query_logs 正規化 |
 | v2.1 | RLS 改用 helper function（消除 EXISTS/JOIN） |
-| v3.0 | **Skill 規範全面合規**：ULID PK、GRANT、service_role、auth.uid() 優化 |
+| v3.0 | **Skill 規範全面合規**：ULID PK、GRANT、service_role、auth.uid() 優化、`chunks_safe` VIEW（欄位級安全）、`rag` schema namespace |
 
 ---
 
+## 建議學習路徑
+
+```
+你應該怎麼讀？
+═══════════════════════════════════════════════════
+
+  ① 01_guide     ②  04_lab       ③ 01_guide
+     教學指南         動手做           回來複習
+  ┌─────────┐    ┌─────────┐    ┌─────────┐
+  │ 📖 理解  │ ─→ │ ⌨️ 操作  │ ─→ │ 🔄 鞏固  │
+  │ 概念+架構│    │ 7 Stage │    │ 第二次讀 │
+  └─────────┘    │ 3 挑戰題 │    │ 理解更深 │
+                 └─────────┘    └─────────┘
+                      │
+                      ▼ 遇到「為什麼？」
+                 ┌─────────┐
+                 │ 📋 查閱  │
+                 │ 02 設計  │ ← 需要時才看
+                 │ 03 審查  │
+                 └─────────┘
+```
+
 ## 檔案清單
 
-| 檔案 | 說明 |
-|------|------|
-| [01_guide-supabase-rag.md](01_guide-supabase-rag.md) | **教學指南**（Head First 風格，先讀這個） |
-| [04_lab-rag-pipeline.md](04_lab-rag-pipeline.md) | Stage-by-stage 實操 Lab（7 階段 + 3 挑戰題） |
-| [004_rag_schema.sql](../migrations/004_rag_schema.sql) | 完整 SQL Schema v3.0 |
-| [02_design-decisions.md](02_design-decisions.md) | 設計決策與取捨說明 |
-| [03_audit-report.md](03_audit-report.md) | Skill 規範審查報告 |
+| 檔案 | 說明 | 何時讀 |
+|------|------|--------|
+| [01_guide-supabase-rag.md](01_guide-supabase-rag.md) | **教學指南**（Head First 風格） | 第一個讀 |
+| [04_lab-rag-pipeline.md](04_lab-rag-pipeline.md) | Stage-by-stage 實操 Lab（7 階段 + 3 挑戰題） | 邊讀邊做 |
+| [004_rag_schema.sql](../migrations/004_rag_schema.sql) | 完整 SQL Schema v3.0 | 參考用 |
+| [02_design-decisions.md](02_design-decisions.md) | 設計決策與取捨說明 | 想知道「為什麼」時 |
+| [03_audit-report.md](03_audit-report.md) | Skill 規範審查報告 | 想知道「符合什麼規範」時 |
 
 ---
 
 ## 快速開始
 
-> **注意**：`004_rag_schema.sql` 將所有表建在 `rag` schema 下。以下 SQL 範例省略了 `rag.` 前綴，請先執行 `SET search_path = rag, public;` 或自行加上 `rag.` 前綴。
+```
+┌─────────────────────────────────────────────────────────┐
+│  ⚠️ 重要：所有 RAG 表都建在 rag schema 下。             │
+│                                                         │
+│  操作前請先執行：                                        │
+│    SET search_path = rag, public;                       │
+│                                                         │
+│  或在每個表名前加 rag. 前綴（如 rag.chunks）。           │
+└─────────────────────────────────────────────────────────┘
+```
 
 ```sql
 -- 1. 執行 schema

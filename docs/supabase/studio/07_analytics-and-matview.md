@@ -2,6 +2,18 @@
 
 > ***「你不能改善你無法衡量的東西。但如果衡量的成本太高，你根本不會去量。」***
 
+### 本章你會學到
+
+| 主題 | 內容 |
+|------|------|
+| Event Log | append-only 事件匯流排設計、GIN index、regex CHECK |
+| Daily Snapshots | UPSERT pattern（`ON CONFLICT DO UPDATE`）、歷史趨勢保存 |
+| Materialized View | VIEW vs MATVIEW、`WITH NO DATA`、`REFRESH CONCURRENTLY` |
+| SQL 分析函數 | `generate_series` 時間軸、`LAG` 漏斗、`FILTER` 條件聚合、Cohort Retention、Z-score |
+| Cross-Schema Triggers | `SECURITY DEFINER` + `SET search_path` 的跨 schema 事件推送 |
+
+**預計時間**：閱讀 30 分鐘 + 動手做 20 分鐘
+
 ---
 
 > ### 你的大腦在想 🧠
@@ -17,12 +29,20 @@
 ## 前置要求
 
 - 已完成 `03_sql-editor-mastery.md`（會用 SQL Editor、會寫 Function）
-- 已執行 `../migrations/001_extensions.sql`（schema + generate_ulid）
-- 已執行 `../migrations/002_shop_schema.sql`
-- 已執行 `../migrations/003_crawler_schema.sql`
-- 已執行 `../migrations/004_rag_schema.sql`
+- 已**依序**執行以下 migration（順序很重要，後面的依賴前面的 schema 和表）：
+  1. `../migrations/001_extensions.sql` — schema 建立 + `generate_ulid` function
+  2. `../migrations/002_shop_schema.sql` — shop schema 完整表結構
+  3. `../migrations/003_crawler_schema.sql` — crawler schema 完整表結構
+  4. `../migrations/004_rag_schema.sql` — rag schema 完整表結構
 - Docker 跑著（`supabase start`）
 - 瀏覽器打開 Studio `http://localhost:54323`
+
+> ⚠️ **migration 依賴警告**：`005_analytics_schema.sql` 的 MATVIEW 和 trigger
+> 直接引用 `shop.orders`、`shop.products`、`shop.order_items`、`shop.reviews`、
+> `crawler.crawl_runs`、`rag.query_logs` 等表。
+> 如果你只做了 `02_schema-strategy.md` 的簡化版練習（只有基礎表），
+> REFRESH MATVIEW 和建立 trigger 時會報 `relation does not exist` 錯誤。
+> **請先跑完 001-004 的完整 migration。**
 
 > 本章所有 SQL 來自 `../migrations/005_analytics_schema.sql`。
 > 建議先執行完整 migration，再回來對照本章解說。
@@ -167,6 +187,18 @@ SELECT analytics.log_event(
 
 這個 function 是 `SECURITY DEFINER`，意味著無論誰呼叫，都用定義者的權限執行。
 這讓 trigger 可以跨 schema 寫入 analytics.events。
+
+> ⚠️ **`SECURITY DEFINER` + `SET search_path` 安全須知**
+>
+> 你會注意到 trigger function 同時設定了 `SET search_path = analytics`。這不是裝飾：
+>
+> | 設定 | 為什麼需要 |
+> |------|-----------|
+> | `SECURITY DEFINER` | 讓 trigger 用 owner 權限執行，才能跨 schema 寫入 analytics |
+> | `SET search_path` | **防止 search_path 注入攻擊**。如果不鎖定，攻擊者可以在 `public` 建一個同名的 `log_event` function，讓 trigger 執行惡意程式碼 |
+>
+> **最佳實踐**：每個 `SECURITY DEFINER` function 都應該搭配 `SET search_path`，
+> 明確指定只搜尋需要的 schema。
 
 > ### 腦筋急轉彎 🧠
 >
@@ -351,7 +383,7 @@ END AS success_rate_pct
 -- 1. 建立時不填資料
 CREATE MATERIALIZED VIEW ... WITH NO DATA;
 
--- 2. 建立 UNIQUE INDEX
+-- 2. 建立 UNIQUE INDEX（REFRESH CONCURRENTLY 的必要條件）
 CREATE UNIQUE INDEX IF NOT EXISTS uq_mv_system_health
   ON analytics.mv_system_health(snapshot_at);
 
@@ -361,6 +393,20 @@ REFRESH MATERIALIZED VIEW analytics.mv_system_health;
 -- 4. 後續刷新用 CONCURRENTLY（不鎖讀取）
 REFRESH MATERIALIZED VIEW CONCURRENTLY analytics.mv_system_health;
 ```
+
+> ### 設計陷阱 ⚠️：`snapshot_at` 當 UNIQUE INDEX 的問題
+>
+> `mv_system_health` 用 `NOW() AS snapshot_at` 當唯一欄位。
+> 但每次 REFRESH 時 `NOW()` 會產生新值，這表示：
+>
+> - MATVIEW 永遠只有**一行**（因為整個 view 就是一筆 summary）
+> - `CONCURRENTLY` 做 diff 時，舊行的 `snapshot_at` ≠ 新行的 `snapshot_at`，
+>   所以 PostgreSQL 會「刪舊 + 插新」而不是「更新」，跟普通 REFRESH 效果一樣
+>
+> **這是一個合理的取捨**：mv_system_health 只有一行，REFRESH 成本極低（<1ms），
+> 用 `CONCURRENTLY` 純粹是為了**不鎖讀取**。但如果你的 MATVIEW 有多行資料
+> （如 `mv_product_ranking`），UNIQUE INDEX 就必須選一個**穩定不變的欄位**
+> （如 `product_id`），CONCURRENTLY 才能真正做差異更新。
 
 > ### 腦筋急轉彎 🧠
 >
@@ -376,6 +422,28 @@ REFRESH MATERIALIZED VIEW CONCURRENTLY analytics.mv_system_health;
 >
 > 普通 `REFRESH`（不加 CONCURRENTLY）則是直接砍掉重建，不需要比對。
 > 但它會**鎖住整個 MATVIEW**，刷新期間所有 SELECT 都得等。
+
+### MATVIEW 效能與空間須知
+
+MATVIEW 不是免費的午餐——它用**磁碟空間換查詢速度**：
+
+| 注意事項 | 說明 |
+|---------|------|
+| **佔磁碟空間** | MATVIEW 是一份完整的資料副本。`mv_product_ranking` 有 1 萬筆商品 = 磁碟上多一份 1 萬行的表 |
+| **REFRESH 成本** | 資料量越大，REFRESH 越慢。`CONCURRENTLY` 比普通 REFRESH 慢約 2 倍（因為要 diff），但不鎖讀取 |
+| **離峰排程** | 生產環境應用 `pg_cron` 在離峰時段刷新（下一章會教），不要讓使用者等 |
+| **不會自動更新** | 跟普通 VIEW 不同，MATVIEW **不會隨底層資料自動更新**。你不 REFRESH 它就永遠是舊的 |
+| **查看大小** | `SELECT pg_size_pretty(pg_total_relation_size('analytics.mv_product_ranking'));` |
+
+```sql
+-- 查看所有 MATVIEW 的大小和最後刷新時間
+SELECT
+  schemaname || '.' || matviewname AS matview,
+  pg_size_pretty(pg_total_relation_size(schemaname || '.' || matviewname)) AS size,
+  ispopulated AS has_data  -- false = WITH NO DATA 尚未 REFRESH
+FROM pg_matviews
+WHERE schemaname = 'analytics';
+```
 
 ---
 
@@ -480,15 +548,35 @@ activity AS (
   FROM shop.orders o
   JOIN first_order fo ON fo.customer_id = o.customer_id
   WHERE o.deleted_at IS NULL
+),
+cohort_size AS (
+  -- Step 3: 每個 cohort 的人數
+  SELECT cohort_month, count(DISTINCT customer_id) AS size
+  FROM first_order
+  GROUP BY cohort_month
+),
+retention AS (
+  -- Step 4: 每個 cohort × 每個月份的活躍人數
+  SELECT
+    a.cohort_month,
+    -- 月份差距：activity_month 距離 cohort_month 幾個月
+    (EXTRACT(YEAR FROM a.activity_month) - EXTRACT(YEAR FROM a.cohort_month)) * 12
+      + (EXTRACT(MONTH FROM a.activity_month) - EXTRACT(MONTH FROM a.cohort_month))
+      AS months_since,
+    count(DISTINCT a.customer_id) AS active_users
+  FROM activity a
+  GROUP BY a.cohort_month, months_since
 )
--- Step 3: 計算每個 cohort 在 N 個月後的留存率
+-- Step 5: 合併計算留存率
 SELECT
-  cohort_month,
-  months_since,
-  cohort_size,
-  active_users,
-  round(active_users::NUMERIC / nullif(cohort_size, 0) * 100, 2) AS retention_pct
-FROM ...
+  r.cohort_month,
+  r.months_since,
+  cs.size AS cohort_size,
+  r.active_users,
+  round(r.active_users::NUMERIC / nullif(cs.size, 0) * 100, 2) AS retention_pct
+FROM retention r
+JOIN cohort_size cs ON cs.cohort_month = r.cohort_month
+ORDER BY r.cohort_month, r.months_since;
 ```
 
 **讀法**：「2024-01 的 cohort 有 100 人，3 個月後還有 45 人活躍 = 45% 留存率」
@@ -751,6 +839,28 @@ REFRESH MATERIALIZED VIEW CONCURRENTLY analytics.mv_source_health;
 SELECT analytics.refresh_all();
 ```
 
+### Step 4.5：砍掉重練 MATVIEW
+
+MATVIEW 不是表，不能用 `DROP TABLE`：
+
+```sql
+-- ❌ 這會報錯
+DROP TABLE analytics.mv_system_health;
+-- ERROR: "mv_system_health" is not a table
+
+-- ✅ 正確做法
+DROP MATERIALIZED VIEW analytics.mv_system_health;
+
+-- 如果有其他物件依賴（例如 index），加 CASCADE
+DROP MATERIALIZED VIEW analytics.mv_system_health CASCADE;
+
+-- 重建：重新執行 CREATE MATERIALIZED VIEW ... + CREATE UNIQUE INDEX ...
+-- 然後 REFRESH 填入資料
+```
+
+> **提示**：如果你用 `DROP SCHEMA analytics CASCADE` 重建整個 schema，
+> MATVIEW 會跟著一起被刪掉（因為它存在於 analytics schema 下）。
+
 ### Step 5：查看系統儀表板
 
 ```sql
@@ -776,6 +886,34 @@ SELECT * FROM analytics.data_freshness();
 
 `is_stale = true` 代表該資料源太久沒有新紀錄，可能需要檢查。
 
+### Step 7：插入 Funnel 測試資料並驗證
+
+Part 6 講了漏斗分析，但你需要先有測試資料才能呼叫 `funnel_conversion()` 和 `funnel_dropoff()`：
+
+```sql
+-- 模擬 3 個 session 的漏斗行為
+INSERT INTO analytics.funnel_events (session_id, customer_id, step, step_order, product_id) VALUES
+  -- Session A：完成購買
+  ('sess_A', 'cust_01', 'view',        1, 'prod_01'),
+  ('sess_A', 'cust_01', 'add_to_cart', 2, 'prod_01'),
+  ('sess_A', 'cust_01', 'checkout',    3, NULL),
+  ('sess_A', 'cust_01', 'payment',     4, NULL),
+  ('sess_A', 'cust_01', 'completed',   5, NULL),
+  -- Session B：加了購物車就離開
+  ('sess_B', 'cust_02', 'view',        1, 'prod_02'),
+  ('sess_B', 'cust_02', 'add_to_cart', 2, 'prod_02'),
+  -- Session C：只瀏覽
+  ('sess_C', NULL,       'view',        1, 'prod_03');
+
+-- 驗證漏斗轉換率（過去 30 天）
+SELECT * FROM analytics.funnel_conversion(30);
+-- 預期：view=3, add_to_cart=2, checkout=1, payment=1, completed=1
+
+-- 驗證逐步流失率
+SELECT * FROM analytics.funnel_dropoff(30);
+-- 預期：view→add_to_cart 流失 33.33%，add_to_cart→checkout 流失 50%
+```
+
 ### 📝 驗證清單
 
 ```
@@ -786,6 +924,8 @@ SELECT * FROM analytics.data_freshness();
 □ system_dashboard() 回傳六個領域的指標
 □ data_freshness() 回傳各 schema 的新鮮度
 □ Trigger 有效：INSERT 一筆 shop.orders，analytics.events 自動多一筆
+□ funnel_conversion() 和 funnel_dropoff() 回傳正確的漏斗數據
+□ DROP MATERIALIZED VIEW 可以刪除 MATVIEW（不是 DROP TABLE）
 ```
 
 ---
@@ -794,8 +934,13 @@ SELECT * FROM analytics.data_freshness();
 
 | 檔案 | 用途 |
 |------|------|
-| `../migrations/005_analytics_schema.sql` | 完整 SQL（本章的程式碼來源） |
+| `../migrations/001_extensions.sql` | 前置：schema 建立 + `generate_ulid` |
+| `../migrations/002_shop_schema.sql` | 前置：shop schema 完整表結構 |
+| `../migrations/003_crawler_schema.sql` | 前置：crawler schema 完整表結構 |
+| `../migrations/004_rag_schema.sql` | 前置：rag schema 完整表結構 |
+| `../migrations/005_analytics_schema.sql` | **本章的程式碼來源**（完整 SQL） |
 | `03_sql-editor-mastery.md` | SQL Editor 操作（前置技能） |
+| `02_schema-strategy.md` | Schema 分區策略（前置觀念） |
 | `08_cron-webhook-vault.md` | 排程刷新 MATVIEW（下一章） |
 
 ---

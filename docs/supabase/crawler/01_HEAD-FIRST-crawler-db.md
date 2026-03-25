@@ -1,1010 +1,1038 @@
-# Head First: Crawler Database Design with Supabase
+# Head First Crawler 資料庫設計
 
-> 用你手上「有 29 個違規」的爬蟲 Schema，一步一步改成生產級架構。
-> 每個 Stage 先看「錯在哪」，再學「為什麼」，最後動手「改成對的」。
-
----
-
-## 你會學到什麼
-
-```
-Stage 1  為什麼 ID 不能用 bigserial？                    (PK & FK 型別)
-Stage 2  每張表少了哪些「必備零件」？                      (欄位紀律)
-Stage 3  為什麼 CREATE TABLE 後面還有一堆東西？            (Index 策略)
-Stage 4  RLS 是什麼？為什麼你「以為沒開」其實更危險？       (安全層)
-Stage 5  如果不處理，三個月後你的 DB 會怎麼死？             (規模化)
-Stage 6  完成品長什麼樣子？                               (Corrected SQL)
-```
+> **對應 SQL**：`migrations/003_crawler_schema.sql` (v3.0 post-audit)
+>
+> **閱讀方式**：這不是 API 文件。請從頭讀到尾，跟著「動腦時間」思考，
+> 答案就在下一段。跳著讀會少掉 80% 的收穫。
 
 ---
 
-## 在開始之前：你現在的 Schema 長這樣
+## 你在蓋什麼？
 
-打開 `003_crawler_schema.sql`，你會看到 10 張表：
+想像你要建一個**自動化新聞爬蟲系統**：
+
+1. 你告訴系統：「去抓 TechCrunch、Hacker News、iThome 的文章」
+2. 系統排隊、分配工作給多個 Worker
+3. Worker 用 Playwright 打開瀏覽器、抓頁面、抽出文章
+4. 文章存進資料庫、圖片傳到 Storage、標籤分類好
+5. 最後推送到你的 WordPress / Notion / Ghost
+
+整條 pipeline 需要 **10 張資料表 + 1 支 RPC 函式**。
+這份教學會帶你從第一張表走到最後一行 RLS policy。
 
 ```
-sources ──→ crawl_runs
-        ──→ crawl_queue
-        ──→ source_pages ──→ articles ──→ article_assets
-                                     ──→ article_tags ──→ tags
-                                     ──→ article_publications ──→ publish_targets
+┌─────────────────────────────────────────────────────┐
+│                    你的爬蟲系統                        │
+│                                                     │
+│  Scheduler ──enqueue──→ crawl_queue                 │
+│                            │ lease                  │
+│                            ▼                        │
+│                     Playwright Worker               │
+│                       │        │                    │
+│                  fetch HTML   extract               │
+│                       │        │                    │
+│                       ▼        ▼                    │
+│               source_pages  articles                │
+│                            ╱   │   ╲                │
+│                     assets  tags  publications      │
+└─────────────────────────────────────────────────────┘
 ```
-
-看起來結構清楚對吧？
-
-**但是這份 SQL 拿去 code review，會被打回來 29 次。**
-
-別擔心——這正是我們要用來學習的素材。
 
 ---
 
-# Stage 1: 地基搞錯，整棟歪掉
+## Chapter 1：Convention —— 不先講規矩，後面全部重寫
 
-## 你的 ID 用錯了
+### 🤔 動腦時間
 
-打開你的 `sources` 表定義：
+> 你要設計 10 張表的 Primary Key。以下兩種方案，你選哪個？
+>
+> **A)** `id bigserial primary key` —— 自增整數，PostgreSQL 預設
+>
+> **B)** `id text primary key default generate_ulid()` —— 26 字元字串
+>
+> 先想 30 秒再往下看。
+
+### 答案：選 B，而且沒有商量餘地
+
+| 比較項目 | bigserial | ULID (text) |
+|---------|-----------|-------------|
+| 時間排序 | ❌ 無意義 | ✅ 內建時間戳，可排序 |
+| 分散式安全 | ❌ 多節點會撞號 | ✅ 隨機成分，不撞號 |
+| 可讀性 | `1234567` | `01H5K3J...` 看得出大概時間 |
+| B-Tree 友善 | ✅ | ✅ 字典序 ≈ 時間序 |
+| FK 型別一致 | 要用 `bigint` | 全部用 `text` |
+
+**規矩 1**：所有 PK 都是 `text default generate_ulid()`。所有 FK 都是 `text`。
+
+> `generate_ulid()` 定義在 `001_extensions.sql`，本檔不重複定義。
+
+### 每張表都要有的欄位
 
 ```sql
-create table public.sources (
-  id bigserial primary key,    -- ← 這行就是問題
-  ...
+-- 必備
+created_at  timestamptz  not null default now()
+updated_at  timestamptz  not null default now()
+project_id  text         not null    -- 多租戶隔離用
+
+-- 選配（人為產生的資料）
+created_by  text                    -- 記錄是誰建的
+```
+
+**規矩 2**：`updated_at` 由 `moddatetime` trigger 自動維護，不靠應用層。
+
+**規矩 3**：constraint 一律明確命名（`constraint ck_xxx check (...)`），不用匿名。
+
+**規矩 4**：DDL 一律 `IF NOT EXISTS`，讓 migration 可重跑。
+
+### ❓ 沒有笨問題
+
+**Q：為什麼 `project_id` 不是 FK 到某個 projects 表？**
+A：Crawler schema 是獨立 module。`project_id` 只是一個 tenant key，
+由 JWT 的 `app_metadata.project_ids` 控制存取。
+不做 FK 是為了解耦——projects 表可能在另一個 schema 裡。
+
+**Q：`moddatetime` 是什麼？**
+A：PostgreSQL extension。只要 UPDATE 觸發 trigger，就自動把指定欄位設成 `now()`。
+比手寫 trigger function 簡潔，而且是 Supabase 內建支援的。
+
+---
+
+## Chapter 2：Sources —— 爬蟲從哪裡開始？
+
+一切從「來源」開始。每個 source 代表一個網站或頻道。
+
+```sql
+create table if not exists crawler.sources (
+  id                text primary key default public.generate_ulid(),
+  project_id        text         not null,
+  code              text         not null,       -- 'techcrunch', 'ithome'
+  name              text         not null,       -- '科技新報'
+  description       text,
+  base_url          text,                        -- 'https://technews.tw'
+  domain            text,                        -- 'technews.tw'
+  crawler_url       text,                        -- 起始抓取 URL
+  config            jsonb  not null default '{}', -- 瀏覽器設定
+  extractor_schema  jsonb  not null default '{}', -- CSS selector 規則
+  field_mapping     jsonb  not null default '{}', -- 欄位對應
+  is_enabled        boolean not null default true,
+  schedule_cron     text,                        -- '0 */6 * * *'
+  last_run_at       timestamptz,
+  created_by        text,
+  created_at        timestamptz  not null default now(),
+  updated_at        timestamptz  not null default now(),
+  constraint uq_sources_code_per_project unique (project_id, code)
 );
 ```
 
-然後看所有 FK：
+### 🤔 動腦時間
+
+> `config`、`extractor_schema`、`field_mapping` 都是 JSONB。
+> 為什麼不拆成獨立的關聯表？
+
+### 答案：這些是「設定」不是「資料」
+
+- 設定是**整塊讀、整塊寫**的。不需要 SQL 查詢 `WHERE config.timeout > 5000`。
+- 每個 source 的設定結構可能不同（有的要登入、有的不用）。
+- JSONB 在 PostgreSQL 裡有索引支援，但我們根本不需要查它——所以用 JSONB 最省事。
+
+**黃金法則**：需要 WHERE/JOIN/GROUP BY 的欄位 → 獨立 column。
+只需整塊讀寫的 → JSONB。
+
+### config 長什麼樣？
+
+```jsonc
+{
+  "user_agent": "Mozilla/5.0 ...",
+  "headers": { "Accept-Language": "zh-TW" },
+  "cookies": [{ "name": "session", "value": "abc", "domain": ".example.com" }],
+  "wait_until": "networkidle",    // Playwright 等待策略
+  "timeout_ms": 30000,
+  "block_resources": ["image", "font", "media", "stylesheet"],
+  "login_required": false
+}
+```
+
+### Indexes
 
 ```sql
-source_id bigint not null references public.sources(id)    -- ← bigint 配 bigserial
+create index if not exists idx_sources_project
+  on crawler.sources(project_id);
+
+create index if not exists idx_sources_enabled
+  on crawler.sources(project_id, is_enabled)
+  where is_enabled = true;
 ```
 
-### 想一想：bigserial 有什麼問題？
+為什麼 `idx_sources_enabled` 是 **partial index** (`WHERE is_enabled = true`)？
 
-`bigserial` 就是 `BIGINT` + 自動遞增。看起來很直覺，但在 Supabase 資料科學專案裡：
+因為你幾乎只查啟用中的來源。停用的不進索引，省空間、更快。
 
-```
-bigserial 的問題：
+---
 
-  1. 不可排序 by 時間         你拿到 id=42，不知道它是今天還是去年
-  2. B-Tree 效能還 OK         但比不上 ULID 的順序寫入
-  3. 跟 Supabase Auth 打架    auth.users 用 UUID → 你的表用 BIGINT → 型別不一致
-  4. FK 型別混亂              有些表 bigint，以後接 Auth 又變 UUID，炸了
-```
+## Chapter 3：Crawl Runs —— 這次跑了幾篇？
 
-### 正確做法：ULID (TEXT)
-
-```
-ULID = 時間戳 (48 bit) + 隨機 (80 bit)
-     = 26 字元 Crockford Base32
-     = 例如 01HXYZ3ABCDEFGHJKMNPQRSTV
-
-特性：
-  - 按時間排序 ✅ (前 10 字元是 timestamp)
-  - 全球唯一 ✅
-  - B-Tree 友善 ✅ (順序寫入，不會頁分裂)
-  - 存成 TEXT ✅ (跟 FK 型別統一)
-```
-
-### 看看正確版本長什麼樣（Shop schema 的做法）
+每次排程觸發（或手動觸發）就開一筆 `crawl_run`。
+它追蹤的是「這次批次」的整體狀態。
 
 ```sql
--- Shop schema 的做法
-create table if not exists public.users (
-  id text primary key default generate_ulid(),    -- TEXT，不是 BIGINT
-  ...
+create table if not exists crawler.crawl_runs (
+  id                  text primary key default public.generate_ulid(),
+  project_id          text         not null,
+  source_id           text         not null
+                      references crawler.sources(id) on delete cascade,
+  run_status          text         not null default 'pending',
+  started_at          timestamptz,
+  finished_at         timestamptz,
+  pages_found         integer      not null default 0,
+  pages_fetched       integer      not null default 0,
+  articles_extracted  integer      not null default 0,
+  error_count         integer      not null default 0,
+  logs                jsonb        not null default '[]'::jsonb,
+  created_at          timestamptz  not null default now(),
+  updated_at          timestamptz  not null default now(),
+  constraint ck_crawl_runs_status
+    check (run_status in ('pending','running','success','partial','failed'))
 );
 ```
 
-所有 FK 也統一用 TEXT：
+### ❓ 沒有笨問題
+
+**Q：`run_status` 為什麼不用 ENUM type？**
+A：PostgreSQL ENUM 修改很痛苦（加值要 `ALTER TYPE ... ADD VALUE`，無法在 transaction 裡做）。
+用 `text` + `CHECK` constraint 更靈活——加新狀態只要 `ALTER TABLE ... DROP CONSTRAINT ... ADD CONSTRAINT`。
+
+**Q：`partial` 狀態是什麼意思？**
+A：部分成功。例如 100 頁抓了 80 頁，20 頁失敗。
+不算 `success`（有失敗），也不算 `failed`（大部分成功）。
+
+**Q：`logs` 為什麼用 JSONB array 而不是另開 log 表？**
+A：一次 crawl run 的 log 量不大（幾十到幾百條），而且跟 run 是 1:1 綁定。
+存成 JSONB array 在查詢時直接跟著 run 一起讀，不用 JOIN。
+
+### 索引
 
 ```sql
-source_id text not null references public.sources(id)    -- TEXT 配 TEXT
+create index if not exists idx_crawl_runs_project
+  on crawler.crawl_runs(project_id);
+create index if not exists idx_crawl_runs_source
+  on crawler.crawl_runs(source_id, created_at desc);
 ```
 
-### 還沒完——你需要 generate_ulid() 函式
-
-你的 schema 載入了 `pgcrypto` 和 `uuid-ossp`，但 `generate_ulid()` 不會從天上掉下來。你必須自己定義它。
-
-```sql
--- 這個函式必須在所有 CREATE TABLE 之前
-create or replace function public.generate_ulid()
-returns text
-language plpgsql
-volatile
-as $$
-declare
-  timestamp  bigint;
-  output     text := '';
-  unix_ts    bigint;
-  encoding   char[] := string_to_array('0123456789ABCDEFGHJKMNPQRSTVWXYZ', null);
-  i          int;
-  rand_bytes bytea;
-begin
-  unix_ts := (extract(epoch from clock_timestamp()) * 1000)::bigint;
-  for i in reverse 9..0 loop
-    output := output || encoding[1 + (unix_ts % 32)::int];
-    unix_ts := unix_ts >> 5;
-  end loop;
-  rand_bytes := gen_random_bytes(10);
-  for i in 0..9 loop
-    output := output || encoding[1 + (get_byte(rand_bytes, i) % 32)];
-  end loop;
-  return output;
-end;
-$$;
-```
-
-### `uuid-ossp`？拿掉
-
-你的 schema 載入了 `uuid-ossp`，但：
-- `generate_ulid()` 用的是 `pgcrypto`（`gen_random_bytes`）
-- lease RPC 的 `gen_random_uuid()` 也來自 `pgcrypto`
-- 業務表不用 UUID
-
-所以 `uuid-ossp` 是多餘的，拿掉。
+第二個是 composite index：「查某個 source 最近的 runs」—— `WHERE source_id = ? ORDER BY created_at DESC` 一個索引搞定。
 
 ---
 
-### 動動腦：為什麼 FK 型別不一致會炸？
+## Chapter 4：Crawl Queue —— Lease-Based 工作佇列
 
-假設你有：
+這是整個系統**最複雜、最有趣**的一張表。
+
+### 🤔 動腦時間
+
+> 假設你有 3 個 Worker 同時跑，每個都要從 queue 裡「搶一筆工作」。
+> 如果只用 `status = 'running'` 來標記，會出什麼問題？
+>
+> 提示：Worker 2 搶到工作後掛掉了，再也不會回來…
+
+### 問題：沒有「過期」機制
+
+如果 Worker 掛掉，那筆工作就永遠卡在 `running`。
+沒人會去接手它。你的 queue 裡會慢慢累積「殭屍任務」。
+
+**解法：Lease-Based Concurrency Control**
+
+```
+pending ──lease──→ leased ──start──→ running ──→ done
+                     │                  │
+                     │ (expired)        ├──→ failed ──retry──→ pending
+                     └──reclaim──→ pending    │
+                                        └──→ dead (max retries)
+                                        └──→ skipped (policy denied)
+```
+
+「Lease」就是租約。Worker 搶到工作時拿到一個 `lease_token` 和 `lease_expires_at`。
+如果時間到了 Worker 沒回報完成，其他 Worker 可以接手。
+
+### 完整 Schema
 
 ```sql
--- 表 A 用 BIGINT
-create table sources (id bigserial primary key);
-
--- 表 B 用 TEXT（因為未來要接 ULID）
-create table articles (id text primary key default generate_ulid());
-
--- 然後你想 JOIN：
-select * from articles a
-join sources s on a.source_id = s.id;
--- ❌ ERROR: operator does not exist: text = bigint
+create table if not exists crawler.crawl_queue (
+  id               text primary key default public.generate_ulid(),
+  project_id       text         not null,
+  source_id        text         not null
+                   references crawler.sources(id) on delete cascade,
+  url              text         not null,
+  page_type        text         not null default 'article',
+  priority         integer      not null default 100,     -- 越大越優先
+  status           text         not null default 'pending',
+  retry_count      integer      not null default 0,
+  max_retries      integer      not null default 5,
+  scheduled_at     timestamptz  not null default now(),
+  locked_at        timestamptz,          -- legacy, 保留但不用
+  finished_at      timestamptz,
+  -- ⭐ lease 機制的核心欄位
+  lease_token      text,                 -- UUID，每次 lease 重新產生
+  leased_at        timestamptz,
+  lease_expires_at timestamptz,
+  worker_id        text,                 -- 是哪個 Worker 在處理
+  error_code       text,
+  error_message    text,
+  payload          jsonb not null default '{}',
+  created_at       timestamptz  not null default now(),
+  constraint ck_crawl_queue_status
+    check (status in ('pending','leased','running','done',
+                      'failed','skipped','dead'))
+);
 ```
 
-**型別不一致 = JOIN 爆炸。整個系統的 PK/FK 必須統一。**
-
----
-
-### Stage 1 自我檢查
-
-```
-□ generate_ulid() 函式已定義
-□ 所有表的 PK 改成 id text primary key default generate_ulid()
-□ 所有 FK 改成 text（不是 bigint）
-□ 移除 uuid-ossp extension
-□ 只保留 pgcrypto extension
-```
-
----
-
-# Stage 2: 每張表少了什麼零件？
-
-## 一張表的「必備組件」
-
-根據 guidelines，每張「業務表」必須有：
+### 索引：為 Lease Query 量身打造
 
 ```sql
--- === 必備零件 ===
-id          text primary key default generate_ulid(),  -- PK
-created_at  timestamptz not null default now(),         -- 何時建立
-updated_at  timestamptz not null default now(),         -- 何時更新
-```
+-- 基礎索引
+create index if not exists idx_crawl_queue_project
+  on crawler.crawl_queue(project_id);
+create index if not exists idx_crawl_queue_source
+  on crawler.crawl_queue(source_id);
+create index if not exists idx_crawl_queue_status
+  on crawler.crawl_queue(status, priority desc);
 
-如果有多租戶需求，加：
-```sql
-project_id  text not null references projects(id) on delete cascade,
-```
-
-如果是使用者操作產生的資料，加：
-```sql
-created_by  text not null references users(id),
-```
-
-## 你的表少了什麼？
-
-```
-表名                 | updated_at | trigger | project_id | 判定
----------------------|------------|---------|------------|------
-sources              | ✅          | ✅       | ❌          | 少 project_id
-crawl_runs           | ❌          | ❌       | ❌          | 少 updated_at + trigger
-crawl_queue          | ❌*         | ❌       | ❌          | 少 updated_at + trigger
-source_pages         | ✅          | ✅       | ❌          | 少 project_id
-articles             | ✅          | ✅       | ❌          | 少 project_id
-article_assets       | ✅          | ✅       | ❌          | OK（結構完整）
-tags                 | ❌          | ❌       | ❌          | 少 updated_at
-publish_targets      | ❌          | ❌       | ❌          | 少 updated_at + trigger
-article_publications | ❌          | ❌       | ❌          | 少 created_at + updated_at
-article_tags         | ❌          | ❌       | ❌          | 聯結表，可以不要
-```
-
-### 為什麼 updated_at 這麼重要？
-
-```
-沒有 updated_at 的後果：
-
-  1. 你不知道一筆 crawl_run 最後更新是什麼時候
-  2. 你不知道一個 publish_target 的 config 何時被改過
-  3. 你做 cache invalidation 沒有依據
-  4. 你做 ETL sync 沒辦法做 incremental update
-  5. debug 的時候你只知道「建立時間」，不知道「最後異動時間」
-```
-
-### 修復：加上 updated_at + trigger
-
-trigger 函式的名稱，guidelines 建議用 `update_updated_at_column()`。
-但其實你也可以用 `moddatetime` extension（跟 Shop schema 一樣），更簡潔：
-
-```sql
--- 方法 A：手寫 trigger function（你現在的做法，但名字要改）
-create or replace function public.update_updated_at_column()
-returns trigger as $$
-begin
-  new.updated_at = now();
-  return new;
-end;
-$$ language plpgsql;
-
--- 方法 B：用 moddatetime extension（更簡潔）
-create extension if not exists moddatetime;
--- 然後 trigger 寫法：
-create trigger trg_sources_updated_at
-  before update on public.sources
-  for each row execute function moddatetime(updated_at);
-```
-
-### UNIQUE 約束：一定要命名
-
-你的 schema：
-```sql
-unique (source_id, url)           -- ← 沒名字
-```
-
-六個月後你要改這個約束，你得這樣找：
-```sql
--- 你必須先查出系統自動產生的名字
-select constraint_name from information_schema.table_constraints
-where table_name = 'source_pages' and constraint_type = 'UNIQUE';
--- 結果可能是 source_pages_source_id_url_key  ← 自動命名，不直覺
-```
-
-正確做法——命名它：
-```sql
-constraint uq_source_pages_source_url unique (source_id, url)
-```
-
-以後修改就很明確：
-```sql
-alter table source_pages drop constraint uq_source_pages_source_url;
-```
-
-### 還有一個死掉的欄位
-
-`crawl_queue` 有個 `locked_at` 欄位（line 88），但整個系統都用 `leased_at` 做 lease。`locked_at` 從來沒被使用過。
-
-**規則：不會用的欄位，不要留。它會困擾每個讀 schema 的人。**
-
----
-
-### project_id：要不要加？
-
-這是一個架構決策，不是程式 bug。
-
-```
-場景 A: 這個 crawler 只給一個專案用
-  → 不加 project_id，但在文件裡說明「此模組為 single-tenant」
-
-場景 B: 未來可能多個專案共用同一套 crawler
-  → 每張表加 project_id
-  → 所有查詢加上 WHERE project_id = $1
-  → RLS policy 走 is_project_member(project_id)
-```
-
-**現在先做的建議**：在 `sources` 加上 `project_id`（來源站歸屬哪個專案），其他表透過 FK 間接繼承。
-
----
-
-### Stage 2 自我檢查
-
-```
-□ 所有表有 created_at + updated_at（除 article_tags 聯結表）
-□ 所有有 updated_at 的表有對應 trigger
-□ trigger function 用統一名稱
-□ 所有 UNIQUE 約束有明確命名
-□ 所有 CHECK 約束有明確命名
-□ 移除 locked_at 死欄位
-□ DDL 全部加上 IF NOT EXISTS（冪等）
-□ publish_targets.target_type 加上 CHECK 約束
-```
-
----
-
-# Stage 3: 沒有 Index，你的查詢在裸奔
-
-## 你知道 FK 欄位沒 index 會怎樣嗎？
-
-當你 `DELETE FROM sources WHERE id = 'xxx'` 時：
-PostgreSQL 必須檢查所有引用 `sources(id)` 的表，確認沒有 orphan row。
-
-**如果 FK 欄位沒 index → 全表掃描。**
-
-```
-你的 7 個 FK 欄位缺 index：
-
-  crawl_queue.source_id          ← 每次刪 source 都掃描整張 queue
-  source_pages.crawl_run_id      ← 刪 crawl_run 時掃描所有 pages
-  articles.source_page_id        ← 刪 source_page 時掃描所有 articles
-  article_assets.source_page_id  ← 同上
-  article_tags.tag_id            ← 刪 tag 時掃描所有 article_tags
-  article_publications.target_id ← 刪 publish_target 時掃描所有 publications
-  tags.parent_id                 ← 刪 parent tag 時掃描所有 tags
-```
-
-### 修復：Tier 1 Index（每個 FK 一個）
-
-```sql
-create index if not exists idx_crawl_queue_source     on public.crawl_queue(source_id);
-create index if not exists idx_source_pages_run       on public.source_pages(crawl_run_id);
-create index if not exists idx_articles_source_page   on public.articles(source_page_id);
-create index if not exists idx_assets_source_page     on public.article_assets(source_page_id);
-create index if not exists idx_article_tags_tag       on public.article_tags(tag_id);
-create index if not exists idx_publications_target    on public.article_publications(target_id);
-create index if not exists idx_tags_parent            on public.tags(parent_id);
-```
-
-## 你的 Lease 查詢也在裸奔
-
-lease RPC 的 WHERE 子句：
-
-```sql
-WHERE (status = 'pending' AND scheduled_at <= now())
-   OR (status = 'leased' AND lease_expires_at < now())
-ORDER BY priority DESC, scheduled_at ASC
-```
-
-你現在只有 `idx_crawl_queue_status(status, priority desc)`。
-
-**問題**：
-```
-PostgreSQL 看到 OR 條件，通常放棄用 index，改成 seq scan。
-即使用了 index，也只能先按 status 篩選，再逐一比 scheduled_at。
-```
-
-**正確做法——Partial Index（只索引你在意的子集）**：
-
-```sql
--- 待處理的工作：按優先級和排程時間排序
-create index if not exists idx_crawl_queue_pending
-  on public.crawl_queue(priority desc, scheduled_at asc)
+-- ⭐ Lease query 專用 partial index
+create index if not exists idx_crawl_queue_lease
+  on crawler.crawl_queue(status, scheduled_at)
   where status = 'pending';
 
--- 過期的 lease：按過期時間排序
-create index if not exists idx_crawl_queue_expired_lease
-  on public.crawl_queue(lease_expires_at asc)
-  where status = 'leased';
+-- ⭐ 防重複：同一 source+url 不能有兩筆 pending
+create unique index if not exists uq_crawl_queue_pending_source_url
+  on crawler.crawl_queue(source_id, url)
+  where status = 'pending';
 ```
 
-**Partial Index 的好處**：
-```
-1. 只索引符合 WHERE 條件的 row → index 更小
-2. 查詢時直接命中 → 不掃描 done/failed/dead 的垃圾
-3. 寫入時只有 pending/leased 的 row 需要維護 index → 寫入更快
-```
+### 🤔 動腦時間
 
-## Composite Index：常見查詢模式
+> `uq_crawl_queue_pending_source_url` 這個 unique partial index 在做什麼？
+> 為什麼不是全表 unique？
 
-你的 API 一定會做這些查詢：
+### 答案
+
+同一個 URL 可能被抓很多次（retry、重新排程）。
+我們只需要確保「此刻 pending 狀態裡」不會有重複的 source + url。
+已經 done / failed 的可以重複出現——那是歷史紀錄。
+
+全表 unique 會讓 retry 無法 enqueue，系統就壞了。
+
+### ❓ 沒有笨問題
+
+**Q：`crawl_queue` 為什麼沒有 `updated_at` 和 moddatetime trigger？**
+A：它是 append-heavy 的狀態機。每次 lease / complete / fail 都會 UPDATE 特定欄位，
+但語意上不需要通用的「最後更新時間」。`leased_at`、`finished_at` 已經紀錄了關鍵時間點。
+
+**Q：`locked_at` 是什麼？**
+A：舊設計的殘留。v3.0 保留了欄位但不再使用。未來清理時可以 DROP。
+
+**Q：`priority` 越大越優先？不是越小嗎？**
+A：這是設計選擇。`ORDER BY priority DESC` —— 100 是預設，
+200 是高優先，50 是低優先。語意上「分數越高越重要」比較直覺。
+
+---
+
+## Chapter 5：Source Pages —— 原始 HTML 快照
+
+Worker 抓到的每一頁都存在這裡。不管是列表頁還是文章頁，先存快照再說。
 
 ```sql
--- 「列出某 source 下最新的 articles」
-SELECT id, title, published_at FROM articles
-WHERE source_id = $1 ORDER BY published_at DESC LIMIT 50;
-
--- 「列出某 source 下的 pages，按類型分」
-SELECT id, url, page_type FROM source_pages
-WHERE source_id = $1 AND page_type = 'article' ORDER BY fetched_at DESC LIMIT 50;
+create table if not exists crawler.source_pages (
+  id             text primary key default public.generate_ulid(),
+  project_id     text         not null,
+  source_id      text         not null
+                 references crawler.sources(id) on delete cascade,
+  crawl_run_id   text
+                 references crawler.crawl_runs(id) on delete set null,
+  page_type      text         not null default 'article',
+  topic          text,
+  url            text         not null,
+  canonical_url  text,
+  title          text,
+  raw_html       text,                  -- ⚠️ 可能很大
+  snapshot_json  jsonb,                 -- 結構化快照
+  http_status    integer,
+  fetched_at     timestamptz,
+  last_seen_at   timestamptz,
+  is_available   boolean      not null default true,
+  created_at     timestamptz  not null default now(),
+  updated_at     timestamptz  not null default now(),
+  constraint uq_source_pages_source_url unique (source_id, url),
+  constraint ck_source_pages_type
+    check (page_type in ('list','article','detail','unknown'))
+);
 ```
 
-沒有 composite index → seq scan + sort。加上：
+### 🤔 動腦時間
+
+> `raw_html` 是 TEXT 欄位，一篇文章可能有 200KB。
+> 10 萬頁 = 20GB 光是 HTML。
+> 如果你執行 `SELECT * FROM source_pages WHERE source_id = ?`，會發生什麼事？
+
+### 答案：TOAST 與查詢策略
+
+PostgreSQL 會自動把大欄位 TOAST（壓縮 + 外部存儲），
+但 `SELECT *` 還是會把它全部讀回來。
+
+**正確做法**：
+1. 查列表時永遠 `SELECT id, url, title, http_status, fetched_at ...`，不選 `raw_html`
+2. 只有需要重新解析時才讀 `raw_html`
+3. 未來可考慮搬到 Supabase Storage（存 .html 檔），表裡只存 `storage_path`
+
+### 索引
 
 ```sql
-create index if not exists idx_articles_source_published
-  on public.articles(source_id, published_at desc);
+create index if not exists idx_source_pages_project
+  on crawler.source_pages(project_id);
+create index if not exists idx_source_pages_source
+  on crawler.source_pages(source_id);
+create index if not exists idx_source_pages_crawl_run
+  on crawler.source_pages(crawl_run_id)
+  where crawl_run_id is not null;       -- partial: 不索引 NULL
+create index if not exists idx_source_pages_fetched
+  on crawler.source_pages(fetched_at desc);
+```
 
-create index if not exists idx_source_pages_source_type
-  on public.source_pages(source_id, page_type, fetched_at desc);
+`crawl_run_id` 的 partial index 很聰明——如果 run_id 是 NULL（手動匯入的頁面），
+不需要進索引。省空間，而且 `WHERE crawl_run_id = ?` 查詢更快。
+
+### snapshot_json 長什麼樣？
+
+```jsonc
+{
+  "final_url": "https://example.com/article/123",  // 經過 redirect 後的真實 URL
+  "title": "AI 改變世界",
+  "meta": { "og:image": "https://..." },
+  "links": ["https://example.com/related/1", "..."],
+  "screenshots": ["storage://bucket/path/screenshot.png"],
+  "extracted_selectors": { "h1": "AI 改變世界", ".author": "張三" }
+}
 ```
 
 ---
 
-### Index 決策快速流程
+## Chapter 6：Articles —— 正規化的成果
 
+這是 pipeline 的**最終產物**。從 source_pages 的 raw HTML 中萃取、清洗、正規化後的文章。
+
+```sql
+create table if not exists crawler.articles (
+  id                 text primary key default public.generate_ulid(),
+  project_id         text         not null,
+  source_id          text         not null
+                     references crawler.sources(id) on delete cascade,
+  source_page_id     text
+                     references crawler.source_pages(id) on delete set null,
+  external_id        text,               -- 來源網站的原始 ID
+  title              text         not null,
+  slug               text,
+  author_name        text,
+  author_url         text,
+  abstract           text,
+  content_html       text,               -- 清洗後的 HTML
+  content_text       text,               -- 純文字版
+  published_at       timestamptz,        -- 原文發布時間
+  source_modified_at timestamptz,        -- 原文修改時間
+  source_url         text         not null,
+  canonical_url      text,
+  lang               text,               -- 'zh-TW', 'en', 'ja'
+  meta               jsonb  not null default '{}',
+  extraction_data    jsonb  not null default '{}',
+  is_published       boolean not null default true,
+  is_available       boolean not null default true,
+  content_hash       text,               -- 用於偵測內容是否更新
+  created_at         timestamptz  not null default now(),
+  updated_at         timestamptz  not null default now(),
+  constraint uq_articles_source_url unique (source_id, source_url)
+);
 ```
-新增表時問自己：
-  Q1: 有 FK 欄位？       → Tier 1 單欄 index（每個 FK 一個）
-  Q2: 有 list API？      → Tier 3 composite index（scope + sort）
-  Q3: 有特定狀態高頻查？  → Tier 4 partial index（WHERE status = 'xxx'）
-  Q4: 要查 JSONB 內容？  → Tier 5 GIN index（慎用，確定需要才加）
+
+### 🤔 動腦時間
+
+> `content_hash` 是做什麼用的？
+> 提示：同一篇文章可能被抓很多次…
+
+### 答案：冪等 Upsert
+
+爬蟲可能每天重新抓同一篇文章。如果內容沒變，不需要更新。
+
+```python
+# 虛擬碼
+new_hash = sha256(content_html)
+if new_hash == existing_article.content_hash:
+    skip()  # 沒變，不 UPDATE
+else:
+    upsert(content_html=..., content_hash=new_hash)
 ```
+
+這避免了：
+- 不必要的 UPDATE（觸發 trigger、寫 WAL）
+- `updated_at` 被無意義地刷新
+- Downstream 系統收到假的「內容更新」通知
+
+### 兩個 JSONB 欄位的分工
+
+**`meta`** —— 文章本身的 metadata：
+
+```jsonc
+{
+  "categories": ["AI", "科技"],
+  "tags": ["ChatGPT", "LLM"],
+  "og_image": "https://...",
+  "section": "Technology",
+  "keywords": ["artificial intelligence"],
+  "byline_raw": "By 張三 and 李四",
+  "source_labels": ["Premium", "Exclusive"]
+}
+```
+
+**`extraction_data`** —— 萃取過程的 metadata（debug 用）：
+
+```jsonc
+{
+  "extractor_version": "1.2.0",
+  "raw_published_at": "2024-03-15T10:00:00+08:00",
+  "raw_author": "張三",
+  "selector_matches": { "h1": true, ".author": true, ".date": false },
+  "extraction_warnings": ["date selector missed, using og:published_time"],
+  "language_confidence": 0.95,
+  "ai_normalized": false
+}
+```
+
+分開存的好處：`meta` 給前端用、`extraction_data` 給 debug 用。
+前端永遠不需要知道 `selector_matches`。
+
+### 索引
+
+```sql
+create index if not exists idx_articles_project
+  on crawler.articles(project_id);
+create index if not exists idx_articles_source
+  on crawler.articles(source_id);
+create index if not exists idx_articles_source_page
+  on crawler.articles(source_page_id)
+  where source_page_id is not null;
+create index if not exists idx_articles_published
+  on crawler.articles(published_at desc);
+create index if not exists idx_articles_hash
+  on crawler.articles(content_hash)
+  where content_hash is not null;
+```
+
+`content_hash` 的 partial index 讓 upsert 的「查重」非常快。
 
 ---
 
-### Stage 3 自我檢查
+## Chapter 7：配角群 —— Assets, Tags, Publishing
 
+### Article Assets（文章附件）
+
+圖片、影片、檔案。存到 Supabase Storage 後，這裡記錄 metadata。
+
+```sql
+create table if not exists crawler.article_assets (
+  id             text primary key default public.generate_ulid(),
+  project_id     text         not null,
+  article_id     text         not null
+                 references crawler.articles(id) on delete cascade,
+  source_page_id text
+                 references crawler.source_pages(id) on delete set null,
+  asset_type     text         not null default 'image',
+  original_url   text,
+  storage_bucket text,
+  storage_path   text,
+  mime_type      text,
+  alt_text       text,
+  caption        text,
+  width          integer,
+  height         integer,
+  checksum       text,
+  sort_order     integer      not null default 0,
+  created_at     timestamptz  not null default now(),
+  updated_at     timestamptz  not null default now(),
+  constraint ck_article_assets_type
+    check (asset_type in ('image','video','file','audio'))
+);
 ```
-□ 所有 FK 欄位有單欄 index
-□ crawl_queue 有 partial index 給 lease 查詢
-□ articles、source_pages 有 composite index 給 list 查詢
-□ 沒有多餘的 index（同一表不超過 5 個 composite）
+
+`sort_order` 控制顯示順序——文章裡第一張圖 `sort_order=0`，第二張 `sort_order=1`。
+
+### Tags（標籤系統）
+
+```sql
+create table if not exists crawler.tags (
+  id          text primary key default public.generate_ulid(),
+  project_id  text         not null,
+  taxonomy    text         not null default 'tag',
+  name        text         not null,
+  slug        text,
+  description text,
+  parent_id   text references crawler.tags(id) on delete set null,
+  meta        jsonb        not null default '{}',
+  created_at  timestamptz  not null default now(),
+  updated_at  timestamptz  not null default now(),
+  constraint uq_tags_taxonomy_name unique (taxonomy, name)
+);
 ```
+
+### 🤔 動腦時間
+
+> `taxonomy` 欄位有什麼用？為什麼不直接叫 tags 表就好？
+
+### 答案：一表多用
+
+`taxonomy` 可以是 `'tag'`、`'category'`、`'topic'`、`'series'`。
+這樣一張表就能管所有分類系統，不用開 4 張表。
+
+`parent_id` 是自引用 FK —— 可以做出巢狀分類：
+```
+Technology (category)
+  └── AI (category)
+      └── LLM (topic)
+```
+
+### Article Tags（多對多關聯）
+
+```sql
+create table if not exists crawler.article_tags (
+  article_id text not null references crawler.articles(id) on delete cascade,
+  tag_id     text not null references crawler.tags(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (article_id, tag_id)
+);
+```
+
+經典的 junction table。PK 就是複合鍵 `(article_id, tag_id)`，天然防重複。
+
+### Publish Targets & Article Publications
+
+```sql
+-- 發布目標（WordPress、Notion 等）
+create table if not exists crawler.publish_targets (
+  id          text primary key default public.generate_ulid(),
+  project_id  text         not null,
+  code        text         not null unique,   -- 'wp-main', 'notion-tech'
+  name        text         not null,
+  target_type text         not null,           -- 'wordpress', 'notion', etc.
+  config      jsonb  not null default '{}',    -- endpoint, auth 設定
+  is_enabled  boolean not null default true,
+  created_by  text,
+  created_at  timestamptz  not null default now(),
+  updated_at  timestamptz  not null default now()
+);
+
+-- 文章 × 目標 的發布紀錄
+create table if not exists crawler.article_publications (
+  id                text primary key default public.generate_ulid(),
+  project_id        text         not null,
+  article_id        text         not null
+                    references crawler.articles(id) on delete cascade,
+  target_id         text         not null
+                    references crawler.publish_targets(id) on delete cascade,
+  remote_id         text,                -- 對方系統的 ID
+  remote_url        text,                -- 對方系統的 URL
+  publish_status    text not null default 'pending',
+  last_published_at timestamptz,
+  payload           jsonb not null default '{}',  -- 送出去的資料
+  result            jsonb not null default '{}',  -- 回傳的結果
+  created_at        timestamptz  not null default now(),
+  updated_at        timestamptz  not null default now(),
+  constraint uq_article_publications unique (article_id, target_id),
+  constraint ck_article_publications_status
+    check (publish_status in ('pending','published','failed','deleted'))
+);
+```
+
+`payload` 存「你送出去的」，`result` 存「對方回傳的」。
+出問題時可以完整重現：是我送錯了，還是對方回錯了？
 
 ---
 
-# Stage 4: RLS——你以為門沒鎖，其實是門拆了
+## Chapter 8：Lease RPC —— 原子搶單
 
-## 先理解：RLS 沒開 = 任何 authenticated 使用者可以讀寫所有資料
-
-你的 schema：
+這支 RPC 是整個佇列系統的心臟。
 
 ```sql
--- 只有 3 張表開了 RLS
-alter table public.sources enable row level security;
-alter table public.articles enable row level security;
-alter table public.article_assets enable row level security;
-
--- 剩下 7 張表：完全沒有 RLS
--- crawl_runs, crawl_queue, source_pages, tags, article_tags,
--- publish_targets, article_publications
-```
-
-### 為什麼沒開 RLS 比開了但寫錯更危險？
-
-```
-                  RLS 沒開         RLS 開了但 policy 寫錯
-                  ──────────       ─────────────────────
-authenticated     可讀寫全部 ❌     可能讀到不該看的 ❌
-anon              可讀寫全部 ❌❌    看 policy 設定
-service_role      可讀寫全部 ✅     可讀寫全部 ✅
-
-結論：RLS 沒開 = 大門拆掉了。
-     RLS 開了 = 至少有門，policy 是鎖頭。
-```
-
-### 規則：所有 public 表必須啟用 RLS，無例外
-
-```sql
-alter table public.crawl_runs enable row level security;
-alter table public.crawl_queue enable row level security;
-alter table public.source_pages enable row level security;
-alter table public.tags enable row level security;
-alter table public.article_tags enable row level security;
-alter table public.publish_targets enable row level security;
-alter table public.article_publications enable row level security;
-```
-
-## Policy 怎麼寫？
-
-你現在的 policy：
-
-```sql
-create policy "dev_all_access" on public.sources for all using (true);
-```
-
-**問題**：
-1. `for all` 沒指定 role → 所有 role 都適用（包含 anon）
-2. `using (true)` → 任何人都能讀
-3. 沒有 `WITH CHECK` → 任何人都能寫
-4. 沒有 service_role 專屬 policy
-
-### 正確做法：最小權限 Policy
-
-對 crawler 來說，大部分操作是 ETL（service_role），少部分是 Dashboard 讀取（authenticated）：
-
-```sql
--- ===== 每張表都要這兩個 policy =====
-
--- 1. service_role：ETL pipeline 完整存取
-create policy "sources_service_role"
-  on public.sources for all to service_role
-  using (true) with check (true);
-
--- 2. authenticated：Dashboard 唯讀
-create policy "sources_read_access"
-  on public.sources for select to authenticated
-  using (true);   -- 如果有 project_id，改成 is_project_member(project_id)
-```
-
-### 特殊考量：publish_targets 有敏感資料
-
-`publish_targets.config` 可能包含 API token、OAuth credentials。
-即使是 authenticated 使用者，也不應該看到所有 target 的 config。
-
-```sql
--- 不要讓 authenticated 直接看 config
-create policy "publish_targets_read_access"
-  on public.publish_targets for select to authenticated
-  using (true);
--- 但查詢時不要 SELECT config，只選需要的欄位
-```
-
-## Lease RPC 也要修
-
-你的 RPC function：
-
-```sql
-create or replace function public.lease_next_crawl_job(...)
-language sql
-as $$
-  ...
-  returning *;       -- ❌ SELECT *
-$$;
-```
-
-**三個問題**：
-
-```
-1. RETURNING *       → 回傳所有欄位（包含不需要的）
-2. 沒有 SET search_path = public  → 安全風險
-3. 沒有 statement_timeout         → 可能永遠卡住
-```
-
-修復：
-
-```sql
-create or replace function public.lease_next_crawl_job(
-  p_worker_id text,
+create or replace function crawler.lease_next_crawl_job(
+  p_worker_id      text,
   p_lease_duration interval default interval '5 minutes'
 )
-returns table (
-  id text, source_id text, url text, page_type text,
-  lease_token text, retry_count int, max_retries int, payload jsonb
-)
+returns setof crawler.crawl_queue
 language sql
-set search_path = public
-set statement_timeout = '5s'
+security definer
+set search_path = crawler
 as $$
-  update public.crawl_queue
+  update crawler.crawl_queue
   set
-    status = 'leased',
-    lease_token = gen_random_uuid()::text,
-    leased_at = now(),
+    status           = 'leased',
+    lease_token      = gen_random_uuid()::text,
+    leased_at        = now(),
     lease_expires_at = now() + p_lease_duration,
-    worker_id = p_worker_id
+    worker_id        = p_worker_id
   where id = (
-    select id from public.crawl_queue
+    select id
+    from crawler.crawl_queue
     where (status = 'pending' and scheduled_at <= now())
        or (status = 'leased' and lease_expires_at < now())
     order by priority desc, scheduled_at asc
     limit 1
     for update skip locked
   )
-  returning
-    id, source_id, url, page_type,
-    lease_token, retry_count, max_retries, payload;
+  returning *;
 $$;
 ```
 
-## GRANT：別忘了權限
+### 逐行拆解
 
-沒有 GRANT，即使 RLS policy 寫了也沒用：
+**`security definer`** + **`set search_path`**：
+函式以「定義者」的權限執行，不是「呼叫者」。
+這樣 authenticated user 可以呼叫它，但實際操作用的是 owner 權限。
+`set search_path` 防止 search_path injection（安全規範要求）。
+
+**`for update skip locked`**：
+這是 PostgreSQL 的行級鎖。多個 Worker 同時呼叫時：
+- `FOR UPDATE`：鎖定選到的那一行
+- `SKIP LOCKED`：如果某行已被別人鎖了，跳過它找下一個
+
+效果：**N 個 Worker 同時搶單，每個都拿到不同的工作，零衝突。**
+
+**subquery 的 WHERE 條件**：
 
 ```sql
--- 對每張表：
-grant select on public.sources to authenticated;
-grant all on public.sources to service_role;
-
--- 對 RPC function：
-grant execute on function public.lease_next_crawl_job(text, interval) to service_role;
+where (status = 'pending' and scheduled_at <= now())   -- 正常的待處理
+   or (status = 'leased' and lease_expires_at < now())  -- 過期的租約回收
 ```
+
+這兩行就是整個「lease 過期自動回收」的實現——不需要另外的 cron job。
+
+### 🤔 動腦時間
+
+> 為什麼 `lease_token` 要用 `gen_random_uuid()` 每次重新產生？
+> 為什麼不用 worker_id 就好？
+
+### 答案：防止過期後的誤操作
+
+場景：
+1. Worker-A 搶到 job-1，拿到 token-abc
+2. Worker-A 掛了，lease 過期
+3. Worker-B 搶到同一筆 job-1，拿到新的 token-xyz
+4. Worker-A 復活了，嘗試用 token-abc 回報完成
+
+如果只用 worker_id 驗證，Worker-A 的回報會被接受（因為它曾經是 owner）。
+用 lease_token 驗證，token-abc ≠ token-xyz，回報被拒——**正確行為**。
+
+### ❓ 沒有笨問題
+
+**Q：`returning *` 不是在 audit 裡被標為 violation 嗎？**
+A：是的，audit (V-25) 建議改為明確列出欄位。
+v3.0 保留了 `returning *` 是為了簡化，但在生產環境建議改為：
+`returning id, source_id, url, page_type, lease_token, ...`
+
+**Q：`p_lease_duration` 預設 5 分鐘夠嗎？**
+A：對大多數頁面抓取夠了。如果某些 source 需要更久（例如要等 JavaScript render），
+呼叫時可以傳 `interval '15 minutes'`。
 
 ---
 
-### Stage 4 自我檢查
+## Chapter 9：Triggers —— moddatetime 自動更新
 
+不要手動管 `updated_at`。讓 trigger 做。
+
+```sql
+do $$
+declare
+  tbl text;
+begin
+  foreach tbl in array array[
+    'sources', 'crawl_runs', 'source_pages', 'articles',
+    'article_assets', 'tags', 'publish_targets', 'article_publications'
+  ]
+  loop
+    execute format('
+      drop trigger if exists trg_%1$s_updated_at on crawler.%1$s;
+      create trigger trg_%1$s_updated_at
+        before update on crawler.%1$s
+        for each row execute function moddatetime(updated_at);
+    ', tbl);
+  end loop;
+end;
+$$;
 ```
-□ 所有 10 張表都有 ALTER TABLE ... ENABLE ROW LEVEL SECURITY
-□ 每張表至少有 service_role policy（for all using (true) with check (true))
-□ 每張表有 authenticated 的 read policy（至少 SELECT）
-□ publish_targets 的敏感欄位有額外保護
-□ lease RPC function 有 SET search_path + statement_timeout
-□ lease RPC 回傳明確欄位（不是 RETURNING *）
-□ 所有表有 GRANT 語句
-□ RPC function 有 GRANT EXECUTE
-```
+
+注意 `crawl_queue` **不在列表裡**——因為它是狀態機，不需要通用的 `updated_at`。
+
+### 為什麼用 DO $$ 迴圈？
+
+8 張表 × 2 行 SQL = 16 行重複代碼。
+用迴圈 = 3 行邏輯 + 1 個 array。DRY。
+
+而且 `drop trigger if exists` + `create trigger` 確保重跑 migration 不會報錯。
 
 ---
 
-# Stage 5: 三個月後你的 DB 會怎麼死
+## Chapter 10：RLS —— 多租戶安全，不是選配
 
-## 死法一：source_pages 表膨脹到爆
+這是整份 SQL 裡**最重要但最容易跳過**的部分。
 
-`source_pages` 存了 `raw_html`（每筆 100KB~1MB），而且是 append-heavy（每次爬就新增）。
+### 🤔 動腦時間
 
-```
-假設：
-  - 10 個 source，每個每天抓 100 頁
-  - 1000 頁/天 × 30 天 = 30,000 頁/月
-  - 30,000 × 平均 200KB = 6GB/月
-  - 一年後：72GB
+> 如果你忘了在某張表上 `ENABLE ROW LEVEL SECURITY`，
+> 而且你用 `anon` key 從前端呼叫 Supabase…會怎樣？
 
-沒有 partition → PostgreSQL 每次 VACUUM 都掃描 72GB
-沒有 retention → 資料永遠不刪
-沒有 autovacuum tuning → dead tuple 追不上
-```
+### 答案：全部資料都看得到
 
-### 修復：Partition + Retention + Autovacuum
+沒有 RLS 的表 = 所有人都能讀寫所有 row。
+Supabase 的 `anon` key 是公開的（寫在前端 JS 裡）。
+**忘了開 RLS = 資料完全裸奔。**
+
+### Step 1：全部開啟 RLS
 
 ```sql
--- 1. Partition by 月（PK 必須包含 partition key）
-create table if not exists public.source_pages (
-  id text not null default generate_ulid(),
-  ...
-  created_at timestamptz not null default now(),
-  primary key (id, created_at)       -- ← 必須包含 created_at
-) partition by range (created_at);
-
--- 2. 建立 partition（每月一張）
-create table if not exists source_pages_2026_03
-  partition of source_pages
-  for values from ('2026-03-01') to ('2026-04-01');
-
--- 3. Autovacuum 調校
-alter table public.source_pages
-  set (autovacuum_vacuum_scale_factor = 0.05);
-
--- 4. Retention：90 天後 archive + delete
--- （用 cron job 執行）
+do $$
+declare
+  tbl text;
+begin
+  foreach tbl in array array[
+    'sources', 'crawl_runs', 'crawl_queue', 'source_pages',
+    'articles', 'article_assets', 'tags', 'article_tags',
+    'publish_targets', 'article_publications'
+  ]
+  loop
+    execute format(
+      'alter table crawler.%I enable row level security;', tbl
+    );
+  end loop;
+end;
+$$;
 ```
 
-### 重要限制：Partition 表的 PK 必須包含 partition key
+10 張表，一個都不能少。
 
-```
-❌ primary key (id)                    → PostgreSQL 拒絕
-✅ primary key (id, created_at)        → OK，因為包含 partition key
-
-為什麼？因為 PostgreSQL 要確保 PK 的 uniqueness，
-但每個 partition 是獨立的表，跨 partition 無法保證 uniqueness。
-包含 partition key 後，每個 partition 內部就能保證了。
-```
-
-## 死法二：crawl_queue 無限增長
-
-完成的 job 留在 queue 裡永遠不刪：
-
-```
-一個月後：
-  pending: 50
-  leased: 5
-  done: 29,000    ← 垃圾
-  failed: 500     ← 垃圾
-  dead: 200       ← 垃圾
-
-lease 查詢必須掃描 29,755 筆才能找到那 50 筆 pending。
-（即使有 partial index 也會有 bloat 問題）
-```
-
-### 修復：設計 Retention Policy
-
-```
-crawl_queue 的生命週期：
-
-  status=done    → 7 天後刪除
-  status=failed  → 30 天後刪除（保留用於分析錯誤模式）
-  status=dead    → 30 天後 archive → 刪除
-  status=skipped → 7 天後刪除
-```
-
-實作（cron job）：
+### Step 2：Helper Function —— JWT 裡的 project_ids
 
 ```sql
--- 每天跑一次
-delete from crawl_queue where ctid in (
-  select ctid from crawl_queue
-  where status in ('done', 'skipped')
-    and finished_at < now() - interval '7 days'
-  limit 50000
-);
+create or replace function crawler.get_my_project_ids()
+returns text[]
+language sql stable security definer
+set search_path = crawler
+as $$
+  select coalesce(
+    array(
+      select jsonb_array_elements_text(
+        (select auth.jwt()) -> 'app_metadata' -> 'project_ids'
+      )
+    ),
+    '{}'::text[]
+  );
+$$;
 ```
 
-## 死法三：raw_html 拖垮所有查詢
+這個函式從 JWT 的 `app_metadata` 裡取出 `project_ids` 陣列。
 
-`source_pages.raw_html` 是 TEXT 型別，平均 200KB。
-即使 PostgreSQL 會用 TOAST 壓縮，每次 `SELECT *` 還是會 detoast。
+JWT 長這樣：
+```jsonc
+{
+  "sub": "user-uuid",
+  "app_metadata": {
+    "project_ids": ["demo-project", "prod-project"]
+  }
+}
+```
+
+設定方式（在 Supabase Dashboard 或 SQL）：
+```sql
+update auth.users
+set raw_app_meta_data =
+  raw_app_meta_data || '{"project_ids":["demo-project"]}'::jsonb
+where id = 'user-uuid';
+```
+
+### Step 3：Access Check Helper
 
 ```sql
--- ❌ 你的 Python code 如果這樣寫：
-result = supabase.table('source_pages').select('*').execute()
--- → 每筆都拉出 200KB raw_html
-
--- ✅ 正確：明確選欄位
-result = supabase.table('source_pages') \
-  .select('id, url, title, http_status, fetched_at') \
-  .execute()
+create or replace function crawler.has_project_access(p_project_id text)
+returns boolean
+language sql stable security definer
+set search_path = crawler
+as $$
+  select p_project_id = ANY(crawler.get_my_project_ids());
+$$;
 ```
 
-**更好的做法**：把 `raw_html` 搬到 Supabase Storage：
+### Step 4：Policy 模式
 
-```
-source_pages 表只存：
-  raw_html_path text    → 'raw_pages/2026/03/01HXYZ....html.gz'
+**有 `project_id` 欄位的表**（sources, crawl_runs, crawl_queue, source_pages, articles, article_assets, tags, publish_targets）：
 
-Storage 存：
-  bucket: raw-pages
-  path:   raw_pages/2026/03/01HXYZ....html.gz
+```sql
+-- 以 sources 為例（其他表用迴圈批量套用）
+create policy "sources_select" on crawler.sources
+  for select to authenticated
+  using (crawler.has_project_access(project_id));
+
+create policy "sources_insert" on crawler.sources
+  for insert to authenticated
+  with check (crawler.has_project_access(project_id));
+
+create policy "sources_update" on crawler.sources
+  for update to authenticated
+  using (crawler.has_project_access(project_id));
+
+create policy "sources_delete" on crawler.sources
+  for delete to authenticated
+  using (crawler.has_project_access(project_id));
+
+-- 後端 pipeline 用 service_role，不受限
+create policy "sources_service_role" on crawler.sources
+  for all to service_role using (true) with check (true);
 ```
+
+**沒有 `project_id` 的 junction table**（article_tags, article_publications）：
+
+```sql
+-- 透過 FK 繼承安全性（JOIN 時 parent 表的 RLS 會擋）
+create policy "article_tags_select" on crawler.article_tags
+  for select to authenticated, anon using (true);
+create policy "article_tags_insert" on crawler.article_tags
+  for insert to authenticated with check (true);
+-- ... update, delete 類似
+```
+
+### 🤔 動腦時間
+
+> article_tags 的 policy 是 `using (true)`——任何人都能讀？
+> 那安全性在哪裡？
+
+### 答案：透過 JOIN 繼承
+
+前端不會直接查 `article_tags`。它會：
+```sql
+select t.name
+from crawler.article_tags at
+join crawler.articles a on a.id = at.article_id
+join crawler.tags t on t.id = at.tag_id
+where a.id = 'some-article-id'
+```
+
+`articles` 表有 RLS（只能看自己 project 的）。
+如果使用者沒有那篇文章的權限，JOIN 就不會回傳任何東西。
+article_tags 本身的 `using(true)` 只是「不額外擋」——安全性由 parent 表保證。
+
+### Step 5：GRANTs
+
+```sql
+-- 所有 crawler 表：authenticated 可 SELECT/INSERT/UPDATE/DELETE
+-- service_role 可 ALL
+-- 特定表（tags, publish_targets, articles）：anon 可 SELECT
+```
+
+RLS policy 定義了「哪些 row 看得到」，GRANT 定義了「有沒有這個操作權限」。
+兩者缺一不可：
+
+| | 沒有 GRANT | 有 GRANT |
+|---|---|---|
+| **沒有 RLS policy** | ❌ 無法操作 | ⚠️ 看到全部（危險） |
+| **有 RLS policy** | ❌ 無法操作 | ✅ 只看到有權限的 row |
 
 ---
 
-### Stage 5 自我檢查
+## Chapter 11：完整 ER 關係圖
 
 ```
-□ source_pages 已 partition by range (created_at)
-□ append-heavy 表設定 autovacuum_vacuum_scale_factor = 0.05
-□ crawl_queue 有 retention policy（cron job 定期清理）
-□ raw_html 考慮搬到 Storage（或至少永遠不 SELECT *）
-□ 所有查詢 source_pages 時都包含 created_at 時間範圍（觸發 partition pruning）
+crawler.sources ─────────────┬──────────────────────────────────┐
+  │ PK: id                   │                                  │
+  │                          │                                  │
+  ├──< crawler.crawl_runs    │                                  │
+  │     FK: source_id        │                                  │
+  │     │                    │                                  │
+  │     └──< crawler.source_pages                               │
+  │           FK: source_id, crawl_run_id                       │
+  │           │                                                 │
+  │           └──< crawler.articles ──< crawler.article_assets  │
+  │                 FK: source_id,       FK: article_id,        │
+  │                     source_page_id       source_page_id     │
+  │                 │                                           │
+  │                 ├──< crawler.article_tags                   │
+  │                 │     FK: article_id, tag_id                │
+  │                 │                                           │
+  │                 └──< crawler.article_publications           │
+  │                       FK: article_id, target_id             │
+  │                                                            │
+  ├──< crawler.crawl_queue                                     │
+  │     FK: source_id                                          │
+  │                                                            │
+  └── crawler.tags (self-ref via parent_id)                    │
+       FK: parent_id                                           │
+                                                               │
+  crawler.publish_targets ─────────────────────────────────────┘
+    FK: (article_publications.target_id)
 ```
+
+**所有 FK 都是 `text`（ULID）**。型別一致，JOIN 不需要 cast。
 
 ---
 
-# Stage 6: 完成品——一份 Migration 該有的所有東西
+## Chapter 12：重點摘要（撕下來貼冰箱）
 
-把上面所有修復組合起來，一張表（以 `sources` 為例）的完整 migration 應該長這樣：
+### Convention Checklist
 
-```sql
--- ============================================================
--- Migration: 20260325120000_public_sources.sql
--- ============================================================
+- [ ] PK: `text default generate_ulid()`
+- [ ] FK: `text references ...`
+- [ ] 每張表都有 `project_id`, `created_at`, `updated_at`
+- [ ] `updated_at` 由 moddatetime trigger 維護
+- [ ] Constraint 明確命名：`constraint ck_xxx check (...)`
+- [ ] DDL 一律 `if not exists`
+- [ ] RLS 每張表都開
+- [ ] 每張表都有 service_role + authenticated policy
+- [ ] 所有 FK 欄位都有索引
+- [ ] RPC function: `security definer` + `set search_path`
 
--- 1. Table
-create table if not exists public.sources (
-  id                text primary key default generate_ulid(),
-  project_id        text not null references projects(id) on delete cascade,
-  code              text not null,
-  name              text not null,
-  description       text,
-  base_url          text,
-  domain            text,
-  crawler_url       text,
-  config            jsonb not null default '{}'::jsonb,
-  extractor_schema  jsonb not null default '{}'::jsonb,
-  field_mapping     jsonb not null default '{}'::jsonb,
-  is_enabled        boolean not null default true,
-  schedule_cron     text,
-  last_run_at       timestamptz,
-  created_by        text references users(id),
-  created_at        timestamptz not null default now(),
-  updated_at        timestamptz not null default now(),
+### 表職責速查
 
-  constraint uq_sources_project_code unique (project_id, code)
-);
+| 表名 | 職責 | 資料量趨勢 |
+|------|------|-----------|
+| sources | 來源定義、爬蟲設定 | 低（幾十筆） |
+| crawl_runs | 批次執行紀錄 | 中（每天幾筆） |
+| crawl_queue | 待處理 URL 佇列 | 高（需清理策略） |
+| source_pages | 原始 HTML 快照 | 高（需 partition 規劃） |
+| articles | 正規化文章 | 中（主要查詢對象） |
+| article_assets | 圖片/檔案 metadata | 中 |
+| tags | 標籤/分類 | 低 |
+| article_tags | 文章 ↔ 標籤 | 中 |
+| publish_targets | 發布目標設定 | 低 |
+| article_publications | 發布紀錄 | 中 |
 
--- 2. Indexes
-create index if not exists idx_sources_project
-  on public.sources(project_id);
-create index if not exists idx_sources_project_enabled
-  on public.sources(project_id, is_enabled)
-  where is_enabled = true;
+### 索引策略速查
 
--- 3. Trigger
-create trigger trg_sources_updated_at
-  before update on public.sources
-  for each row execute function moddatetime(updated_at);
+| 索引類型 | 用途 | 範例 |
+|---------|------|------|
+| FK index | 加速 JOIN 和 CASCADE DELETE | `idx_articles_source(source_id)` |
+| Partial index | 只索引有意義的子集 | `WHERE status = 'pending'` |
+| Composite index | 一個索引服務 WHERE + ORDER BY | `(source_id, created_at DESC)` |
+| Unique partial | 只在特定狀態下防重複 | `(source_id, url) WHERE status='pending'` |
 
--- 4. RLS
-alter table public.sources enable row level security;
+### RLS 模式速查
 
--- 5. Policies
-create policy "sources_service_role"
-  on public.sources for all to service_role
-  using (true) with check (true);
-
-create policy "sources_read_access"
-  on public.sources for select to authenticated
-  using (true);
-
--- 6. Grants
-grant select on public.sources to authenticated;
-grant all on public.sources to service_role;
-```
-
-### 對照你原本的版本
-
-```
-原本的 sources：
-  ✅ 有 created_at, updated_at, trigger
-  ❌ bigserial PK
-  ❌ bigint FK
-  ❌ 沒有 project_id
-  ❌ 沒有 IF NOT EXISTS
-  ❌ UNIQUE 沒命名
-  ❌ RLS policy 太寬鬆
-  ❌ 沒有 GRANT
-  ❌ 沒有 created_by
-
-改好的 sources：
-  ✅ ULID PK (text)
-  ✅ project_id (text FK)
-  ✅ IF NOT EXISTS
-  ✅ 命名的 UNIQUE constraint
-  ✅ service_role + authenticated policies
-  ✅ GRANT 語句
-  ✅ created_by
-  ✅ moddatetime trigger
-```
+| 表類型 | Policy 邏輯 |
+|--------|------------|
+| 有 project_id 的業務表 | `has_project_access(project_id)` |
+| junction table（無 project_id） | `using(true)` + 透過 JOIN 繼承 |
+| 所有表 | `service_role` policy: `using(true) with check(true)` |
 
 ---
 
-# 總結：一張圖看完所有規則
+## 下一步
 
-```
-┌─────────────────────────────────────────────────────┐
-│                一張表的完整生命                        │
-│                                                     │
-│  CREATE TABLE IF NOT EXISTS                         │
-│    id text primary key default generate_ulid()      │
-│    project_id text not null references projects(id) │
-│    created_at timestamptz not null default now()    │
-│    updated_at timestamptz not null default now()    │
-│    CHECK constraints 有名字                          │
-│    UNIQUE constraints 有名字                         │
-│                                                     │
-│  CREATE INDEX IF NOT EXISTS                         │
-│    每個 FK 一個 index                                │
-│    每個 list query 一個 composite index              │
-│    高頻狀態查詢用 partial index                      │
-│                                                     │
-│  CREATE TRIGGER trg_<table>_updated_at              │
-│                                                     │
-│  ALTER TABLE ... ENABLE ROW LEVEL SECURITY          │
-│                                                     │
-│  CREATE POLICY service_role (for all, using true)   │
-│  CREATE POLICY authenticated (for select)           │
-│                                                     │
-│  GRANT SELECT TO authenticated                      │
-│  GRANT ALL TO service_role                          │
-│                                                     │
-│  如果是 append-heavy (>1M rows)：                    │
-│    PARTITION BY RANGE (created_at)                   │
-│    SET autovacuum_vacuum_scale_factor = 0.05         │
-│    設計 retention policy                             │
-│                                                     │
-└─────────────────────────────────────────────────────┘
-```
+讀完 schema 後，建議按以下順序繼續：
+
+1. **[04_data-flow-overview.md](04_data-flow-overview.md)** — pipeline 資料流與 Python 型別對應
+2. **[05_worker-architecture.md](05_worker-architecture.md)** — 部署方案與模組結構
+3. **[06_worker-consume-loop-python.md](06_worker-consume-loop-python.md)** — 消費迴圈實作
+4. **[07_worker-retry-and-anti-ban.md](07_worker-retry-and-anti-ban.md)** — 重試策略與反封鎖
 
 ---
 
-# 附錄：完整自我檢查清單
-
-## 每張新表
-
-```
-□ PK: id text primary key default generate_ulid()
-□ FK: 全部 text（不是 bigint、不是 uuid）
-□ created_at + updated_at
-□ updated_at trigger（moddatetime 或手寫）
-□ project_id（如果需要多租戶）
-□ created_by（如果是使用者操作產生的）
-□ CHECK 約束有名字
-□ UNIQUE 約束有名字
-□ DDL 全部 IF NOT EXISTS
-```
-
-## 每張表的 Index
-
-```
-□ 每個 FK 欄位有單欄 index
-□ 常見 list query 有 composite index
-□ 高頻狀態查詢有 partial index
-□ 同一表 composite index 不超過 5 個
-```
-
-## 每張表的安全
-
-```
-□ RLS enabled
-□ service_role policy (for all)
-□ authenticated policy (至少 select)
-□ GRANT SELECT to authenticated
-□ GRANT ALL to service_role
-```
-
-## 每張 append-heavy 表
-
-```
-□ PARTITION BY RANGE (created_at)
-□ PK 包含 created_at
-□ autovacuum_vacuum_scale_factor = 0.05
-□ 有 retention policy
-□ 查詢包含 created_at 時間範圍
-□ 不用 soft delete
-□ DELETE 加 LIMIT（batch 50,000）
-```
-
-## 每個 RPC function
-
-```
-□ SET search_path = public
-□ SET statement_timeout = '5s'（或合理值）
-□ 不用 RETURNING *
-□ GRANT EXECUTE to 需要的 role
-```
-
----
-
-> **下一步**：拿著這份 checklist，重寫 `003_crawler_schema.sql`。
-> 每改一張表，回來對照一次。
-> 改完之後，跑一次 `02_AUDIT-vs-guidelines.md` 的 29 項，確認全部 pass。
-
----
-
-## 在 Studio 中驗證你的爬蟲 Schema
-
-> **前置要求**：已讀完 [01_supabase-studio.md](../01_supabase-studio.md)
-
-跑完 `003_crawler_schema.sql`（v3.0）後，打開 `http://localhost:54323` 驗證：
-
-### Table Editor 驗證
-
-```
-📝 驗證清單
-1. public schema → 確認 10 張表全部出現
-2. 點進 sources → 確認 id 是 TEXT 型別（不是 bigint）
-3. 點進 crawl_queue → 檢查 FK
-   - source_id → sources(id) ✅
-4. 點進 articles → 確認 project_id 欄位存在
-5. 檢查 article_tags → 確認是複合 PK (article_id, tag_id)，都是 TEXT
-```
-
-### SQL Editor 驗證
-
-```sql
--- 確認 ULID 正常
-SELECT generate_ulid();
-
--- 確認所有 PK 都是 TEXT
-SELECT table_name, column_name, data_type
-FROM information_schema.columns
-WHERE table_schema = 'public'
-  AND column_name = 'id'
-  AND data_type != 'text';
--- 理想結果：空（全部都是 text）
-
--- 確認 updated_at trigger
-SELECT tgname, tgrelid::regclass
-FROM pg_trigger
-WHERE tgname LIKE 'trg_%_updated';
-
--- 測試 Queue 的 lease 機制
-EXPLAIN ANALYZE
-SELECT * FROM crawl_queue
-WHERE status = 'pending' AND lease_expires_at < NOW()
-ORDER BY priority DESC, created_at ASC
-LIMIT 10;
-```
-
-### RLS 驗證
-
-```sql
--- 確認 RLS 狀態
-SELECT tablename, rowsecurity
-FROM pg_tables
-WHERE schemaname = 'public';
-
--- 用 anon 角色測試
-SET ROLE anon;
-SELECT count(*) FROM articles;  -- 應為 0 或被拒絕
-RESET ROLE;
-```
-
-### 監控查詢（上線後常用）
-
-```sql
--- Queue 健康度
-SELECT status, count(*) FROM crawl_queue GROUP BY status;
-
--- 最近 24 小時的爬蟲執行
-SELECT source_id, run_status, pages_fetched, error_count
-FROM crawl_runs
-WHERE created_at > NOW() - INTERVAL '24 hours'
-ORDER BY created_at DESC;
-```
+> **歷史紀錄**：本 schema 從 v1.0（bigserial PK、無 RLS）經過 29 項 audit violation 修正，
+> 演進到 v3.0。完整 audit 報告見 [02_AUDIT-vs-guidelines.md](02_AUDIT-vs-guidelines.md)（歷史參考）。

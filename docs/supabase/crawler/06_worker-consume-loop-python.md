@@ -168,6 +168,7 @@ def _minutes_from_now(minutes: int) -> str:
 
 
 if __name__ == "__main__":
+    import os
     from supabase._async.client import AsyncClient, create_client
     client = asyncio.get_event_loop().run_until_complete(
         create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_KEY"])
@@ -487,8 +488,9 @@ class SupabaseQueueConsumer:
         self._client = client
 
     async def enqueue(self, input: EnqueueUrlInput) -> CrawlQueueRow:
-        result = await self._client.table("crawl_queue").insert(
+        result = await self._client.schema("crawler").table("crawl_queue").insert(
             {
+                "project_id": input.project_id,
                 "source_id": input.source_id,
                 "url": input.url,
                 "page_type": input.page_type.value,
@@ -499,7 +501,7 @@ class SupabaseQueueConsumer:
         return result.data[0]
 
     async def lease_next_job(self, worker_id: str) -> LeasedJob | None:
-        result = await self._client.rpc(
+        result = await self._client.schema("crawler").rpc(
             "lease_next_crawl_job", {"p_worker_id": worker_id}
         ).execute()
         rows = result.data
@@ -517,22 +519,22 @@ class SupabaseQueueConsumer:
             payload=row.get("payload", {}),
         )
 
-    async def heartbeat(self, job_id: int, lease_token: str) -> None:
-        await self._client.table("crawl_queue").update(
+    async def heartbeat(self, job_id: str, lease_token: str) -> None:
+        await self._client.schema("crawler").table("crawl_queue").update(
             {"lease_expires_at": _future_iso(5)}
         ).eq("id", job_id).eq("lease_token", lease_token).execute()
 
     async def complete_job(
-        self, job_id: int, lease_token: str, result: Json | None = None
+        self, job_id: str, lease_token: str, result: Json | None = None
     ) -> None:
-        await self._client.table("crawl_queue").update(
+        await self._client.schema("crawler").table("crawl_queue").update(
             {"status": "done", "finished_at": _now_iso()}
         ).eq("id", job_id).eq("lease_token", lease_token).execute()
 
     async def fail_job(
-        self, job_id: int, lease_token: str, error: WorkerError
+        self, job_id: str, lease_token: str, error: WorkerError
     ) -> None:
-        await self._client.table("crawl_queue").update(
+        await self._client.schema("crawler").table("crawl_queue").update(
             {
                 "status": "failed",
                 "finished_at": _now_iso(),
@@ -542,17 +544,17 @@ class SupabaseQueueConsumer:
         ).eq("id", job_id).eq("lease_token", lease_token).execute()
 
     async def requeue_job(
-        self, job_id: int, lease_token: str, retry_at: str, error: WorkerError
+        self, job_id: str, lease_token: str, retry_at: str, error: WorkerError
     ) -> None:
         # 取得目前的 retry_count
-        row = await self._client.table("crawl_queue").select(
+        row = await self._client.schema("crawler").table("crawl_queue").select(
             "retry_count, max_retries"
         ).eq("id", job_id).single().execute()
 
         new_retry = row.data["retry_count"] + 1
         new_status = "dead" if new_retry >= row.data["max_retries"] else "pending"
 
-        await self._client.table("crawl_queue").update(
+        await self._client.schema("crawler").table("crawl_queue").update(
             {
                 "status": new_status,
                 "scheduled_at": retry_at,
@@ -574,14 +576,16 @@ class SupabaseQueueConsumer:
 使用 `FOR UPDATE SKIP LOCKED` 進行原子性 lease 取得：
 
 ```sql
-create or replace function public.lease_next_crawl_job(
+create or replace function crawler.lease_next_crawl_job(
   p_worker_id text,
   p_lease_duration interval default interval '5 minutes'
 )
-returns setof public.crawl_queue
+returns setof crawler.crawl_queue
 language sql
+security definer
+set search_path = crawler
 as $$
-  update public.crawl_queue
+  update crawler.crawl_queue
   set
     status = 'leased',
     lease_token = gen_random_uuid()::text,
@@ -590,7 +594,7 @@ as $$
     worker_id = p_worker_id
   where id = (
     select id
-    from public.crawl_queue
+    from crawler.crawl_queue
     where (status = 'pending' and scheduled_at <= now())
        or (status = 'leased' and lease_expires_at < now())
     order by priority desc, scheduled_at asc

@@ -151,6 +151,33 @@ WHERE collection_id = (SELECT id FROM collections WHERE code = 'tw-food');
 -- ERROR: violates check constraint "ck_documents_process_status"
 ```
 
+### 3.4 模擬處理失敗（錯誤場景）
+
+```sql
+-- 模擬：第一份文件在 parsed 階段失敗
+UPDATE documents SET
+  process_status = 'failed',
+  process_error = 'PDF extraction error: unsupported encoding UTF-16LE at page 3'
+WHERE title = '台北牛肉麵完全攻略';
+
+-- 查看失敗的文件
+SELECT title, process_status, process_error
+FROM documents
+WHERE process_status = 'failed';
+```
+
+**觀察**：`process_error` 記錄了具體失敗原因和位置。三個月後回頭看，你還是知道哪一步出了什麼問題。
+
+```sql
+-- 模擬：修復後重試（重設回上一個成功狀態）
+UPDATE documents SET
+  process_status = 'parsed',   -- 回到 parsed，準備重新切分
+  process_error = NULL          -- 清除錯誤訊息
+WHERE title = '台北牛肉麵完全攻略';
+```
+
+**思考**：為什麼不直接設回 `uploaded` 重頭來？因為如果 parsing 已經成功了，沒必要重做——只需要從失敗的那一步重試。
+
 ---
 
 ## Stage 4：Chunking（文件切分）
@@ -304,6 +331,36 @@ FROM chunks
 WHERE to_tsvector('simple', content) @@ plainto_tsquery('simple', '牛肉麵')
   AND collection_id = (SELECT id FROM collections WHERE code = 'tw-food');
 -- 應看到 Bitmap Index Scan on idx_chunks_fts
+```
+
+### 5.6 驗證 chunks_safe VIEW（欄位級安全）
+
+```sql
+-- 1. 查 chunks 原始表：有 embedding 欄位
+SELECT id, left(content, 30) AS content,
+  embedding IS NOT NULL AS has_embedding
+FROM chunks LIMIT 3;
+
+-- 2. 查 chunks_safe VIEW：沒有 embedding 欄位
+SELECT * FROM chunks_safe LIMIT 3;
+-- 觀察：回傳的欄位裡沒有 embedding！
+```
+
+**思考**：如果前端 REST API 用 `chunks_safe`，有什麼好處？
+
+```sql
+-- 3. 確認 VIEW 欄位列表
+SELECT column_name
+FROM information_schema.columns
+WHERE table_schema = 'rag' AND table_name = 'chunks_safe'
+ORDER BY ordinal_position;
+-- 應該看不到 'embedding'
+
+-- 4. 驗證 VIEW 繼承 RLS（security_invoker = true）
+-- chunks_safe 不需要自己的 RLS policy，它用 chunks 的
+SELECT schemaname, viewname
+FROM pg_views
+WHERE schemaname = 'rag' AND viewname = 'chunks_safe';
 ```
 
 ---
@@ -473,26 +530,119 @@ END;
 
 ### 挑戰 1：標籤系統
 
+**目標**：建立城市標籤，為 chunks 加標籤，然後查詢特定標籤的 chunks。
+
 ```sql
--- 建立城市標籤，然後為 chunks 加標籤
--- 最後查詢：所有標記為「台南」的 chunks
+-- Step 1：建立標籤（在 tags 表）
+INSERT INTO tags (taxonomy, name, slug) VALUES
+  ('city', '台北', 'taipei'),
+  ('city', '台南', 'tainan'),
+  ('city', '台中', 'taichung');
+
+-- Step 2：幫「台南小吃地圖」的 chunks 貼上台南標籤
+-- 提示：用 chunk_tags 關聯表
+INSERT INTO chunk_tags (chunk_id, tag_id)
+SELECT c.id, t.id
+FROM chunks c
+JOIN documents d ON d.id = c.document_id
+CROSS JOIN tags t
+WHERE d.title = '台南小吃地圖'
+  AND t.slug = 'tainan';
+
+-- Step 3：查詢所有標記為「台南」的 chunks
+-- 你的 SQL：_______________________________________
+-- 提示：JOIN chunks → chunk_tags → tags，WHERE t.slug = 'tainan'
 ```
+
+**預期結果**：應該看到台南小吃地圖的 2 個 chunks。
 
 ### 挑戰 2：Agentic RAG 多輪對話
 
+**目標**：模擬 Agentic RAG 的多輪查詢追蹤。
+
 ```sql
--- 第 1 輪：session_id = 'session-001', iteration = 1, agent_action = 'initial'
--- 第 2 輪：parent_query_id = 第 1 輪 id, iteration = 2, agent_action = 'reformulate'
+-- Step 1：第 1 輪查詢
+INSERT INTO query_logs (
+  collection_id, query_text, query_embedding, top_k,
+  generated_answer, llm_model, session_id, iteration, agent_action, created_by
+)
+SELECT
+  (SELECT id FROM collections WHERE code = 'tw-food'),
+  '台灣有什麼美食？',
+  public.random_embedding(), 5,
+  '台灣美食包括牛肉麵、小吃、珍珠奶茶等。',
+  'gpt-4o', 'session-001', 1, 'initial', 'demo-owner-001'
+RETURNING id;
+-- 記下這個 id → 下一步要用
+
+-- Step 2：第 2 輪（追問，引用第 1 輪）
+-- 提示：parent_query_id = 第 1 輪的 id，iteration = 2
+INSERT INTO query_logs (
+  collection_id, query_text, query_embedding, top_k,
+  generated_answer, llm_model,
+  session_id, parent_query_id, iteration, agent_action, created_by
+)
+VALUES (
+  (SELECT id FROM collections WHERE code = 'tw-food'),
+  '台南的小吃有哪些？',
+  public.random_embedding(), 5,
+  '台南小吃包括擔仔麵、豆花、棺材板、鹹粥。',
+  'gpt-4o',
+  'session-001',
+  (SELECT id FROM query_logs WHERE session_id = 'session-001' AND iteration = 1),
+  2, 'reformulate', 'demo-owner-001'
+);
+
+-- Step 3：查看對話鏈
+SELECT id, left(query_text, 30), iteration, agent_action, parent_query_id
+FROM query_logs WHERE session_id = 'session-001'
+ORDER BY iteration;
 ```
+
+**預期結果**：第 2 輪的 `parent_query_id` 指向第 1 輪的 `id`。
 
 ### 挑戰 3：文件更新流程
 
+**目標**：模擬文件內容更新後重新 chunking 的完整流程。
+
 ```sql
--- 1. UPDATE documents SET process_status = 'stale'
--- 2. DELETE FROM chunks WHERE document_id = ?
--- 3. INSERT 新的 chunks
--- 4. 走完 pipeline: uploaded → parsed → chunked → embedded → ready
+-- Step 1：標記文件為過時
+UPDATE documents SET process_status = 'stale'
+WHERE title = '台中美食精選';
+
+-- Step 2：刪除舊 chunks
+DELETE FROM chunks
+WHERE document_id = (SELECT id FROM documents WHERE title = '台中美食精選');
+
+-- Step 3：確認 chunk_count 要歸零
+UPDATE documents SET chunk_count = 0, process_status = 'uploaded'
+WHERE title = '台中美食精選';
+
+-- Step 4：插入新的 chunks（模擬更新後的內容）
+DO $$
+DECLARE v_doc_id TEXT;
+BEGIN
+  SELECT id INTO v_doc_id FROM documents WHERE title = '台中美食精選';
+  INSERT INTO chunks (document_id, content, chunk_index, token_count, chunking_method)
+  VALUES
+    (v_doc_id, '台中以創意美食和文青風格著稱。宮原眼科冰淇淋有超過60種口味，是必訪景點。', 0, 35, 'recursive'),
+    (v_doc_id, '逢甲夜市是台灣最大夜市之一。春水堂1983年發明珍珠奶茶，改變了全球飲料市場。', 1, 33, 'recursive');
+  UPDATE documents SET process_status = 'chunked', chunk_count = 2 WHERE id = v_doc_id;
+END $$;
+
+-- Step 5：重新生成 embedding 並標記完成
+UPDATE chunks SET embedding = public.random_embedding()
+WHERE document_id = (SELECT id FROM documents WHERE title = '台中美食精選');
+
+UPDATE documents SET process_status = 'ready'
+WHERE title = '台中美食精選';
+
+-- Step 6：驗證
+SELECT title, process_status, chunk_count FROM documents WHERE title = '台中美食精選';
+-- 應該是 ready, chunk_count = 2
 ```
+
+**預期結果**：文件狀態回到 `ready`，chunk_count = 2（更新前是 3）。
 
 ---
 
@@ -514,9 +664,10 @@ DELETE FROM collections WHERE code = 'tw-food';
 | 2 | Collection 作為 tenant scope | schema-design (project_id 等價) |
 | 3 | Ingestion Pipeline + CHECK constraint | anti-patterns D3, migration-guidelines |
 | 4 | Chunking + trigger 一致性 | performance-linter (data integrity) |
-| 5 | 語意搜尋 + FTS 索引驗證 | query-patterns, performance-linter |
+| 5 | 語意搜尋 + FTS 索引 + chunks_safe VIEW | query-patterns, performance-linter, security |
 | 6 | 正規化查詢紀錄 + Ragas | anti-patterns P5 (no N+1) |
 | 7 | 分析查詢 + 健康度監控 | scaling-guidelines, large-table-management |
+| — | moddatetime 自動更新 updated_at | anti-patterns M6（貫穿所有 Stage） |
 
 ---
 

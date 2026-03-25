@@ -5,7 +5,7 @@ Worker 層型別，使用 `dataclasses`、`Literal` 與 `enum`。
 > 資料庫列型別（SourceRow、ArticleRow 等）定義於 `08_db-types-python.md`。
 > 本檔案僅包含**與 Worker 相關**且不綁定資料庫表的型別。
 >
-> **⚠️ ULID 遷移注意**：`job_id`、`source_id` 等 ID 欄位目前為 `int`，遷移後應改為 `str`。詳見 `08_db-types-python.md` 說明。
+> 已對齊 `003_crawler_schema.sql` v3.0（ULID text PK）。所有 ID 欄位皆為 `str`。
 
 ---
 
@@ -45,8 +45,8 @@ from .db_types import (
 ```python
 @dataclass
 class LeasedJob:
-    job_id: int
-    source_id: int
+    job_id: str
+    source_id: str
     url: str
     page_type: CrawlPageType
     lease_token: str
@@ -92,8 +92,8 @@ class WorkerError:
 @dataclass
 class ProcessResultDone:
     status: Literal["done"] = "done"
-    page_id: int | None = None
-    article_id: int | None = None
+    page_id: str | None = None
+    article_id: str | None = None
     discovered_urls: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
 
@@ -157,7 +157,7 @@ RetryDecision = RetryDecisionRetry | RetryDecisionFail | RetryDecisionDead | Ret
 class RetryContext:
     retry_count: int
     max_retries: int
-    source_id: int
+    source_id: str
     url: str
     page_type: CrawlPageType
     last_error: WorkerError | None = None
@@ -177,7 +177,7 @@ class SourceHealthState(str, enum.Enum):
 
 @dataclass
 class SourceHealth:
-    source_id: int
+    source_id: str
     state: SourceHealthState = SourceHealthState.HEALTHY
     active_requests: int = 0
     last_request_at: str | None = None

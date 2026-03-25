@@ -43,6 +43,7 @@
 | H3 | 缺 `created_by` 欄位 | schema-design §3 | documents, query_logs | 加入 created_by |
 | H4 | Index 未用 `IF NOT EXISTS` | migration-guidelines §5 | 全部 index | 加入 IF NOT EXISTS |
 | H5 | Constraint 未明確命名 | anti-patterns M4 | 部分 constraint | 補上命名 |
+| H6 | 無欄位級安全機制 | security best practice | embedding 暴露給前端 | 新增 `chunks_safe` VIEW（`security_invoker = true`） |
 
 ### ℹ️ Medium — 紀錄為未來升級
 
@@ -51,7 +52,7 @@
 | M1 | 無 `project_id` 多租戶 scoping | schema-design §2 | RAG 用 `collection_id` 作為等價的 scope 單位 |
 | M2 | `query_logs` append-heavy 未規劃 partition | large-table-management | 10K+ 查詢後應考慮 partition |
 | M3 | 無 document versioning | data-versioning | 文件更新時無法回溯歷史版本 |
-| M4 | 無資料分層前綴 | schema-design §5 | RAG 表可考慮 `rag_` 前綴 |
+| M4 | ~~無資料分層前綴~~ | schema-design §5 | ✅ 已解決：v3.0 改用獨立 `rag` schema，比表名前綴更徹底 |
 
 ---
 

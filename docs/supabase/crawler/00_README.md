@@ -65,12 +65,11 @@ Scheduler / Cron
 | [07_worker-retry-and-anti-ban.md](07_worker-retry-and-anti-ban.md) | 重試策略、backoff、source health、anti-ban 原則 |
 | [04_data-flow-overview.md](04_data-flow-overview.md) | Pipeline mapping、type strategy、file structure |
 
-### TypeScript Reference (superseded)
+### TypeScript Reference (archived)
 
-| File | Note |
-|------|------|
-| [12_typescript-types.md](12_typescript-types.md) | 已被 `08_db-types-python.md` 取代 |
-| [11_domain-types-and-repositories.md](11_domain-types-and-repositories.md) | 已被 `10_worker-interfaces-python.md` 取代 |
+已移至 `_archived/`，由 Python 版本取代：
+- `_archived/12_typescript-types.md` → 由 `08_db-types-python.md` 取代
+- `_archived/11_domain-types-and-repositories.md` → 由 `10_worker-interfaces-python.md` 取代
 
 ## Type Strategy
 
@@ -137,21 +136,13 @@ pending → leased → running → done
 | 偵測異常就退 | 429/403/captcha → source cooldown |
 | 不繞過防護 | 禁止 CAPTCHA bypass、proxy rotation for evasion |
 
-## Schema Audit Status
+## Schema Status
 
-Current schema has **29 violations** against project Supabase guidelines.
-See [02_AUDIT-vs-guidelines.md](02_AUDIT-vs-guidelines.md) for details.
+Schema v3.0 (post-audit)。所有 29 項 audit violation 已修正，包括：
+ULID PK、project_id 多租戶、RLS + JWT policy、moddatetime trigger、named constraint、partial index。
 
-**Recommended fix order**:
-
-1. **Foundation** — PK/FK type system (bigserial → ULID text)
-2. **Columns** — missing updated_at, named constraints, idempotent DDL
-3. **Indexes** — FK indexes, partial indexes for lease, composite indexes
-4. **RLS** — enable on all tables, service_role + authenticated policies, GRANTs
-5. **Scaling** — partition source_pages, autovacuum tuning, retention policy
-6. **Convention** — project_id, created_by, table prefix naming
-
-Learn the reasoning behind each fix: [01_HEAD-FIRST-crawler-db.md](01_HEAD-FIRST-crawler-db.md)
+- **Head First 教學**：[01_HEAD-FIRST-crawler-db.md](01_HEAD-FIRST-crawler-db.md) — 從零學 schema 設計邏輯
+- **歷史 Audit 報告**：[02_AUDIT-vs-guidelines.md](02_AUDIT-vs-guidelines.md) — 原始 29 項 violation 紀錄（歷史參考）
 
 ## Implementation Phases
 
