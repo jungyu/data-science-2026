@@ -78,7 +78,7 @@
 - RLS
 - 為什麼它是 PostgreSQL
 
-**對應教材**：[第二章](chapter-02-what-is-supabase.md)、[實驗 1](labs/lab-01-supabase-architecture.md)
+**對應教材**：[第二章](03_what-is-supabase.md)、[實驗 1](labs/00_lab-supabase-architecture.md)
 
 ---
 
@@ -137,7 +137,7 @@ Password: postgres
 - 可 Migration
 - 可備份
 
-**對應教材**：[Docker 實驗講義](labs/lab-docker-supabase.md)
+**對應教材**：[Docker 實驗講義](labs/05_lab-docker-supabase.md)
 
 ---
 
@@ -154,7 +154,7 @@ supabase migration new create_videos
 - 不靠 UI
 - 可 CI/CD
 
-**對應教材**：[Docker 實驗講義](labs/lab-docker-supabase.md)
+**對應教材**：[Docker 實驗講義](labs/05_lab-docker-supabase.md)
 
 ---
 
@@ -173,7 +173,7 @@ ALTER TABLE predictions ENABLE ROW LEVEL SECURITY;
 - 資料責任
 - 法規思維
 
-**對應教材**：[實驗 4](labs/lab-04-rls.md)、[作業四](assignments/hw-04-rls-advanced.md)
+**對應教材**：[實驗 4](labs/03_lab-rls.md)、[作業四](assignments/03_hw-rls-advanced.md)
 
 ---
 
@@ -189,7 +189,7 @@ from supabase import create_client
 - Update
 - Filter
 
-**對應教材**：[實驗 3](labs/lab-03-python-connection.md)、[作業三](assignments/hw-03-python-supabase.md)
+**對應教材**：[實驗 3](labs/02_lab-python-connection.md)、[作業三](assignments/02_hw-python-supabase.md)
 
 ---
 
@@ -201,7 +201,7 @@ from supabase import create_client
 - 可追蹤設計
 - 可重現設計
 
-**對應教材**：[作業二](assignments/hw-02-jsonb.md)
+**對應教材**：[作業二](assignments/01_hw-jsonb.md)
 
 ---
 
@@ -211,7 +211,7 @@ from supabase import create_client
 - 權限控制
 - Token
 
-**對應教材**：[實驗 5](labs/lab-05-api.md)
+**對應教材**：[實驗 5](labs/04_lab-api.md)
 
 ---
 
@@ -222,7 +222,7 @@ from supabase import create_client
 - API Flow
 - 使用者流程
 
-**對應教材**：[第四章](chapter-04-project-practice.md)
+**對應教材**：[第四章](05_project-practice.md)
 
 ---
 
@@ -267,7 +267,7 @@ supabase deploy
 - 展示 Demo
 - Q&A
 
-**對應教材**：[期末專題](assignments/final-project.md)
+**對應教材**：[期末專題](assignments/04_final-project.md)
 
 ---
 
@@ -294,16 +294,16 @@ supabase deploy
 
 | 項目 | 分數 | 週次 |
 |------|------|------|
-| [作業一：基礎 SQL](assignments/hw-01-sql-basics.md) | 20 | Week 3 |
-| [作業二：JSONB 應用](assignments/hw-02-jsonb.md) | 20 | Week 5 |
-| [作業三：Python + Supabase](assignments/hw-03-python-supabase.md) | 20 | Week 10 |
-| [作業四：RLS 進階](assignments/hw-04-rls-advanced.md) | 20 | Week 12 |
+| [作業一：基礎 SQL](assignments/00_hw-sql-basics.md) | 20 | Week 3 |
+| [作業二：JSONB 應用](assignments/01_hw-jsonb.md) | 20 | Week 5 |
+| [作業三：Python + Supabase](assignments/02_hw-python-supabase.md) | 20 | Week 10 |
+| [作業四：RLS 進階](assignments/03_hw-rls-advanced.md) | 20 | Week 12 |
 
 （取最高 3 份，共 60 分）
 
 ### 期末專題（40 分）
 
-詳見 [期末專題評分](assignments/final-project.md)
+詳見 [期末專題評分](assignments/04_final-project.md)
 
 ---
 
