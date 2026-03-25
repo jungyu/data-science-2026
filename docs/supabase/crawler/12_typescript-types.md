@@ -2,7 +2,7 @@
 
 > **已取代**：Python 版本請見 `08_db-types-python.md` + `09_worker-types-python.md`。本檔案僅保留作為 TypeScript 參考。
 
-所有型別皆對齊 `03_playwright_crawler_schema.sql`。
+所有型別皆對齊 `003_crawler_schema.sql`。
 
 ---
 
@@ -111,7 +111,7 @@ export type SourceUpdate = Partial<SourceInsert>;
 
 ```ts
 export type CrawlPageType = "list" | "article" | "detail" | "unknown";
-export type CrawlQueueStatus = "pending" | "running" | "done" | "failed" | "skipped";
+export type CrawlQueueStatus = "pending" | "leased" | "running" | "done" | "failed" | "skipped" | "dead";
 
 export type CrawlQueuePayload = {
   referrerUrl?: string;

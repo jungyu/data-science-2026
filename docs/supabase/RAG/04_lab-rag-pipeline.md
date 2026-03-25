@@ -10,7 +10,9 @@
 
 - Supabase 專案（免費版即可）
 - 開啟 SQL Editor（Dashboard → SQL Editor）
-- 執行 `05_rag_supabase_schema.sql` 建立所有表
+- 執行 `004_rag_schema.sql` 建立所有表
+
+> **注意**：RAG 表建在 `rag` schema 下。以下練習省略了 `rag.` 前綴，請先執行 `SET search_path = rag, public;` 或自行加上 `rag.` 前綴。
 
 ```sql
 -- 確認 pgvector 已啟用

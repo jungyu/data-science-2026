@@ -1,8 +1,8 @@
 # Crawler Schema vs Supabase Guidelines — Strict Audit
 
-Audit of `03_playwright_crawler_schema.sql` against `agent-init/skills/supabase/*.md`.
+Audit of `003_crawler_schema.sql` against `agent-init/skills/supabase/*.md`.
 
-> Verdict: **29 violations** across 7 categories. 10 Critical, 12 High, 7 Medium.
+> Verdict: **29 violations** across 7 categories. 6 Critical, 14 High, 8 Medium, 1 Info.
 
 ---
 
@@ -359,7 +359,7 @@ Raw HTML can be 100KB-1MB per row. Storing it inline causes:
 - Move `raw_html` to Supabase Storage, store only path in DB (guideline S4)
 - Or at minimum, never `SELECT *` from this table
 
-### V-29 [CRITICAL] `uuid-ossp` extension loaded but not needed
+### V-29 [INFO] `uuid-ossp` extension loaded but not needed
 
 The schema loads `uuid-ossp` (line 5) but:
 - If switching to ULID, `uuid-ossp` is unnecessary
@@ -374,7 +374,7 @@ The schema loads `uuid-ossp` (line 5) but:
 |----------|-------|-----------|
 | CRITICAL | 6 | V-01, V-02, V-04, V-15, V-21, V-25 |
 | HIGH | 14 | V-03, V-07, V-08, V-09, V-11, V-12, V-13, V-16, V-18, V-19, V-22, V-26, V-27, V-28 |
-| MEDIUM | 7 | V-05, V-06, V-10, V-14, V-17, V-20, V-23, V-24 |
+| MEDIUM | 8 | V-05, V-06, V-10, V-14, V-17, V-20, V-23, V-24 |
 | INFO | 1 | V-29 |
 
 ---

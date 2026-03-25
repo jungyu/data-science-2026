@@ -91,8 +91,8 @@
 
 ✅ Schema 分區：
    public.profiles          ← 共用的使用者資料
-   app.orders               ← 電商核心
-   app.products
+   shop.orders              ← 電商核心
+   shop.products
    crawler.jobs             ← 爬蟲 pipeline
    crawler.results
    rag.documents            ← 向量搜尋
@@ -102,7 +102,7 @@
 
 ---
 
-### 正體中文編碼：你不需要擔心
+## 正體中文編碼：你不需要擔心
 
 > **你的大腦在想：「建 Schema 的時候需要設定 UTF-8 嗎？像 MySQL 的 `utf8mb4`？」**
 >
@@ -150,11 +150,11 @@ SELECT * FROM products ORDER BY created_at DESC;  -- 這就夠了
 ### 建議的 Schema 分層
 
 ```
-public        → Supabase 預設（auth bridge, shared helpers）
-app           → SaaS 核心業務（電商、使用者管理）
+public        → API Gateway（bridge functions，PostgREST 唯一暴露層）
+shop          → 電商核心業務（商品、訂單、使用者管理）
 crawler       → Playwright pipeline（爬蟲任務、結果）
 rag           → 向量搜尋 + 知識庫
-analytics     → logs / metrics（分析、監控）
+analytics     → 跨域觀測（事件匯流、聚合快照、分析 function）
 ```
 
 **為什麼 `public` 不放業務邏輯？**
@@ -175,6 +175,7 @@ analytics     → logs / metrics（分析、監控）
 -- ============================================
 -- Step 1: 建立 Schema
 -- ============================================
+CREATE SCHEMA IF NOT EXISTS shop;
 CREATE SCHEMA IF NOT EXISTS crawler;
 CREATE SCHEMA IF NOT EXISTS rag;
 CREATE SCHEMA IF NOT EXISTS analytics;
@@ -182,10 +183,65 @@ CREATE SCHEMA IF NOT EXISTS analytics;
 -- 確認建立成功
 SELECT schema_name
 FROM information_schema.schemata
-WHERE schema_name IN ('crawler', 'rag', 'analytics');
+WHERE schema_name IN ('shop', 'crawler', 'rag', 'analytics');
 ```
 
-按 `Cmd+Enter` 執行。你應該看到三個 schema 名稱。
+按 `Cmd+Enter` 執行。你應該看到四個 schema 名稱。
+
+```sql
+-- ============================================
+-- Step 1.5: 設定權限（很重要！不做會踩坑）
+-- ============================================
+-- Supabase 的 anon / authenticated role 預設只能存取 public schema。
+-- 如果你希望透過 API 或 bridge function 存取自訂 schema，必須授權。
+
+-- 授權 role 可以「看到」這些 schema
+GRANT USAGE ON SCHEMA shop TO anon, authenticated;
+GRANT USAGE ON SCHEMA crawler TO anon, authenticated;
+GRANT USAGE ON SCHEMA rag TO anon, authenticated;
+GRANT USAGE ON SCHEMA analytics TO anon, authenticated;
+
+-- 授權 role 可以讀取這些 schema 裡「現有的」表
+GRANT SELECT ON ALL TABLES IN SCHEMA shop TO anon, authenticated;
+GRANT SELECT ON ALL TABLES IN SCHEMA crawler TO anon, authenticated;
+GRANT SELECT ON ALL TABLES IN SCHEMA rag TO anon, authenticated;
+GRANT SELECT ON ALL TABLES IN SCHEMA analytics TO anon, authenticated;
+
+-- 設定未來在這些 schema 建的新表，自動授權（不然每次建表都要重跑 GRANT）
+ALTER DEFAULT PRIVILEGES IN SCHEMA shop GRANT SELECT ON TABLES TO anon, authenticated;
+ALTER DEFAULT PRIVILEGES IN SCHEMA crawler GRANT SELECT ON TABLES TO anon, authenticated;
+ALTER DEFAULT PRIVILEGES IN SCHEMA rag GRANT SELECT ON TABLES TO anon, authenticated;
+ALTER DEFAULT PRIVILEGES IN SCHEMA analytics GRANT SELECT ON TABLES TO anon, authenticated;
+```
+
+> ### 你的大腦在想 🧠
+>
+> **「為什麼只 GRANT SELECT，不給 INSERT / UPDATE / DELETE？」**
+>
+> 因為這些 schema 是後端 pipeline 用的。前端透過 bridge function（`SECURITY DEFINER`）
+> 間接操作就好，不需要直接寫入。如果某個 schema 確實需要前端寫入，再加：
+> ```sql
+> GRANT INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA shop TO authenticated;
+> ALTER DEFAULT PRIVILEGES IN SCHEMA shop
+>   GRANT INSERT, UPDATE, DELETE ON TABLES TO authenticated;
+> ```
+
+```sql
+-- ============================================
+-- Step 1.6: 設定 search_path（選用）
+-- ============================================
+-- 預設 search_path 是 public，查詢其他 schema 的表必須加前綴：
+--   SELECT * FROM crawler.jobs;     -- 要寫 crawler.
+--
+-- 如果你經常操作多個 schema，可以擴展 search_path：
+ALTER ROLE postgres SET search_path TO public, shop, crawler, rag, analytics;
+
+-- 設定後重新連線生效。之後可以直接寫：
+--   SELECT * FROM jobs;  -- PostgreSQL 會依序在 public → shop → crawler → ... 找
+--
+-- ⚠️ 注意：如果不同 schema 有同名表（如 public.logs 和 analytics.logs），
+--    search_path 會找到第一個符合的。建議表名不要跨 schema 重複。
+```
 
 ```sql
 -- ============================================
@@ -422,7 +478,7 @@ Part 2：跨 schema 查詢（SQL Editor）
 5. 寫一個查詢統計每個 schema 有多少張表：
    SELECT schemaname, count(*) as table_count
    FROM pg_tables
-   WHERE schemaname IN ('public', 'crawler', 'rag', 'analytics')
+   WHERE schemaname IN ('shop', 'crawler', 'rag', 'analytics')
    GROUP BY schemaname
    ORDER BY table_count DESC;
 
@@ -442,6 +498,178 @@ Part 4：API 橋樑（SQL Editor）
    - crawler/rag 的表不在 REST API ❌（這是正確的！）
    - get_crawler_stats function 出現在 API Docs ✅
 ```
+
+---
+
+## 砍掉重練：清空 Schema
+
+練習到一半搞亂了？想從頭來過？這很正常。以下是三種常見的「重置」方式。
+
+### 方法 1：清空單一 Schema（最常用）
+
+把某個 schema 整個砍掉再重建，裡面的表、function、view 全部消失：
+
+```sql
+-- 例：重建 crawler schema
+DROP SCHEMA crawler CASCADE;
+CREATE SCHEMA crawler;
+```
+
+> ⚠️ `CASCADE` 會連同該 schema 下的**所有物件**一起刪除，包含表、function、view、trigger、type。
+
+### 方法 2：重建 public Schema
+
+`public` 比較特殊，刪掉之後要補回預設權限：
+
+```sql
+-- 砍掉整個 public schema
+DROP SCHEMA public CASCADE;
+
+-- 重建空的 public + 恢復預設權限
+CREATE SCHEMA public;
+GRANT ALL ON SCHEMA public TO postgres;
+GRANT ALL ON SCHEMA public TO public;
+```
+
+**這會影響什麼？**
+- `public` 裡的所有表、function、RLS policy → 全部消失
+- `auth`、`storage`、`extensions` schema → **不受影響**
+- 如果有開 Realtime 訂閱 → 需要重新設定
+
+### 方法 3：只刪表，保留 Function / Type
+
+如果你只想清掉表和資料，但保留寫好的 function：
+
+```sql
+-- 刪除 public schema 裡的所有表（保留 function、type）
+DO $$ DECLARE
+  r RECORD;
+BEGIN
+  FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = 'public') LOOP
+    EXECUTE 'DROP TABLE IF EXISTS public.' || quote_ident(r.tablename) || ' CASCADE';
+  END LOOP;
+END $$;
+```
+
+要清其他 schema，把 `'public'` 換成目標 schema 名稱即可。
+
+### 遇到 Foreign Key 卡住怎麼辦？
+
+當兩張表有 FK 關聯（例如 `crawler.results.job_id → crawler.jobs.id`），直接刪會報錯：
+
+```
+ERROR: cannot drop table crawler.jobs because other objects depend on it
+DETAIL: constraint results_job_id_fkey on table crawler.results depends on table crawler.jobs
+```
+
+這是因為 PostgreSQL 保護你，不讓你刪掉別人還在參照的表。以下是四種解法：
+
+#### 解法 1：用 CASCADE 連鎖刪除（最直接）
+
+```sql
+-- 刪表：CASCADE 會自動刪除所有依賴這張表的 FK constraint
+DROP TABLE crawler.jobs CASCADE;
+-- ⚠️ 注意：這不會刪 results 表本身，只會刪掉 results 上的 FK constraint
+--    results 表還在，但 job_id 欄位不再有 FK 保護
+```
+
+```sql
+-- 刪資料：CASCADE 搭配 ON DELETE CASCADE 的 FK 設計
+-- 如果建表時寫了 REFERENCES crawler.jobs(id) ON DELETE CASCADE
+-- 那刪 jobs 的一筆資料，對應的 results 資料會自動跟著刪
+DELETE FROM crawler.jobs WHERE id = 1;
+-- → results 裡 job_id = 1 的資料也會自動消失
+```
+
+#### 解法 2：按順序刪（先子後父）
+
+```sql
+-- 先刪子表（有 FK 的那張），再刪父表
+DROP TABLE crawler.results;   -- 子表先走
+DROP TABLE crawler.jobs;      -- 父表再走，不會報錯
+```
+
+```sql
+-- 清資料也一樣：先清子表
+TRUNCATE crawler.results;
+TRUNCATE crawler.jobs;
+```
+
+#### 解法 3：暫時關掉 FK 檢查（清資料用）
+
+```sql
+-- TRUNCATE 支援一次清多張表 + 自動處理 FK
+TRUNCATE crawler.jobs, crawler.results;
+-- ⚠️ 如果其他表也參照 jobs，需要全部列出來
+
+-- 或者用 CASCADE 讓 TRUNCATE 自動找出所有關聯表一起清
+TRUNCATE crawler.jobs CASCADE;
+-- → 會連 results 的資料一起清空（表結構保留）
+```
+
+#### 解法 4：手動解除 FK 再操作
+
+```sql
+-- 先查出 FK constraint 名稱
+SELECT conname, conrelid::regclass, confrelid::regclass
+FROM pg_constraint
+WHERE confrelid = 'crawler.jobs'::regclass;
+-- 結果例：results_job_id_fkey | crawler.results | crawler.jobs
+
+-- 手動刪除 FK constraint
+ALTER TABLE crawler.results DROP CONSTRAINT results_job_id_fkey;
+
+-- 現在可以自由操作了
+DROP TABLE crawler.jobs;       -- 不會報錯
+-- 或
+DELETE FROM crawler.jobs;      -- 不會報錯
+
+-- 操作完畢後，如果 results 表還在，記得補回 FK
+ALTER TABLE crawler.results
+  ADD CONSTRAINT results_job_id_fkey
+  FOREIGN KEY (job_id) REFERENCES crawler.jobs(id) ON DELETE CASCADE;
+```
+
+#### 怎麼選？
+
+| 情境 | 推薦解法 |
+|------|---------|
+| 整張表不要了 | 解法 1（`DROP TABLE ... CASCADE`）或解法 2（按順序刪） |
+| 清空資料但保留表結構 | 解法 3（`TRUNCATE ... CASCADE`） |
+| 只刪特定幾筆資料 | 確認建表時有 `ON DELETE CASCADE`，直接 `DELETE` 就好 |
+| 想精確控制哪些 constraint 要拆 | 解法 4（手動解除 FK） |
+
+> ### 你的大腦在想 🧠
+>
+> **「`ON DELETE CASCADE` 和 `DROP TABLE ... CASCADE` 的 CASCADE 是同一個意思嗎？」**
+>
+> 不是！這是最容易搞混的地方：
+>
+> | | 作用對象 | 效果 |
+> |--|---------|------|
+> | `ON DELETE CASCADE`（建表時設定） | **資料層級** | 刪父表的一筆 row → 子表對應的 row 自動跟著刪 |
+> | `DROP TABLE ... CASCADE`（DDL 指令） | **結構層級** | 刪表時 → 自動移除其他表上依賴它的 constraint |
+> | `TRUNCATE ... CASCADE`（DML 指令） | **資料層級** | 清空表時 → 連同有 FK 參照的子表資料一起清空 |
+>
+> 三個 `CASCADE` 長得一樣，但作用範圍完全不同。
+
+---
+
+### 怎麼選？
+
+| 情境 | 推薦方法 |
+|------|---------|
+| 練習搞砸了，想整個重來 | 方法 1（單一 schema）或方法 2（public） |
+| 只是資料亂了，結構沒問題 | `TRUNCATE` 個別表就好 |
+| 想保留 function，只砍表 | 方法 3 |
+| 想重置整個 project（包含 auth） | Supabase Dashboard → Settings → General → Delete project |
+
+> ### 腦筋急轉彎 🧠
+>
+> **Q：為什麼 `DROP SCHEMA public CASCADE` 不會影響 `auth` 和 `storage`？**
+>
+> A：因為它們是**不同的 schema**。`CASCADE` 只會刪除被指定 schema 裡面的物件，
+> 不會跨到其他 schema。這也是 Schema 分區的好處之一——爆炸半徑被限制在單一 schema 內。
 
 ---
 
@@ -488,12 +716,13 @@ Part 4：API 橋樑（SQL Editor）
 
 | Schema | 對應 Stage | 預計表數量 | 教程位置 |
 |--------|-----------|-----------|---------|
-| `public` (電商 + 共用) | Stage 3 | 約 20 張 | [e-Commerce/](../e-Commerce/00_README.md) |
+| `shop` (電商) | Stage 3 | 約 20 張 | [shop/](../shop/00_README.md) |
 | `crawler` | Stage 4 | 約 10 張 | [crawler/](../crawler/00_README.md) |
 | `rag` | Stage 5 | 約 7 張 | [RAG/](../RAG/00_README.md) |
+| `analytics` | 跨域 | 5 表 + 3 MATVIEW + 20 functions | [analytics/](../migrations/005_analytics_schema.sql) |
 
-> **注意**：目前電商 Schema 使用 `public`（因為 PostgREST 預設只暴露 public）。
-> 在實際多領域專案中，你可以把電商移到 `app` schema 並設定 PostgREST 的 `db-schemas`。
+> **注意**：電商 Schema 使用獨立的 `shop` schema。
+> PostgREST 預設只暴露 `public`，需在 Supabase Dashboard 的 API Settings 加入 `shop` 到 `db-schemas`，或透過 Database Function 橋接。
 
 ```
 現在的你                         未來的你

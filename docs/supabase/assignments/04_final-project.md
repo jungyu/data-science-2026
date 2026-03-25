@@ -143,3 +143,78 @@ project/
 | Week 16 | 選題、設計資料模型、建立 Migration |
 | Week 17 | 實作 Python API、RLS、測試 |
 | Week 18 | 簡報準備、最終測試、發表 |
+
+---
+
+## 附錄：參考範例 — 模型預測平台
+
+以下是一個完整的端對端範例，展示如何把資料科學專案從 Notebook 升級到可部署系統。你可以參考這個架構來設計自己的專題。
+
+### 資料模型
+
+```sql
+CREATE TABLE predictions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID,
+  input_data JSONB,
+  output_data JSONB,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+### Python 寫入預測結果
+
+```python
+result = model.predict(data)
+
+supabase.table("predictions").insert({
+    "user_id": user_id,
+    "input_data": input_json,
+    "output_data": result_json
+}).execute()
+```
+
+### REST API 查詢
+
+Supabase 自動產生 API，不用寫後端：
+
+```
+GET https://project.supabase.co/rest/v1/predictions
+Header:
+  apikey: anon-key
+  Authorization: Bearer <user-jwt>
+```
+
+### RLS 保護預測結果
+
+```sql
+ALTER TABLE predictions ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can read own predictions"
+ON predictions FOR SELECT
+USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own predictions"
+ON predictions FOR INSERT
+WITH CHECK (auth.uid() = user_id);
+```
+
+### 完整流程
+
+```
+Python 模型訓練
+    ↓
+模型預測結果（JSON）
+    ↓
+supabase.table("predictions").insert()
+    ↓
+Supabase PostgreSQL 儲存
+    ↓
+REST API 自動產生
+    ↓
+前端 / 其他服務查詢
+    ↓
+RLS 確保只看到自己的資料
+```
+
+> 這個範例涵蓋了專題要求的所有技術元素：PostgreSQL 設計、JSONB、Python API、RLS、REST 測試。用它當骨架，換上你自己的題目資料即可。

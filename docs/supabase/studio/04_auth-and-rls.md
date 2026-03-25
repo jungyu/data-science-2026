@@ -20,7 +20,7 @@
 - Docker 跑著（`supabase start`）
 - 瀏覽器打開 Studio `http://localhost:54323`
 
-> 如果要跑電商 RLS 範例，需先執行 `e-Commerce/01_shop_supabase_native_schema.sql`。
+> 如果要跑電商 RLS 範例，需先執行 `../migrations/002_shop_schema.sql`。
 
 ---
 
@@ -33,7 +33,7 @@
        │
        ▼
 ┌──────────────┐
-│   GoTrue     │  ← Auth 服務 (port 9999)
+│   GoTrue     │  ← Auth 服務 (Docker 內部 port 9999，經 API gateway 暴露於 54321)
 │  (Auth API)  │     處理註冊、登入、JWT 簽發
 └──────┬───────┘
        │ 寫入
@@ -260,9 +260,9 @@ service_role    → 繞過 RLS（後端用）
 
 ---
 
-### 電商 RLS 實戰 — 從 e-Commerce Schema 學 Policy 設計
+### 電商 RLS 實戰 — 從 Shop Schema 學 Policy 設計
 
-> 以下範例來自 `e-Commerce/01_shop_supabase_native_schema.sql` Stage 9。
+> 以下範例來自 `../migrations/002_shop_schema.sql` Stage 9。
 > 這是真正生產級的 RLS，不是教科書範例。
 
 #### Auth Bridge Helper（最關鍵的函數）
@@ -581,7 +581,7 @@ SELECT auth.uid();
 
 ```
 📝 Exercise: 用電商 Schema 測試 RLS
-前提：已跑過 e-Commerce/01_shop_supabase_native_schema.sql
+前提：已跑過 ../migrations/002_shop_schema.sql
 
 1. 在 Inbucket 註冊 customer@test.com（模擬顧客）
 2. 在 Inbucket 註冊 staff@test.com（模擬店員）
@@ -620,7 +620,7 @@ Auth & RLS 是 Supabase 安全的基石。你現在知道怎麼保護資料了�
 
 接下來學習如何與外界互動：
 
-→ `05_api-and-storage.md` — 自動產生的 REST API + 檔案儲存管理。
+→ `05_api-storage-functions.md` — 自動產生的 REST API + 檔案儲存管理。
 
 > **最後提醒**：每次建新表，第一件事就是 `ALTER TABLE ... ENABLE ROW LEVEL SECURITY;`。
 > 先鎖門，再決定發給誰鑰匙。這應該變成你的肌肉記憶。

@@ -20,7 +20,7 @@ Stage 6  完成品長什麼樣子？                               (Corrected SQ
 
 ## 在開始之前：你現在的 Schema 長這樣
 
-打開 `03_playwright_crawler_schema.sql`，你會看到 10 張表：
+打開 `003_crawler_schema.sql`，你會看到 10 張表：
 
 ```
 sources ──→ crawl_runs
@@ -84,10 +84,10 @@ ULID = 時間戳 (48 bit) + 隨機 (80 bit)
   - 存成 TEXT ✅ (跟 FK 型別統一)
 ```
 
-### 看看正確版本長什麼樣（e-Commerce 的做法）
+### 看看正確版本長什麼樣（Shop schema 的做法）
 
 ```sql
--- e-Commerce schema 的做法
+-- Shop schema 的做法
 create table if not exists public.users (
   id text primary key default generate_ulid(),    -- TEXT，不是 BIGINT
   ...
@@ -232,7 +232,7 @@ article_tags         | ❌          | ❌       | ❌          | 聯結表，可
 ### 修復：加上 updated_at + trigger
 
 trigger 函式的名稱，guidelines 建議用 `update_updated_at_column()`。
-但其實你也可以用 `moddatetime` extension（跟 e-Commerce schema 一樣），更簡潔：
+但其實你也可以用 `moddatetime` extension（跟 Shop schema 一樣），更簡潔：
 
 ```sql
 -- 方法 A：手寫 trigger function（你現在的做法，但名字要改）
@@ -931,7 +931,7 @@ grant all on public.sources to service_role;
 
 ---
 
-> **下一步**：拿著這份 checklist，重寫 `03_playwright_crawler_schema.sql`。
+> **下一步**：拿著這份 checklist，重寫 `003_crawler_schema.sql`。
 > 每改一張表，回來對照一次。
 > 改完之後，跑一次 `02_AUDIT-vs-guidelines.md` 的 29 項，確認全部 pass。
 
@@ -941,7 +941,7 @@ grant all on public.sources to service_role;
 
 > **前置要求**：已讀完 [01_supabase-studio.md](../01_supabase-studio.md)
 
-跑完 `03_playwright_crawler_schema.sql`（v3.0）後，打開 `http://localhost:54323` 驗證：
+跑完 `003_crawler_schema.sql`（v3.0）後，打開 `http://localhost:54323` 驗證：
 
 ### Table Editor 驗證
 
@@ -977,7 +977,7 @@ WHERE tgname LIKE 'trg_%_updated';
 -- 測試 Queue 的 lease 機制
 EXPLAIN ANALYZE
 SELECT * FROM crawl_queue
-WHERE status = 'pending' AND leased_until < NOW()
+WHERE status = 'pending' AND lease_expires_at < NOW()
 ORDER BY priority DESC, created_at ASC
 LIMIT 10;
 ```

@@ -23,7 +23,7 @@
 
 | 檔案 | 用途 |
 |------|------|
-| `01_shop_supabase_native_schema.sql` | 完整可執行的 SQL schema（v3.0, 1,047 行） |
+| [`002_shop_schema.sql`](../migrations/002_shop_schema.sql) | 完整可執行的 SQL schema（v3.0, 1,047 行） |
 | `00_README.md` | 你正在讀的這份教學指南 |
 
 **使用方式**：邊讀指南，邊打開 `.sql` 檔案對照。每個 Stage 都有對應的 SQL 段落。
@@ -735,7 +735,7 @@ create policy "staff_upload" on storage.objects for insert to authenticated
 
 ## 參考資源
 
-- **Schema SQL**：`01_shop_supabase_native_schema.sql`（本目錄）
+- **Schema SQL**：[`002_shop_schema.sql`](../migrations/002_shop_schema.sql)
 - **Supabase 設計規範**：`../../agent-init/skills/supabase/` 目錄
   - `pk-convention.md` — ULID 主鍵慣例
   - `rls-patterns.md` — RLS 正確寫法
@@ -751,7 +751,7 @@ create policy "staff_upload" on storage.objects for insert to authenticated
 
 > **前置要求**：已讀完 [01_supabase-studio.md](../01_supabase-studio.md)
 
-跑完 `01_shop_supabase_native_schema.sql` 之後，打開 `http://localhost:54323` 逐項驗證：
+跑完 `002_shop_schema.sql` 之後，打開 `http://localhost:54323` 逐項驗證：
 
 ### Table Editor 驗證
 

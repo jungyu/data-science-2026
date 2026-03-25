@@ -128,7 +128,7 @@ worker/
 
 | 檔案 | 內容 |
 |------|---------|
-| `03_playwright_crawler_schema.sql` | 權威 DB schema（含 lease 欄位） |
+| `003_crawler_schema.sql` | 權威 DB schema（含 lease 欄位） |
 | `08_db-types-python.md` | Python DB row/insert/update 型別 |
 | `09_worker-types-python.md` | Worker 專用型別（LeasedJob、錯誤、結果） |
 | `10_worker-interfaces-python.md` | Protocol 介面、Service Input、聚合物件 |

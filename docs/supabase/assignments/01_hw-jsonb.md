@@ -51,7 +51,7 @@ VALUES
 
 ## 必須完成的查詢
 
-### 查詢 1：取出 output 中的 score
+### 查詢 1：取出 output 中的 prediction
 
 ```sql
 SELECT model_name, output_data->>'prediction' AS prediction

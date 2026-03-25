@@ -80,7 +80,7 @@
 |------|------|
 | [01_guide-supabase-rag.md](01_guide-supabase-rag.md) | **教學指南**（Head First 風格，先讀這個） |
 | [04_lab-rag-pipeline.md](04_lab-rag-pipeline.md) | Stage-by-stage 實操 Lab（7 階段 + 3 挑戰題） |
-| [05_05_rag_supabase_schema.sql](05_05_rag_supabase_schema.sql) | 完整 SQL Schema v3.0 |
+| [004_rag_schema.sql](../migrations/004_rag_schema.sql) | 完整 SQL Schema v3.0 |
 | [02_design-decisions.md](02_design-decisions.md) | 設計決策與取捨說明 |
 | [03_audit-report.md](03_audit-report.md) | Skill 規範審查報告 |
 
@@ -88,9 +88,11 @@
 
 ## 快速開始
 
+> **注意**：`004_rag_schema.sql` 將所有表建在 `rag` schema 下。以下 SQL 範例省略了 `rag.` 前綴，請先執行 `SET search_path = rag, public;` 或自行加上 `rag.` 前綴。
+
 ```sql
 -- 1. 執行 schema
--- （複製 05_rag_supabase_schema.sql 貼到 Supabase SQL Editor 執行）
+-- （複製 004_rag_schema.sql 貼到 Supabase SQL Editor 執行）
 
 -- 2. 建立知識庫
 INSERT INTO collections (name, code, embedding_model_id, owner_id)

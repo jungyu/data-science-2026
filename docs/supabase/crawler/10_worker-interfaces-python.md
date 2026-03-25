@@ -4,6 +4,8 @@
 
 > 資料庫列型別從 `db_types` 模組匯入（參見 `08_db-types-python.md`）。
 > Worker 型別從 `types` 模組匯入（參見 `09_worker-types-python.md`）。
+>
+> **⚠️ ULID 遷移注意**：Protocol 方法中的 `int` 型別 ID 參數，遷移後應改為 `str`。詳見 `08_db-types-python.md` 說明。
 
 ---
 

@@ -27,14 +27,52 @@
 
 ---
 
+## Part 0: 什麼是 Supabase？
+
+在深入 Studio 之前，先搞清楚你面對的是什麼。
+
+### Supabase = PostgreSQL + 後端服務層
+
+```
+PostgreSQL（核心）
++ PostgREST（自動產生 API）
++ Auth（身份驗證）
++ Storage（檔案儲存）
++ Realtime（即時推送）
+```
+
+它不是「取代 PostgreSQL」，它是「幫 PostgreSQL 做雲端化包裝」。**你學的 SQL 完全通用。**
+
+### Supabase 與 PostgreSQL 的關係
+
+| PostgreSQL | Supabase |
+|------------|----------|
+| 純資料庫引擎 | 包裝好的後端平台 |
+| 需要自行架設 | 雲端管理 / Docker 本地運行 |
+| 無內建 API | 自動產生 REST API |
+| 無身份管理 | 內建 Auth |
+| 無即時功能 | Realtime |
+
+### 為什麼資料科學用 Supabase？
+
+| 優勢 | 說明 |
+|------|------|
+| **自動 API** | 建好 Table，`GET /rest/v1/students` 直接可用 |
+| **內建 Auth** | Google / Email / JWT，不用自己寫 |
+| **RLS** | 資料列層級權限——A 客戶只能看自己的資料，不用寫後端邏輯 |
+| **JSONB + AI** | 存 LLM 結果、embedding、metadata |
+
+> **小結**：PostgreSQL 是資料引擎，Supabase 是讓它變成完整後端的包裝層。理解了這層關係，你在 Studio 裡看到的每個面板就都有了脈絡。
+
+---
+
 ## 搭配檔案
 
 | 檔案 | 用途 |
 |------|------|
-| `03_what-is-supabase.md` | 前置知識（Supabase 整體架構） |
 | `labs/05_lab-docker-supabase.md` | Docker 環境設定 |
 | `labs/00_lab-supabase-architecture.md` | 架構理解（服務對照表） |
-| `e-Commerce/00_README.md` | 下一步：用 Studio 蓋電商資料庫 |
+| `shop/00_README.md` | 下一步：用 Studio 蓋電商資料庫 |
 
 **使用方式**：邊讀指南，邊打開 `http://localhost:54323` 實際操作。讀到哪裡，做到哪裡。
 
@@ -139,7 +177,7 @@ Schema 下拉選單
 >
 > 解法？建一個 `public.users` 當橋接表，把 `auth.users` 的 UUID 轉成你自己的 ULID。這就是電商 Stage 2 的 **Auth Bridge 模式**。
 >
-> → 詳見 [e-Commerce/00_README.md](e-Commerce/00_README.md) Stage 2
+> → 詳見 [shop/00_README.md](shop/00_README.md) Stage 2
 
 ---
 
@@ -964,4 +1002,4 @@ Level 3 — 能自己建構
 > Studio 操作熟悉了。接下來，我們要用它來蓋一個真正的電商資料庫。
 > 10 個 Stage、20 張表、從 ULID 到 RLS 全部實戰。
 >
-> → [e-Commerce/00_README.md](e-Commerce/00_README.md)
+> → [shop/00_README.md](shop/00_README.md)

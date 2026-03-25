@@ -78,7 +78,7 @@
 - RLS
 - 為什麼它是 PostgreSQL
 
-**對應教材**：[第二章](03_what-is-supabase.md)、[實驗 1](labs/00_lab-supabase-architecture.md)
+**對應教材**：[01_supabase-studio.md Part 0](01_supabase-studio.md)、[實驗 1](labs/00_lab-supabase-architecture.md)
 
 ---
 
@@ -222,7 +222,7 @@ from supabase import create_client
 - API Flow
 - 使用者流程
 
-**對應教材**：[第四章](05_project-practice.md)
+**對應教材**：[期末專題附錄](assignments/04_final-project.md)
 
 ---
 

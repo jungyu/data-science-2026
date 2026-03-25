@@ -31,8 +31,8 @@
 
 | 檔案 | 用途 |
 |------|------|
-| `02_why-postgresql.md` | PostgreSQL 基礎（接續本章） |
-| `e-Commerce/00_README.md` | Stage 3 電商實戰（本章觀念的應用） |
+| 本章 Part 7 | PostgreSQL 基礎導覽（接續正規化觀念） |
+| `shop/00_README.md` | Stage 3 電商實戰（本章觀念的應用） |
 | `crawler/00_README.md` | 爬蟲資料庫實戰（本章觀念的應用） |
 | `RAG/00_README.md` | RAG 向量資料庫實戰（本章觀念的應用） |
 
@@ -47,7 +47,7 @@
 ```
 Stage 0  ★ 你在這裡 ★  ── 資料庫觀念地基
 Stage 1  Foundation     ── PostgreSQL + Supabase Studio
-Stage 2  e-Commerce     ── 電商資料庫實戰（20 表）
+Stage 2  Shop           ── 電商資料庫實戰（20 表）
 Stage 3  Crawler        ── 爬蟲資料庫實戰（10 表）
 Stage 4  RAG            ── 向量資料庫實戰（7 表）
 ```
@@ -484,7 +484,7 @@ CREATE TABLE order_items (
 
 這就是你在電商 Stage 3 會看到的骨架——只是實際版本有 20 張表而已。
 
-> **腦筋急轉彎**：打開 [e-Commerce/00_README.md](e-Commerce/00_README.md) 的依賴關係圖，你能找出幾個 1:N 和幾個 M:N 關係？
+> **腦筋急轉彎**：打開 [shop/00_README.md](shop/00_README.md) 的依賴關係圖，你能找出幾個 1:N 和幾個 M:N 關係？
 >
 > 提示：找到 `order_items` 了嗎？它就是典型的 M:N 中間表。那 `product_categories` 呢？`store_staff` 呢？
 
@@ -735,10 +735,79 @@ price NUMERIC(12,2) NOT NULL  -- 12 位數，小數點後 2 位
 
 ---
 
+## Part 7: 認識 PostgreSQL — 你的資料引擎
+
+觀念打好了。現在來認識你即將使用的工具：**PostgreSQL**——全世界最受歡迎的開源關聯式資料庫，也是 Supabase 的底層引擎。
+
+### PostgreSQL 是什麼？
+
+- 開源關聯式資料庫
+- 強型別
+- ACID 交易
+- 支援 JSONB（同時兼具 NoSQL 能力）
+- 支援 Index、View、Trigger、Function
+- 支援複雜分析查詢
+
+> **跟 Pandas 比**：Pandas 適合單次分析，但沒有版本管理、多人協作、權限控管、持久化資料模型、API 供應。真實世界的資料科學一定接資料庫。
+
+### 核心概念速覽
+
+前面幾個 Part 教了你「為什麼要這樣設計」，現在看看 PostgreSQL 怎麼實現這些觀念：
+
+#### (A) Table — 你在 Part 2 學的正規化，最終落地在這裡
+
+```sql
+CREATE TABLE students (
+  id SERIAL PRIMARY KEY,
+  name TEXT,
+  score NUMERIC,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+#### (B) Index — 大數據查詢加速
+
+為什麼資料科學需要 Index？`GROUP BY` / `WHERE` 在百萬筆資料上，有沒有 Index 差十倍。
+
+```sql
+CREATE INDEX idx_students_score ON students(score);
+```
+
+#### (C) JOIN — Part 3 的 ER Diagram，靠 JOIN 串起來
+
+```sql
+SELECT s.name, c.course_name
+FROM students s
+JOIN enrollments e ON s.id = e.student_id
+JOIN courses c ON e.course_id = c.id;
+```
+
+#### (D) JSONB — 半結構資料的秘密武器
+
+PostgreSQL 可以存模型輸出、AI metadata、半結構化資料：
+
+```sql
+CREATE TABLE predictions (
+  id SERIAL,
+  model_output JSONB
+);
+```
+
+這讓 PostgreSQL 同時兼具 NoSQL 能力——你在後面的 RAG Stage 會大量用到。
+
+### PostgreSQL 核心概念對照表
+
+| 概念 | 說明 | 對應本章觀念 | 資料科學應用 |
+|------|------|-------------|-------------|
+| Table | 結構化資料儲存 | Part 2 正規化 | 取代 CSV |
+| Index | 查詢加速 | — | 大資料場景 |
+| JOIN | 多表關聯 | Part 3 ER Diagram | 資料整合 |
+| JSONB | 半結構資料 | Part 4 反正規化 | 模型輸出、AI metadata |
+
+---
+
 ## 下一步
 
-> 觀念打好了。接下來，我們要認識 PostgreSQL——全世界最受歡迎的開源關聯式資料庫，也是 Supabase 的底層引擎。
+> 你已經有了資料庫觀念 + PostgreSQL 基礎認識。接下來，打開 Supabase Studio，把這些觀念實際動手建出來。
 >
 > → [01_supabase-studio.md](01_supabase-studio.md)（Supabase Studio 五大模組實操）
->
-> → [02_why-postgresql.md](02_why-postgresql.md)（PostgreSQL 深入基礎）

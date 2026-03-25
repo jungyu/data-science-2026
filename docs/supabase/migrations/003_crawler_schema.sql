@@ -4,7 +4,7 @@
 -- ============================================================
 --
 -- Conventions:
---   - PK: TEXT DEFAULT generate_ulid()  (not BIGSERIAL)
+--   - PK: TEXT DEFAULT public.generate_ulid()  (not BIGSERIAL)
 --   - FK: TEXT references (type consistency)
 --   - Every business table: project_id for tenant scoping
 --   - Every table: created_at + updated_at (where applicable)
@@ -32,46 +32,15 @@
 -- STAGE 1: FOUNDATION
 -- ************************************************************
 
--- Extensions
-create extension if not exists pgcrypto;      -- gen_random_bytes for ULID
-create extension if not exists moddatetime;    -- updated_at triggers
-create extension if not exists pg_trgm;        -- trigram search (optional)
--- NOTE: uuid-ossp removed — not needed; ULID uses pgcrypto
-
--- ULID generator (26-char Crockford Base32, time-sortable)
-create or replace function public.generate_ulid()
-returns text
-language plpgsql
-volatile
-as $$
-declare
-  timestamp  bigint;
-  output     text := '';
-  unix_ts    bigint;
-  encoding   char[] := string_to_array('0123456789ABCDEFGHJKMNPQRSTVWXYZ', null);
-  i          int;
-  rand_bytes bytea;
-begin
-  unix_ts := (extract(epoch from clock_timestamp()) * 1000)::bigint;
-  for i in reverse 9..0 loop
-    output := output || encoding[1 + (unix_ts % 32)::int];
-    unix_ts := unix_ts >> 5;
-  end loop;
-  rand_bytes := gen_random_bytes(10);
-  for i in 0..9 loop
-    output := output || encoding[1 + (get_byte(rand_bytes, i) % 32)];
-  end loop;
-  return output;
-end;
-$$;
+-- NOTE: schema, extensions, generate_ulid() 已移至 001_extensions.sql
 
 
 -- ************************************************************
 -- STAGE 2: SOURCES
 -- ************************************************************
 
-create table if not exists public.sources (
-  id                text primary key default generate_ulid(),
+create table if not exists crawler.sources (
+  id                text primary key default public.generate_ulid(),
   project_id        text         not null,
   code              text         not null,
   name              text         not null,
@@ -91,8 +60,8 @@ create table if not exists public.sources (
   constraint uq_sources_code_per_project unique (project_id, code)
 );
 
-create index if not exists idx_sources_project on public.sources(project_id);
-create index if not exists idx_sources_enabled on public.sources(project_id, is_enabled)
+create index if not exists idx_sources_project on crawler.sources(project_id);
+create index if not exists idx_sources_enabled on crawler.sources(project_id, is_enabled)
   where is_enabled = true;
 
 
@@ -100,10 +69,10 @@ create index if not exists idx_sources_enabled on public.sources(project_id, is_
 -- STAGE 3: CRAWL RUNS
 -- ************************************************************
 
-create table if not exists public.crawl_runs (
-  id                  text primary key default generate_ulid(),
+create table if not exists crawler.crawl_runs (
+  id                  text primary key default public.generate_ulid(),
   project_id          text         not null,
-  source_id           text         not null references public.sources(id) on delete cascade,
+  source_id           text         not null references crawler.sources(id) on delete cascade,
   run_status          text         not null default 'pending',
   started_at          timestamptz,
   finished_at         timestamptz,
@@ -118,18 +87,18 @@ create table if not exists public.crawl_runs (
     check (run_status in ('pending','running','success','partial','failed'))
 );
 
-create index if not exists idx_crawl_runs_project on public.crawl_runs(project_id);
-create index if not exists idx_crawl_runs_source on public.crawl_runs(source_id, created_at desc);
+create index if not exists idx_crawl_runs_project on crawler.crawl_runs(project_id);
+create index if not exists idx_crawl_runs_source on crawler.crawl_runs(source_id, created_at desc);
 
 
 -- ************************************************************
 -- STAGE 4: CRAWL QUEUE
 -- ************************************************************
 
-create table if not exists public.crawl_queue (
-  id               text primary key default generate_ulid(),
+create table if not exists crawler.crawl_queue (
+  id               text primary key default public.generate_ulid(),
   project_id       text         not null,
-  source_id        text         not null references public.sources(id) on delete cascade,
+  source_id        text         not null references crawler.sources(id) on delete cascade,
   url              text         not null,
   page_type        text         not null default 'article',
   priority         integer      not null default 100,
@@ -152,22 +121,25 @@ create table if not exists public.crawl_queue (
     check (status in ('pending','leased','running','done','failed','skipped','dead'))
 );
 
-create index if not exists idx_crawl_queue_project on public.crawl_queue(project_id);
-create index if not exists idx_crawl_queue_source on public.crawl_queue(source_id);
-create index if not exists idx_crawl_queue_status on public.crawl_queue(status, priority desc);
-create index if not exists idx_crawl_queue_lease on public.crawl_queue(status, scheduled_at)
+create index if not exists idx_crawl_queue_project on crawler.crawl_queue(project_id);
+create index if not exists idx_crawl_queue_source on crawler.crawl_queue(source_id);
+create index if not exists idx_crawl_queue_status on crawler.crawl_queue(status, priority desc);
+create index if not exists idx_crawl_queue_lease on crawler.crawl_queue(status, scheduled_at)
   where status = 'pending';
+-- 防止 cron 重複塞入相同 source+url 的 pending 任務
+create unique index if not exists uq_crawl_queue_pending_source_url
+  on crawler.crawl_queue(source_id, url) where status = 'pending';
 
 
 -- ************************************************************
 -- STAGE 5: SOURCE PAGES
 -- ************************************************************
 
-create table if not exists public.source_pages (
-  id             text primary key default generate_ulid(),
+create table if not exists crawler.source_pages (
+  id             text primary key default public.generate_ulid(),
   project_id     text         not null,
-  source_id      text         not null references public.sources(id) on delete cascade,
-  crawl_run_id   text         references public.crawl_runs(id) on delete set null,
+  source_id      text         not null references crawler.sources(id) on delete cascade,
+  crawl_run_id   text         references crawler.crawl_runs(id) on delete set null,
   page_type      text         not null default 'article',
   topic          text,
   url            text         not null,
@@ -186,22 +158,22 @@ create table if not exists public.source_pages (
     check (page_type in ('list','article','detail','unknown'))
 );
 
-create index if not exists idx_source_pages_project on public.source_pages(project_id);
-create index if not exists idx_source_pages_source on public.source_pages(source_id);
-create index if not exists idx_source_pages_crawl_run on public.source_pages(crawl_run_id)
+create index if not exists idx_source_pages_project on crawler.source_pages(project_id);
+create index if not exists idx_source_pages_source on crawler.source_pages(source_id);
+create index if not exists idx_source_pages_crawl_run on crawler.source_pages(crawl_run_id)
   where crawl_run_id is not null;
-create index if not exists idx_source_pages_fetched on public.source_pages(fetched_at desc);
+create index if not exists idx_source_pages_fetched on crawler.source_pages(fetched_at desc);
 
 
 -- ************************************************************
 -- STAGE 6: ARTICLES
 -- ************************************************************
 
-create table if not exists public.articles (
-  id                 text primary key default generate_ulid(),
+create table if not exists crawler.articles (
+  id                 text primary key default public.generate_ulid(),
   project_id         text         not null,
-  source_id          text         not null references public.sources(id) on delete cascade,
-  source_page_id     text         references public.source_pages(id) on delete set null,
+  source_id          text         not null references crawler.sources(id) on delete cascade,
+  source_page_id     text         references crawler.source_pages(id) on delete set null,
   external_id        text,
   title              text         not null,
   slug               text,
@@ -225,12 +197,12 @@ create table if not exists public.articles (
   constraint uq_articles_source_url unique (source_id, source_url)
 );
 
-create index if not exists idx_articles_project on public.articles(project_id);
-create index if not exists idx_articles_source on public.articles(source_id);
-create index if not exists idx_articles_source_page on public.articles(source_page_id)
+create index if not exists idx_articles_project on crawler.articles(project_id);
+create index if not exists idx_articles_source on crawler.articles(source_id);
+create index if not exists idx_articles_source_page on crawler.articles(source_page_id)
   where source_page_id is not null;
-create index if not exists idx_articles_published on public.articles(published_at desc);
-create index if not exists idx_articles_hash on public.articles(content_hash)
+create index if not exists idx_articles_published on crawler.articles(published_at desc);
+create index if not exists idx_articles_hash on crawler.articles(content_hash)
   where content_hash is not null;
 
 
@@ -238,11 +210,11 @@ create index if not exists idx_articles_hash on public.articles(content_hash)
 -- STAGE 7: ARTICLE ASSETS
 -- ************************************************************
 
-create table if not exists public.article_assets (
-  id             text primary key default generate_ulid(),
+create table if not exists crawler.article_assets (
+  id             text primary key default public.generate_ulid(),
   project_id     text         not null,
-  article_id     text         not null references public.articles(id) on delete cascade,
-  source_page_id text         references public.source_pages(id) on delete set null,
+  article_id     text         not null references crawler.articles(id) on delete cascade,
+  source_page_id text         references crawler.source_pages(id) on delete set null,
   asset_type     text         not null default 'image',
   original_url   text,
   storage_bucket text,
@@ -260,9 +232,9 @@ create table if not exists public.article_assets (
     check (asset_type in ('image','video','file','audio'))
 );
 
-create index if not exists idx_assets_project on public.article_assets(project_id);
-create index if not exists idx_assets_article on public.article_assets(article_id);
-create index if not exists idx_assets_source_page on public.article_assets(source_page_id)
+create index if not exists idx_assets_project on crawler.article_assets(project_id);
+create index if not exists idx_assets_article on crawler.article_assets(article_id);
+create index if not exists idx_assets_source_page on crawler.article_assets(source_page_id)
   where source_page_id is not null;
 
 
@@ -270,40 +242,40 @@ create index if not exists idx_assets_source_page on public.article_assets(sourc
 -- STAGE 8: TAGS
 -- ************************************************************
 
-create table if not exists public.tags (
-  id          text primary key default generate_ulid(),
+create table if not exists crawler.tags (
+  id          text primary key default public.generate_ulid(),
   project_id  text         not null,
   taxonomy    text         not null default 'tag',
   name        text         not null,
   slug        text,
   description text,
-  parent_id   text         references public.tags(id) on delete set null,
+  parent_id   text         references crawler.tags(id) on delete set null,
   meta        jsonb        not null default '{}'::jsonb,
   created_at  timestamptz  not null default now(),
   updated_at  timestamptz  not null default now(),
   constraint uq_tags_taxonomy_name unique (taxonomy, name)
 );
 
-create index if not exists idx_tags_project on public.tags(project_id);
-create index if not exists idx_tags_taxonomy on public.tags(taxonomy, name);
-create index if not exists idx_tags_parent on public.tags(parent_id) where parent_id is not null;
+create index if not exists idx_tags_project on crawler.tags(project_id);
+create index if not exists idx_tags_taxonomy on crawler.tags(taxonomy, name);
+create index if not exists idx_tags_parent on crawler.tags(parent_id) where parent_id is not null;
 
-create table if not exists public.article_tags (
-  article_id text not null references public.articles(id) on delete cascade,
-  tag_id     text not null references public.tags(id) on delete cascade,
+create table if not exists crawler.article_tags (
+  article_id text not null references crawler.articles(id) on delete cascade,
+  tag_id     text not null references crawler.tags(id) on delete cascade,
   created_at timestamptz not null default now(),
   primary key (article_id, tag_id)
 );
 
-create index if not exists idx_article_tags_tag on public.article_tags(tag_id);
+create index if not exists idx_article_tags_tag on crawler.article_tags(tag_id);
 
 
 -- ************************************************************
 -- STAGE 9: PUBLISH TARGETS
 -- ************************************************************
 
-create table if not exists public.publish_targets (
-  id          text primary key default generate_ulid(),
+create table if not exists crawler.publish_targets (
+  id          text primary key default public.generate_ulid(),
   project_id  text         not null,
   code        text         not null unique,
   name        text         not null,
@@ -315,13 +287,13 @@ create table if not exists public.publish_targets (
   updated_at  timestamptz  not null default now()
 );
 
-create index if not exists idx_publish_targets_project on public.publish_targets(project_id);
+create index if not exists idx_publish_targets_project on crawler.publish_targets(project_id);
 
-create table if not exists public.article_publications (
-  id               text primary key default generate_ulid(),
+create table if not exists crawler.article_publications (
+  id               text primary key default public.generate_ulid(),
   project_id       text         not null,
-  article_id       text         not null references public.articles(id) on delete cascade,
-  target_id        text         not null references public.publish_targets(id) on delete cascade,
+  article_id       text         not null references crawler.articles(id) on delete cascade,
+  target_id        text         not null references crawler.publish_targets(id) on delete cascade,
   remote_id        text,
   remote_url       text,
   publish_status   text         not null default 'pending',
@@ -335,25 +307,25 @@ create table if not exists public.article_publications (
     check (publish_status in ('pending','published','failed','deleted'))
 );
 
-create index if not exists idx_article_publications_project on public.article_publications(project_id);
-create index if not exists idx_article_publications_article on public.article_publications(article_id);
-create index if not exists idx_article_publications_target on public.article_publications(target_id);
+create index if not exists idx_article_publications_project on crawler.article_publications(project_id);
+create index if not exists idx_article_publications_article on crawler.article_publications(article_id);
+create index if not exists idx_article_publications_target on crawler.article_publications(target_id);
 
 
 -- ************************************************************
 -- STAGE 10: LEASE RPC
 -- ************************************************************
 
-create or replace function public.lease_next_crawl_job(
+create or replace function crawler.lease_next_crawl_job(
   p_worker_id text,
   p_lease_duration interval default interval '5 minutes'
 )
-returns setof public.crawl_queue
+returns setof crawler.crawl_queue
 language sql
 security definer
-set search_path = public
+set search_path = crawler
 as $$
-  update public.crawl_queue
+  update crawler.crawl_queue
   set
     status = 'leased',
     lease_token = gen_random_uuid()::text,
@@ -362,7 +334,7 @@ as $$
     worker_id = p_worker_id
   where id = (
     select id
-    from public.crawl_queue
+    from crawler.crawl_queue
     where (status = 'pending' and scheduled_at <= now())
        or (status = 'leased' and lease_expires_at < now())
     order by priority desc, scheduled_at asc
@@ -372,7 +344,7 @@ as $$
   returning *;
 $$;
 
-grant execute on function public.lease_next_crawl_job(text, interval) to authenticated;
+grant execute on function crawler.lease_next_crawl_job(text, interval) to authenticated;
 
 
 -- ************************************************************
@@ -389,9 +361,9 @@ begin
   ]
   loop
     execute format('
-      drop trigger if exists trg_%1$s_updated_at on public.%1$s;
+      drop trigger if exists trg_%1$s_updated_at on crawler.%1$s;
       create trigger trg_%1$s_updated_at
-        before update on public.%1$s
+        before update on crawler.%1$s
         for each row execute function moddatetime(updated_at);
     ', tbl);
   end loop;
@@ -417,29 +389,81 @@ begin
     'publish_targets', 'article_publications'
   ]
   loop
-    execute format('alter table public.%I enable row level security;', tbl);
+    execute format('alter table crawler.%I enable row level security;', tbl);
   end loop;
 end;
 $$;
 
--- Policies: project-scoped read via sources.project_id
--- For simplicity, all authenticated users with matching project_id can read.
--- Staff/admin logic can be layered on top (see e-Commerce Stage 9 for example).
+-- ************************************************************
+-- RLS PATTERN: Multi-Tenant（project_id scoping via JWT）
+-- ************************************************************
+-- 教學重點：
+--   - 每個 crawler 表都有 project_id 欄位
+--   - 用 JWT custom claim (app_metadata.project_ids) 做租戶隔離
+--   - 用戶只能存取自己 project 的資料
+--   - Helper function 封裝 claim 讀取邏輯
+--   - service_role 不受限制（後端 pipeline 用）
+--
+-- JWT app_metadata 範例：
+--   { "project_ids": ["demo-project", "prod-project"] }
+--
+-- 設定方式（Supabase Dashboard → Authentication → Users → Edit User）：
+--   或用 SQL：
+--   UPDATE auth.users SET raw_app_meta_data =
+--     raw_app_meta_data || '{"project_ids":["demo-project"]}'::jsonb
+--   WHERE id = 'user-uuid';
+-- ************************************************************
 
--- Sources: direct project_id check
-create policy "sources_select" on public.sources
-  for select to authenticated using (true);
-create policy "sources_insert" on public.sources
-  for insert to authenticated with check (true);
-create policy "sources_update" on public.sources
-  for update to authenticated using (true);
-create policy "sources_delete" on public.sources
-  for delete to authenticated using (true);
-create policy "sources_service_role" on public.sources
+-- Helper: 取得當前用戶可存取的 project_ids（從 JWT app_metadata）
+create or replace function crawler.get_my_project_ids()
+returns text[]
+language sql
+stable
+security definer
+set search_path = crawler
+as $$
+  select coalesce(
+    array(
+      select jsonb_array_elements_text(
+        (select auth.jwt()) -> 'app_metadata' -> 'project_ids'
+      )
+    ),
+    '{}'::text[]
+  );
+$$;
+
+grant execute on function crawler.get_my_project_ids() to authenticated;
+
+-- Helper: 檢查用戶是否可存取特定 project
+create or replace function crawler.has_project_access(p_project_id text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = crawler
+as $$
+  select p_project_id = ANY(crawler.get_my_project_ids());
+$$;
+
+grant execute on function crawler.has_project_access(text) to authenticated;
+
+-- Sources: 直接檢查 project_id
+create policy "sources_select" on crawler.sources
+  for select to authenticated
+  using (crawler.has_project_access(project_id));
+create policy "sources_insert" on crawler.sources
+  for insert to authenticated
+  with check (crawler.has_project_access(project_id));
+create policy "sources_update" on crawler.sources
+  for update to authenticated
+  using (crawler.has_project_access(project_id));
+create policy "sources_delete" on crawler.sources
+  for delete to authenticated
+  using (crawler.has_project_access(project_id));
+create policy "sources_service_role" on crawler.sources
   for all to service_role using (true) with check (true);
 
--- Tables with source_id FK: inherit access via source
--- (In production, use helper function. Simplified here for learning.)
+-- 有 project_id 欄位的表：直接檢查
 do $$
 declare
   tbl text;
@@ -450,40 +474,65 @@ begin
   ]
   loop
     execute format('
-      create policy "%1$s_select" on public.%1$s
-        for select to authenticated using (true);
-      create policy "%1$s_insert" on public.%1$s
-        for insert to authenticated with check (true);
-      create policy "%1$s_update" on public.%1$s
-        for update to authenticated using (true);
-      create policy "%1$s_delete" on public.%1$s
-        for delete to authenticated using (true);
-      create policy "%1$s_service_role" on public.%1$s
+      create policy "%1$s_select" on crawler.%1$s
+        for select to authenticated
+        using (crawler.has_project_access(project_id));
+      create policy "%1$s_insert" on crawler.%1$s
+        for insert to authenticated
+        with check (crawler.has_project_access(project_id));
+      create policy "%1$s_update" on crawler.%1$s
+        for update to authenticated
+        using (crawler.has_project_access(project_id));
+      create policy "%1$s_delete" on crawler.%1$s
+        for delete to authenticated
+        using (crawler.has_project_access(project_id));
+      create policy "%1$s_service_role" on crawler.%1$s
         for all to service_role using (true) with check (true);
     ', tbl);
   end loop;
 end;
 $$;
 
--- Reference / taxonomy tables: public read, authenticated write
+-- tags / publish_targets: 有 project_id，一樣做 tenant scoping
+-- article_tags / article_publications: 沒有 project_id，透過 FK 繼承
 do $$
 declare
   tbl text;
 begin
-  foreach tbl in array array[
-    'tags', 'article_tags', 'publish_targets', 'article_publications'
-  ]
+  -- 有 project_id 的 reference tables
+  foreach tbl in array array['tags', 'publish_targets']
   loop
     execute format('
-      create policy "%1$s_select" on public.%1$s
+      create policy "%1$s_select" on crawler.%1$s
+        for select to authenticated, anon
+        using (crawler.has_project_access(project_id));
+      create policy "%1$s_insert" on crawler.%1$s
+        for insert to authenticated
+        with check (crawler.has_project_access(project_id));
+      create policy "%1$s_update" on crawler.%1$s
+        for update to authenticated
+        using (crawler.has_project_access(project_id));
+      create policy "%1$s_delete" on crawler.%1$s
+        for delete to authenticated
+        using (crawler.has_project_access(project_id));
+      create policy "%1$s_service_role" on crawler.%1$s
+        for all to service_role using (true) with check (true);
+    ', tbl);
+  end loop;
+
+  -- 沒有 project_id 的 junction tables（public read, authenticated write）
+  foreach tbl in array array['article_tags', 'article_publications']
+  loop
+    execute format('
+      create policy "%1$s_select" on crawler.%1$s
         for select to authenticated, anon using (true);
-      create policy "%1$s_insert" on public.%1$s
+      create policy "%1$s_insert" on crawler.%1$s
         for insert to authenticated with check (true);
-      create policy "%1$s_update" on public.%1$s
+      create policy "%1$s_update" on crawler.%1$s
         for update to authenticated using (true);
-      create policy "%1$s_delete" on public.%1$s
+      create policy "%1$s_delete" on crawler.%1$s
         for delete to authenticated using (true);
-      create policy "%1$s_service_role" on public.%1$s
+      create policy "%1$s_service_role" on crawler.%1$s
         for all to service_role using (true) with check (true);
     ', tbl);
   end loop;
@@ -501,15 +550,15 @@ begin
     'publish_targets', 'article_publications'
   ]
   loop
-    execute format('grant select on public.%I to authenticated;', tbl);
-    execute format('grant insert, update, delete on public.%I to authenticated;', tbl);
-    execute format('grant all on public.%I to service_role;', tbl);
+    execute format('grant select on crawler.%I to authenticated;', tbl);
+    execute format('grant insert, update, delete on crawler.%I to authenticated;', tbl);
+    execute format('grant all on crawler.%I to service_role;', tbl);
   end loop;
 
   -- Public-readable tables
   foreach tbl in array array['tags', 'publish_targets', 'articles']
   loop
-    execute format('grant select on public.%I to anon;', tbl);
+    execute format('grant select on crawler.%I to anon;', tbl);
   end loop;
 end;
 $$;

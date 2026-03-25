@@ -44,7 +44,7 @@ Scheduler / Cron
 
 | File | Description |
 |------|-------------|
-| [03_playwright_crawler_schema.sql](03_playwright_crawler_schema.sql) | SQL schema（10 tables + lease RPC + RLS） |
+| [003_crawler_schema.sql](../migrations/003_crawler_schema.sql) | SQL schema（10 tables + lease RPC + RLS） |
 | [02_AUDIT-vs-guidelines.md](02_AUDIT-vs-guidelines.md) | Schema 對照 Supabase guidelines 的 29 項 audit |
 | [01_HEAD-FIRST-crawler-db.md](01_HEAD-FIRST-crawler-db.md) | Head First 風格教學：Stage by Stage 學會 Supabase schema 設計 |
 

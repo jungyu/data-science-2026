@@ -94,19 +94,27 @@ USING (auth.uid() = user_id);
 ### 方式 2：Python 測試
 
 ```python
-# 使用者 A 的 JWT
-supabase_a = create_client(url, key)
-# 設定使用者 A 的 session
+from supabase import create_client
 
-# 使用者 B 的 JWT
+url = "http://localhost:54321"  # 或你的 Supabase URL
+key = "your-anon-key"
+
+# 使用者 A 登入
+supabase_a = create_client(url, key)
+supabase_a.auth.sign_in_with_password({"email": "user_a@test.com", "password": "test1234"})
+
+# 使用者 B 登入
 supabase_b = create_client(url, key)
-# 設定使用者 B 的 session
+supabase_b.auth.sign_in_with_password({"email": "user_b@test.com", "password": "test1234"})
 
 # 使用者 A 只能看到自己的資料
 response_a = supabase_a.table("user_predictions").select("*").execute()
 
 # 使用者 B 只能看到自己的資料
 response_b = supabase_b.table("user_predictions").select("*").execute()
+
+# 驗證：兩個回應的資料應該不重疊
+assert response_a.data != response_b.data
 ```
 
 ---

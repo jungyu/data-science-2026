@@ -71,13 +71,19 @@ Docker version 24.x.x
 
 ### 3.2 安裝 Supabase CLI
 
-從 GitHub Release 直接下載（不依賴 Node.js）：
+**macOS（建議）**：
+
+```bash
+brew install supabase/tap/supabase
+```
+
+**Linux**（手動安裝）：
 
 ```bash
 mkdir -p ~/bin && cd /tmp
 curl -L https://github.com/supabase/cli/releases/latest/download/supabase_linux_amd64.tar.gz -o supabase.tar.gz
 tar -xzf supabase.tar.gz && chmod +x supabase && mv supabase ~/bin/supabase
-echo 'export PATH="$HOME/bin:$PATH"' >> ~/.bashrc && source ~/.bashrc
+echo 'export PATH="$HOME/bin:$PATH"' >> ~/.zshrc && source ~/.zshrc
 ```
 
 確認：

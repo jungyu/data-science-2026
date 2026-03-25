@@ -70,8 +70,8 @@
 |------|------|
 | **核心問題** | 真實電商系統的資料庫怎麼設計？訂單、庫存、RLS 如何搭配？ |
 | **前置條件** | Stage 1 + 2 完成 |
-| **教材** | [e-Commerce/00_README.md](e-Commerce/00_README.md) |
-| **SQL Schema** | [e-Commerce/01_shop_supabase_native_schema.sql](e-Commerce/01_shop_supabase_native_schema.sql) |
+| **教材** | [shop/00_README.md](shop/00_README.md) |
+| **SQL Schema** | [migrations/002_shop_schema.sql](migrations/002_shop_schema.sql) |
 | **預估時數** | ~4h |
 
 ---
@@ -83,7 +83,7 @@
 | **核心問題** | 爬蟲系統的資料怎麼收、怎麼存、怎麼追蹤狀態？ |
 | **前置條件** | Stage 1 + 2 完成 |
 | **教材** | [crawler/00_README.md](crawler/00_README.md) |
-| **SQL Schema** | [crawler/03_playwright_crawler_schema.sql](crawler/03_playwright_crawler_schema.sql) |
+| **SQL Schema** | [migrations/003_crawler_schema.sql](migrations/003_crawler_schema.sql) |
 | **預估時數** | ~3h |
 
 ---
@@ -95,20 +95,8 @@
 | **核心問題** | LLM 應用的向量搜尋怎麼做？Embedding 怎麼存進 PostgreSQL？ |
 | **前置條件** | Stage 1 + 2 完成 |
 | **教材** | [RAG/01_guide-supabase-rag.md](RAG/01_guide-supabase-rag.md) |
-| **SQL Schema** | [RAG/05_rag_supabase_schema.sql](RAG/05_rag_supabase_schema.sql) |
+| **SQL Schema** | [migrations/004_rag_schema.sql](migrations/004_rag_schema.sql) |
 | **預估時數** | ~3h |
-
----
-
-## 補充教材
-
-| 文件 | 說明 |
-|------|------|
-| [02_why-postgresql.md](02_why-postgresql.md) | PostgreSQL 基礎：為什麼資料科學需要它？ |
-| [03_what-is-supabase.md](03_what-is-supabase.md) | Supabase 架構概述 |
-| [04_supabase-hands-on.md](04_supabase-hands-on.md) | Supabase 實作（從 0 到完成） |
-| [05_project-practice.md](05_project-practice.md) | 資料科學專案實戰 |
-| [06_strategic-significance.md](06_strategic-significance.md) | Supabase 在資料科學的戰略意義 |
 
 ---
 
@@ -122,6 +110,8 @@
 | [實驗 4](labs/03_lab-rls.md) | RLS（資料科學最重要的一課） | 1h |
 | [實驗 5](labs/04_lab-api.md) | 建立簡易資料科學 API | 1h |
 | [Docker 實驗](labs/05_lab-docker-supabase.md) | Docker + Supabase 本地開發環境 | 3h |
+| [實驗 6](labs/06_lab-realtime-storage.md) | Realtime 即時訂閱 + Storage 檔案管理 | 2h |
+| [實驗 7](labs/07_lab-seed-and-testing.md) | Seed Data 策略 + RLS 驗證方法 | 1.5h |
 
 ## 作業與評量
 
@@ -161,11 +151,29 @@ Stage 1 → Stage 2 → Stage 3 + Stage 4 或 Stage 5
 
 這門課不是教 Supabase。它在教：**系統型資料科學思維**。
 
-三層能力：
-1. **分析能力** — Pandas、統計、模型
-2. **資料建模能力** — PostgreSQL、Schema、Index
-3. **系統設計能力** — API、RLS、部署、Migration
+### 為什麼這門課重要？
 
-> 只會 Pandas 是分析者
-> 會 PostgreSQL 是資料工程師
-> 會 Supabase 是產品型資料科學家
+| 只會 Pandas | 會 Supabase |
+|-------------|-------------|
+| 分析型 | 系統型 |
+| 做報告 | 做產品 |
+| Notebook | API |
+| 無權限 | RLS |
+| 無部署 | 雲端化 |
+
+### 三種層次的資料科學家
+
+| 層次 | 工具 | 產出 | 能力邊界 |
+|------|------|------|----------|
+| **分析者** | Pandas、Jupyter | 報告、圖表 | 無法部署、無法協作 |
+| **資料工程師** | PostgreSQL、SQL、Index | 結構化資料模型 | 資料建模、查詢優化 |
+| **產品型資料科學家** | Supabase、REST API、RLS | 可部署的資料系統 | API 設計、權限控制、系統架構 |
+
+### 這門課培養的職場能力
+
+學生畢業後會具備：資料庫設計、權限控制、API 設計、部署流程、Migration 管理、版本控制。
+
+**這些能力比多會一個模型重要。**
+
+> PostgreSQL 是資料科學的「資料引擎」
+> Supabase 是資料科學的「產品化引擎」

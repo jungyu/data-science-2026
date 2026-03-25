@@ -10,7 +10,7 @@
 
 ## 要求
 
-使用 `supabase-py` 完成以下操作：
+使用 `supabase` Python SDK（`pip install supabase`）完成以下操作：
 
 1. **建立資料** — Insert
 2. **查詢資料** — Select（含條件篩選）

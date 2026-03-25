@@ -1,8 +1,11 @@
 # Playwright Crawler — Python 資料庫列型別
 
-所有資料庫列/插入/更新型別皆以 Python `dataclass` 定義，與 `03_playwright_crawler_schema.sql` 對齊。
+所有資料庫列/插入/更新型別皆以 Python `dataclass` 定義，與 `003_crawler_schema.sql` 對齊。
 
 > 從 `12_typescript-types.md` 轉換而來。此為權威性的 Python 版本。
+
+> **⚠️ ULID 遷移注意**：以下 `id` 和 `*_id` 欄位目前標記為 `int`，對應的是遷移前的 BIGINT 主鍵。
+> 完成 ULID 遷移（V-01/V-02）後，這些欄位應改為 `str`。其他數值欄位（`priority`、`retry_count` 等）維持 `int` 不變。
 
 ---
 

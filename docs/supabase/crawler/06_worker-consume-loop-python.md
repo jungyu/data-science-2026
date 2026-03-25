@@ -60,7 +60,7 @@ async def main(supabase_client: AsyncClient) -> None:
             # 2. 檢查來源健康狀態
             if not health_tracker.is_available(job.source_id):
                 logger.info(
-                    "Source %d in cooldown, requeuing job %d",
+                    "Source %s in cooldown, requeuing job %s",
                     job.source_id,
                     job.job_id,
                 )
@@ -87,7 +87,7 @@ async def main(supabase_client: AsyncClient) -> None:
                 if isinstance(result, ProcessResultDone):
                     await consumer.complete_job(job.job_id, job.lease_token)
                     health_tracker.record_success(job.source_id)
-                    logger.info("Job %d done: %s", job.job_id, job.url)
+                    logger.info("Job %s done: %s", job.job_id, job.url)
 
                 elif isinstance(result, ProcessResultRetry):
                     if result.error is not None:
@@ -99,7 +99,7 @@ async def main(supabase_client: AsyncClient) -> None:
                             error=result.error,
                         )
                         logger.warning(
-                            "Job %d retry: %s - %s",
+                            "Job %s retry: %s - %s",
                             job.job_id,
                             result.error.code.value,
                             result.error.message,
@@ -123,7 +123,7 @@ async def main(supabase_client: AsyncClient) -> None:
                             job.job_id, job.lease_token, result.error
                         )
                         logger.error(
-                            "Job %d failed: %s - %s",
+                            "Job %s failed: %s - %s",
                             job.job_id,
                             result.error.code.value,
                             result.error.message,
@@ -141,10 +141,10 @@ async def main(supabase_client: AsyncClient) -> None:
 
                 elif isinstance(result, ProcessResultSkipped):
                     await consumer.complete_job(job.job_id, job.lease_token)
-                    logger.info("Job %d skipped: %s", job.job_id, result.reason)
+                    logger.info("Job %s skipped: %s", job.job_id, result.reason)
 
             except Exception:
-                logger.exception("Unexpected error processing job %d", job.job_id)
+                logger.exception("Unexpected error processing job %s", job.job_id)
                 await consumer.fail_job(
                     job.job_id,
                     job.lease_token,
@@ -168,7 +168,11 @@ def _minutes_from_now(minutes: int) -> str:
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    from supabase._async.client import AsyncClient, create_client
+    client = asyncio.get_event_loop().run_until_complete(
+        create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_KEY"])
+    )
+    asyncio.run(main(client))
 ```
 
 ---

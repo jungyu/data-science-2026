@@ -734,7 +734,7 @@ uploaded → parsed → chunked → embedded → ready
 
 > **前置要求**：已讀完 [01_supabase-studio.md](../01_supabase-studio.md)
 
-跑完 `05_rag_supabase_schema.sql`（v3.0）後，打開 `http://localhost:54323` 驗證：
+跑完 `004_rag_schema.sql`（v3.0）後，打開 `http://localhost:54323` 驗證：
 
 ### Table Editor 驗證
 
@@ -743,7 +743,7 @@ uploaded → parsed → chunked → embedded → ready
 1. public schema → 確認核心 7 張表出現
    (embedding_models, collections, documents, chunks, tags, chunk_tags, query_logs)
 2. 點進 chunks → 確認有 embedding VECTOR(1536) 欄位
-3. 點進 documents → 確認 pipeline_status 欄位（7 態 FSM）
+3. 點進 documents → 確認 process_status 欄位（7 態 FSM）
 4. 確認 collections → documents → chunks 的 FK 鏈
 5. 點進 collections 的設定 → 開啟 Realtime
    （讓前端即時顯示 ingestion 進度）
@@ -772,9 +772,9 @@ SELECT * FROM match_chunks(
 );
 
 -- 查看 ingestion pipeline 狀態分佈
-SELECT pipeline_status, count(*)
+SELECT process_status, count(*)
 FROM documents
-GROUP BY pipeline_status;
+GROUP BY process_status;
 ```
 
 ### RLS 驗證
@@ -805,9 +805,9 @@ SELECT * FROM collection_stats('YOUR_COLLECTION_ID');
 SELECT * FROM top_hit_chunks('YOUR_COLLECTION_ID', 10);
 
 -- 找出卡住的文件（超過 1 小時未完成）
-SELECT id, title, pipeline_status, updated_at
+SELECT id, title, process_status, updated_at
 FROM documents
-WHERE pipeline_status NOT IN ('ready', 'failed')
+WHERE process_status NOT IN ('ready', 'failed')
   AND updated_at < NOW() - INTERVAL '1 hour';
 ```
 

@@ -63,6 +63,8 @@ CRUD = Create, Read, Update, Delete。這四個操作是所有應用程式的基
 
 ### CREATE — 建表
 
+> **注意**：以下用到 `generate_ulid()`，這是 Part 5 會教的自訂 helper function。如果你的資料庫還沒有它，先把 `id` 改成 `UUID PRIMARY KEY DEFAULT gen_random_uuid()` 即可。
+
 ```sql
 CREATE TABLE public.experiments (
   id TEXT PRIMARY KEY DEFAULT generate_ulid(),
@@ -231,15 +233,15 @@ WHERE status = 'completed';
 
 ---
 
-### 電商實戰範例 — 用 e-Commerce Schema 練習 CRUD
+### 電商實戰範例 — 用 Shop Schema 練習 CRUD
 
-> 以下範例來自 `e-Commerce/01_shop_supabase_native_schema.sql`。
+> 以下範例來自 `../migrations/002_shop_schema.sql`。
 > 如果你已經跑過該 schema，可以直接在 SQL Editor 操作真實電商資料。
 
 #### 建表：商品目錄（Stage 4）
 
 ```sql
--- 這是電商 Schema 的 products 表（簡化版，完整版見 e-Commerce schema）
+-- 這是電商 Schema 的 products 表（簡化版，完整版見 shop schema）
 CREATE TABLE IF NOT EXISTS public.products (
   id               TEXT PRIMARY KEY DEFAULT generate_ulid(),
   title            VARCHAR(255)         NOT NULL,

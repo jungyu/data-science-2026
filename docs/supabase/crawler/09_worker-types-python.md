@@ -4,6 +4,8 @@ Worker 層型別，使用 `dataclasses`、`Literal` 與 `enum`。
 
 > 資料庫列型別（SourceRow、ArticleRow 等）定義於 `08_db-types-python.md`。
 > 本檔案僅包含**與 Worker 相關**且不綁定資料庫表的型別。
+>
+> **⚠️ ULID 遷移注意**：`job_id`、`source_id` 等 ID 欄位目前為 `int`，遷移後應改為 `str`。詳見 `08_db-types-python.md` 說明。
 
 ---
 

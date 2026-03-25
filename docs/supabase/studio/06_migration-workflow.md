@@ -327,10 +327,14 @@ Table Editor 的操作無法 version control，容易造成 drift。你改了什
 
 ## 下一步
 
-> Studio 操作全部學完了！你已經從界面總覽、SQL Editor、到 API、Storage、Edge Functions、再到 Migration 流程，完整走了一遍。
+> 基礎操作學完了。但 Studio 還有進階能力等著你：
 >
-> 接下來，選一個實戰專案開始動手：
-> - [電商資料庫](../e-Commerce/00_README.md) — 完整的 e-Commerce schema 設計
+> → [07_analytics-and-matview.md](07_analytics-and-matview.md) — 跨域分析 + Materialized View
+> → [08_cron-webhook-vault.md](08_cron-webhook-vault.md) — 生產運維三件套
+> → [09_api-gateway-pattern.md](09_api-gateway-pattern.md) — 用 Database Function 當 API
+>
+> 或者直接進入實戰專案：
+> - [電商資料庫](../shop/00_README.md) — 完整的 Shop schema 設計
 > - [爬蟲資料庫](../crawler/00_README.md) — Crawler ETL pipeline
 > - [RAG 資料庫](../RAG/00_README.md) — 向量搜尋與知識庫
 >
