@@ -42,7 +42,7 @@ RETURNS TEXT
 LANGUAGE SQL
 STABLE
 SECURITY DEFINER
-SET search_path = rag
+SET search_path = rag, auth, public
 AS $$
   SELECT (SELECT auth.uid())::TEXT;
 $$;
@@ -344,7 +344,7 @@ CREATE OR REPLACE FUNCTION rag.sync_document_owner()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = rag
+SET search_path = rag, auth, public
 AS $$
 BEGIN
   SELECT owner_id INTO NEW.owner_id
@@ -363,7 +363,7 @@ CREATE OR REPLACE FUNCTION rag.sync_chunk_from_document()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = rag
+SET search_path = rag, auth, public
 AS $$
 DECLARE
   v_collection_id TEXT;
@@ -396,7 +396,7 @@ RETURNS BOOLEAN
 LANGUAGE SQL
 STABLE
 SECURITY DEFINER
-SET search_path = rag
+SET search_path = rag, auth, public
 AS $$
   SELECT EXISTS (
     SELECT 1 FROM rag.collections
@@ -409,7 +409,7 @@ RETURNS BOOLEAN
 LANGUAGE SQL
 STABLE
 SECURITY DEFINER
-SET search_path = rag
+SET search_path = rag, auth, public
 AS $$
   SELECT COALESCE(
     (SELECT is_active FROM rag.collections WHERE id = p_collection_id),
@@ -422,7 +422,7 @@ RETURNS BOOLEAN
 LANGUAGE SQL
 STABLE
 SECURITY DEFINER
-SET search_path = rag
+SET search_path = rag, auth, public
 AS $$
   SELECT COALESCE(
     (SELECT is_active OR owner_id = (SELECT auth.uid())::TEXT
@@ -452,7 +452,7 @@ RETURNS TABLE (
 )
 LANGUAGE SQL
 SECURITY DEFINER
-SET search_path = rag
+SET search_path = rag, auth, public
 STABLE
 AS $$
   SELECT
@@ -485,7 +485,7 @@ RETURNS TABLE (
 )
 LANGUAGE SQL
 SECURITY DEFINER
-SET search_path = rag
+SET search_path = rag, auth, public
 STABLE
 AS $$
   SELECT
@@ -522,7 +522,7 @@ RETURNS TABLE (
 )
 LANGUAGE SQL
 SECURITY DEFINER
-SET search_path = rag
+SET search_path = rag, auth, public
 STABLE
 AS $$
   WITH semantic AS (
@@ -571,7 +571,7 @@ RETURNS TABLE (
 )
 LANGUAGE SQL
 SECURITY DEFINER
-SET search_path = rag
+SET search_path = rag, auth, public
 STABLE
 AS $$
   SELECT
@@ -597,7 +597,7 @@ RETURNS TABLE (
 )
 LANGUAGE SQL
 SECURITY DEFINER
-SET search_path = rag
+SET search_path = rag, auth, public
 STABLE
 AS $$
   SELECT r.chunk_id, c.document_id, c.content,
