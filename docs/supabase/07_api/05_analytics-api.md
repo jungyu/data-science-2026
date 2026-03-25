@@ -380,7 +380,7 @@ END IF;
 | 文件 | 涵蓋內容 |
 |------|----------|
 | [`005_analytics_schema.sql`](../migrations/005_analytics_schema.sql) | Analytics schema + 底層函數定義 |
-| [studio/07_analytics-and-matview.md](../studio/07_analytics-and-matview.md) | Materialized View 與分析策略 |
+| [02_studio/07_analytics-and-matview.md](../02_studio/07_analytics-and-matview.md) | Materialized View 與分析策略 |
 
 > **注意**：本文中 `analytics.revenue_time_series()` 等底層函數的參數說明（如 granularity 的合法值 `hour/day/week/month`）是根據常見模式推斷。實際白名單請以 `005_analytics_schema.sql` 為準。
 

@@ -334,8 +334,8 @@ Table Editor 的操作無法 version control，容易造成 drift。你改了什
 > → [09_api-gateway-pattern.md](09_api-gateway-pattern.md) — 用 Database Function 當 API
 >
 > 或者直接進入實戰專案：
-> - [電商資料庫](../shop/00_README.md) — 完整的 Shop schema 設計
-> - [爬蟲資料庫](../crawler/00_README.md) — Crawler ETL pipeline
-> - [RAG 資料庫](../RAG/00_README.md) — 向量搜尋與知識庫
+> - [電商資料庫](../03_shop/00_README.md) — 完整的 Shop schema 設計
+> - [爬蟲資料庫](../04_crawler/00_README.md) — Crawler ETL pipeline
+> - [RAG 資料庫](../05_rag/00_README.md) — 向量搜尋與知識庫
 >
 > **記住：從現在開始，每一次 schema 變更都要有 migration。沒有例外。**

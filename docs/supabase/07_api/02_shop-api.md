@@ -476,10 +476,10 @@ SELECT coalesce(sum(pr.points), 0) AS balance
 
 | 文件 | 涵蓋內容 |
 |------|----------|
-| [shop/01_foundation-identity.md](../shop/01_foundation-identity.md) | ULID、Auth bridge、profiles |
-| [shop/02_organization-catalog.md](../shop/02_organization-catalog.md) | 組織層級、商品建模 |
-| [shop/04_coupons-commerce.md](../shop/04_coupons-commerce.md) | 折扣券、訂單、付款 |
-| [shop/05_security-rls.md](../shop/05_security-rls.md) | RLS Policy（與 API GRANT 互補） |
+| [03_shop/01_foundation-identity.md](../03_shop/01_foundation-identity.md) | ULID、Auth bridge、profiles |
+| [03_shop/02_organization-catalog.md](../03_shop/02_organization-catalog.md) | 組織層級、商品建模 |
+| [03_shop/04_coupons-commerce.md](../03_shop/04_coupons-commerce.md) | 折扣券、訂單、付款 |
+| [03_shop/05_security-rls.md](../03_shop/05_security-rls.md) | RLS Policy（與 API GRANT 互補） |
 | [`002_shop_schema.sql`](../migrations/002_shop_schema.sql) | 完整 SQL schema |
 
 ---

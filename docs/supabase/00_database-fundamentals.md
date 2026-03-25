@@ -32,9 +32,9 @@
 | 檔案 | 用途 |
 |------|------|
 | 本章 Part 7 | PostgreSQL 基礎導覽（接續正規化觀念） |
-| `shop/00_README.md` | Stage 3 電商實戰（本章觀念的應用） |
-| `crawler/00_README.md` | 爬蟲資料庫實戰（本章觀念的應用） |
-| `RAG/00_README.md` | RAG 向量資料庫實戰（本章觀念的應用） |
+| `03_shop/00_README.md` | Stage 3 電商實戰（本章觀念的應用） |
+| `04_crawler/00_README.md` | 爬蟲資料庫實戰（本章觀念的應用） |
+| `05_rag/00_README.md` | RAG 向量資料庫實戰（本章觀念的應用） |
 
 **使用方式**：先讀完這份，再去看後面三個 README。你會發現每個設計決策背後，都有本章的觀念在支撐。
 
@@ -484,7 +484,7 @@ CREATE TABLE order_items (
 
 這就是你在電商 Stage 3 會看到的骨架——只是實際版本有 20 張表而已。
 
-> **腦筋急轉彎**：打開 [shop/00_README.md](shop/00_README.md) 的依賴關係圖，你能找出幾個 1:N 和幾個 M:N 關係？
+> **腦筋急轉彎**：打開 [03_shop/00_README.md](03_shop/00_README.md) 的依賴關係圖，你能找出幾個 1:N 和幾個 M:N 關係？
 >
 > 提示：找到 `order_items` 了嗎？它就是典型的 M:N 中間表。那 `product_categories` 呢？`store_staff` 呢？
 

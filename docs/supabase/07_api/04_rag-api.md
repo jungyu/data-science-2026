@@ -291,9 +291,9 @@ const { data } = await supabase.rpc('api_rag_list_collections')
 
 | 文件 | 涵蓋內容 |
 |------|----------|
-| [RAG/01_guide-supabase-rag.md](../RAG/01_guide-supabase-rag.md) | RAG 系統完整指南 |
-| [RAG/02_design-decisions.md](../RAG/02_design-decisions.md) | 設計決策（chunk 策略、embedding 選型） |
-| [RAG/04_lab-rag-pipeline.md](../RAG/04_lab-rag-pipeline.md) | RAG Pipeline 實作 Lab |
+| [05_rag/01_guide-supabase-rag.md](../05_rag/01_guide-supabase-rag.md) | RAG 系統完整指南 |
+| [05_rag/02_design-decisions.md](../05_rag/02_design-decisions.md) | 設計決策（chunk 策略、embedding 選型） |
+| [05_rag/04_lab-rag-pipeline.md](../05_rag/04_lab-rag-pipeline.md) | RAG Pipeline 實作 Lab |
 | [`004_rag_schema.sql`](../migrations/004_rag_schema.sql) | 完整 SQL schema |
 
 ---

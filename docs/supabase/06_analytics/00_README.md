@@ -145,5 +145,5 @@ Chapter 6   Automation         ── Snapshot builders + pg_cron
 ## 參考資源
 
 - **Schema SQL**：[`005_analytics_schema.sql`](../migrations/005_analytics_schema.sql)
-- **Studio 實操教學**：[`../studio/07_analytics-and-matview.md`](../studio/07_analytics-and-matview.md) — 用 Studio 跑 analytics 的操作指南
+- **Studio 實操教學**：[`../02_studio/07_analytics-and-matview.md`](../02_studio/07_analytics-and-matview.md) — 用 Studio 跑 analytics 的操作指南
 - **Supabase 設計規範**：`../../agent-init/skills/supabase/` 目錄

@@ -755,10 +755,10 @@ ALTER TABLE crawler.results
 
 | Schema | 對應 Stage | 預計表數量 | 教程位置 |
 |--------|-----------|-----------|---------|
-| `shop` (電商) | Stage 3 | 約 20 張 | [shop/](../shop/00_README.md) |
-| `crawler` | Stage 4 | 約 10 張 | [crawler/](../crawler/00_README.md) |
-| `rag` | Stage 5 | 約 7 張 | [RAG/](../RAG/00_README.md) |
-| `analytics` | 跨域 | 5 表 + 3 MATVIEW + 20 functions | [analytics/](../migrations/005_analytics_schema.sql) |
+| `shop` (電商) | Stage 3 | 約 20 張 | [03_shop/](../03_shop/00_README.md) |
+| `crawler` | Stage 4 | 約 10 張 | [04_crawler/](../04_crawler/00_README.md) |
+| `rag` | Stage 5 | 約 7 張 | [05_rag/](../05_rag/00_README.md) |
+| `analytics` | 跨域 | 5 表 + 3 MATVIEW + 20 functions | [06_analytics/](../06_analytics/00_README.md) |
 
 > **注意**：電商 Schema 使用獨立的 `shop` schema。
 > PostgREST 預設只暴露 `public`，如果你希望 `shop` 的表也有 REST API，有兩種做法：

@@ -72,7 +72,7 @@ PostgreSQL（核心）
 |------|------|
 | `labs/05_lab-docker-supabase.md` | Docker 環境設定 |
 | `labs/00_lab-supabase-architecture.md` | 架構理解（服務對照表） |
-| `shop/00_README.md` | 下一步：用 Studio 蓋電商資料庫 |
+| `03_shop/00_README.md` | 下一步：用 Studio 蓋電商資料庫 |
 
 **使用方式**：邊讀指南，邊打開 `http://localhost:54323` 實際操作。讀到哪裡，做到哪裡。
 
@@ -177,7 +177,7 @@ Schema 下拉選單
 >
 > 解法？建一個 `public.users` 當橋接表，把 `auth.users` 的 UUID 轉成你自己的 ULID。這就是電商 Stage 2 的 **Auth Bridge 模式**。
 >
-> → 詳見 [shop/00_README.md](shop/00_README.md) Stage 2
+> → 詳見 [03_shop/00_README.md](03_shop/00_README.md) Stage 2
 
 ---
 
@@ -1002,4 +1002,4 @@ Level 3 — 能自己建構
 > Studio 操作熟悉了。接下來，我們要用它來蓋一個真正的電商資料庫。
 > 10 個 Stage、20 張表、從 ULID 到 RLS 全部實戰。
 >
-> → [shop/00_README.md](shop/00_README.md)
+> → [03_shop/00_README.md](03_shop/00_README.md)

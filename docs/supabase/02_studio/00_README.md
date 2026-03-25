@@ -10,7 +10,7 @@
 
 ## 這份手冊和 `01_supabase-studio.md` 的差別
 
-| | `01_supabase-studio.md` | `studio/` 目錄 |
+| | `01_supabase-studio.md` | `02_studio/` 目錄 |
 |--|--|--|
 | 定位 | 觀念導向（原理 + 架構） | 實操導向（step-by-step） |
 | 適合 | 理解背後發生什麼事 | 打開瀏覽器跟著做 |
@@ -53,7 +53,7 @@
 |------|------|
 | `../01_supabase-studio.md` | 觀念版（先讀這個） |
 | `../labs/05_lab-docker-supabase.md` | Docker 環境設定 |
-| `../shop/00_README.md` | 學完 Studio 後的實戰專案 |
+| `../03_shop/00_README.md` | 學完 Studio 後的實戰專案 |
 
 ---
 
@@ -78,9 +78,9 @@
  │         ↓ 知道「為什麼」            │
  │  2. 打開 Studio（localhost:54323）  │
  │         ↓ 準備好環境               │
- │  3. 跟著 studio/ 目錄做            │
+ │  3. 跟著 02_studio/ 目錄做          │
  │         ↓ 一步一步操作             │
- │  4. 進入電商實戰（shop/）          │
+ │  4. 進入電商實戰（03_shop/）       │
  │         ↓ 用學到的技能蓋真專案      │
  └─────────────────────────────────┘
 ```

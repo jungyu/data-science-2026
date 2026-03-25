@@ -261,9 +261,9 @@ LEFT JOIN crawler.crawl_runs cr ON cr.source_id = s.id
 
 | 文件 | 涵蓋內容 |
 |------|----------|
-| [crawler/01_HEAD-FIRST-crawler-db.md](../crawler/01_HEAD-FIRST-crawler-db.md) | Crawler 資料庫全景 |
-| [crawler/05_worker-architecture.md](../crawler/05_worker-architecture.md) | Worker 架構 |
-| [crawler/04_data-flow-overview.md](../crawler/04_data-flow-overview.md) | 資料流總覽 |
+| [04_crawler/01_HEAD-FIRST-crawler-db.md](../04_crawler/01_HEAD-FIRST-crawler-db.md) | Crawler 資料庫全景 |
+| [04_crawler/05_worker-architecture.md](../04_crawler/05_worker-architecture.md) | Worker 架構 |
+| [04_crawler/04_data-flow-overview.md](../04_crawler/04_data-flow-overview.md) | 資料流總覽 |
 | [`003_crawler_schema.sql`](../migrations/003_crawler_schema.sql) | 完整 SQL schema |
 
 ---
