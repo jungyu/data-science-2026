@@ -172,7 +172,7 @@ graph LR
   A[使用者] --> B[Dashboard]
   B --> C[MCP Server]
   C --> D[你的 RAG]
-  D --> E[Qdrant]
+  D --> E[Qdrant / pgvector]
   D --> F[Supabase]
 `
 

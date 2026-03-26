@@ -5,6 +5,23 @@
 >
 > **學習成果**：能把網頁、PDF、自訂文字存進 Qdrant，建立你的 RAG 知識庫
 
+```
+┌─────────────────────────────────────────────────────────┐
+│  🔀 另一條路：Supabase + pgvector                       │
+│                                                         │
+│  本模組使用 Qdrant 做為向量資料庫。                      │
+│  如果你想用 Supabase 統一管理文件和向量，                │
+│  可以改走 Supabase RAG 路徑：                            │
+│                                                         │
+│  → ../supabase/05_rag/01_guide-supabase-rag.md（概念）  │
+│  → ../supabase/05_rag/04_lab-rag-pipeline.md （Lab）    │
+│                                                         │
+│  兩條路學到的 ETL 觀念相同，差別在儲存目的地：           │
+│    本模組 → Qdrant collection                            │
+│    05_rag  → Supabase rag.chunks 表 + pgvector          │
+└─────────────────────────────────────────────────────────┘
+```
+
 ---
 
 ## 這個模組解決什麼問題？
@@ -380,3 +397,5 @@ Module A 的 `search_knowledge_base` 工具有 `collection` 參數可以指定�
 ---
 
 > 完成本模組後，你的 Qdrant 裡有了資料，繼續 **Module A｜MCP Server**，讓 Claude Desktop 能搜尋它。
+>
+> **走 Supabase 路徑？** 如果你改用 Supabase + pgvector 儲存向量，對應的操作在 [05_rag Lab](../supabase/05_rag/04_lab-rag-pipeline.md) 的 Stage 3–5，概念完全相同，只是目的地從 Qdrant 變成 `rag.chunks` 表。

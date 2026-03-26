@@ -129,7 +129,8 @@ RAG 的文件切分，就是讓 AI 只看「方法 B」中找到的那一章。
                       ┌──────────────────────┐
                       │                      │
                       │  向量資料庫           │
-                      │  (Vector Store)      │
+                      │  (FAISS / Qdrant /   │
+                      │   pgvector)          │
                       │                      │
                       │  [Chunk 1] [1024d]   │
                       │  [Chunk 2] [1024d]   │
@@ -617,6 +618,14 @@ if __name__ == "__main__":
     print(f"\n查詢結果：{response}")
 ```
 
+### 沒有笨問題 💡
+
+> **問：上面的 ETL Pipeline 只有 Extract → Transform → Load 三步，但聽說正式環境的 pipeline 更複雜？**
+>
+> 答：是的！在生產環境裡，你需要追蹤每份文件「走到哪一步了」。如果 Embedding API 掛了，你要知道文件卡在 Load 階段，而不是從頭重來。
+>
+> [Supabase RAG 實戰指南](../supabase/05_rag/01_guide-supabase-rag.md) 裡有一套完整的 **Ingestion Pipeline 狀態機**，用 7 個狀態（uploaded → parsed → chunked → embedded → ready / failed / stale）追蹤每份文件的進度。如果你想把這裡學到的 ETL 觀念應用到資料庫裡，那就是下一步。
+
 ---
 
 ## 動手做 Lab 2.1：視覺化不同切分策略的效果
@@ -966,7 +975,7 @@ index = load_index_from_storage(storage_context)
 
 > 「king - man + woman = queen？數學怎麼懂得語意？」
 
-我們會學習向量 Embedding 的神奇魔法，以及如何用 FAISS 和 Qdrant 建立超快速的語意搜尋引擎。
+我們會學習向量 Embedding 的神奇魔法，以及如何用 FAISS、Qdrant 和 pgvector（Supabase）建立超快速的語意搜尋引擎。
 
 ---
 

@@ -21,6 +21,14 @@ Pre-A  →  Module A  →  Module B
 （必修）   （必修）     （必修，擇一出口）
   ↓
 期末作品：RAG + MCP + 可展示的視覺化介面
+
+
+🔗 Supabase 實戰路徑（選修，推薦）
+─────────────────────────────────────
+完成 Ch03 後，可同步閱讀：
+  ../supabase/05_rag/  ← 用 Supabase + pgvector 實作 RAG 資料層
+  把 Qdrant/FAISS 換成 PostgreSQL 統一管理
+  含完整 Schema、Lab、設計決策文件
 ```
 
 ---
@@ -45,6 +53,15 @@ Pre-A  →  Module A  →  Module B
 | [Pre-A](module-pre-a-crawler.md) | ETL Pipeline — 把知識存進 Qdrant | Playwright、Chunking、Embedding | 必修 |
 | [Module A](module-a-mcp-server.md) | MCP Server | FastAPI、MCP 協議、SSE | 必修 |
 | [Module B](module-b-dashboard.md) | Dashboard + AI 側欄 | Next.js、Chart.js、Mermaid | 必修 |
+
+### Supabase 實戰路徑（選修）
+
+| 資源 | 說明 | 核心技術 |
+|------|------|----------|
+| [05_rag 指南](../supabase/05_rag/01_guide-supabase-rag.md) | 把 RAG 搬進 Supabase | pgvector、RLS、ULID、rag schema |
+| [05_rag Lab](../supabase/05_rag/04_lab-rag-pipeline.md) | 7 階段實操 Lab | SQL、Ingestion Pipeline、語意搜尋 |
+
+> 完成 Ch03（向量）後即可開始。用 Supabase 統一管理文件元資料、向量儲存和權限控制，取代 Qdrant + PostgreSQL + Redis 三套系統。
 
 ---
 
@@ -76,7 +93,7 @@ Pre-A  →  Module A  →  Module B
 rag_stack = {
     "llm":       ["openai", "anthropic"],
     "embedding": ["openai/text-embedding-3-small"],
-    "vector_db": ["qdrant-client", "faiss-cpu"],
+    "vector_db": ["qdrant-client", "faiss-cpu", "supabase/pgvector"],
     "framework": ["llama-index", "langgraph"],
     "etl":       ["unstructured", "pandas", "pypdf"],
     "eval":      ["ragas"],

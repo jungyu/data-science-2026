@@ -320,10 +320,17 @@ KNOWLEDGE_BASE_DOCS = [
     - 缺點：成本較高、資料在第三方
     - 適合場景：快速上線、無 DevOps 資源的團隊
 
+    pgvector（PostgreSQL Extension）：
+    - PostgreSQL 的向量搜尋擴充，Supabase 已內建
+    - 優點：和現有資料庫整合、支援 RLS 多租戶、SQL 過濾 + 向量搜尋
+    - 缺點：單機效能上限、需要 PostgreSQL
+    - 適合場景：已有 PostgreSQL 的專案、需要統一管理資料和向量
+
     選擇建議：
     - 開發和原型：FAISS（簡單快速）
     - 生產但自管：Qdrant（功能完整）
     - 生產且托管：Pinecone（省心但貴）
+    - 已有 PostgreSQL：pgvector / Supabase（一個資料庫搞定）
     """),
     Document(text="""
     Chunk Size 選擇指南
@@ -595,7 +602,7 @@ def run_rag_agent(question: str):
 # 測試
 questions = [
     "RAG 系統是由哪些部分組成的？",
-    "我應該選擇 FAISS 還是 Qdrant？有什麼考慮因素？",
+    "我應該選擇 FAISS、Qdrant 還是 pgvector？有什麼考慮因素？",
     "Chunk Size 要設多大？各種文件類型的建議值是什麼？",
 ]
 
@@ -960,6 +967,8 @@ for q in test_questions:
 > 「如何客觀地評分一個開卷考試的答案？這比你想的更難。」
 
 我們會學習用 Ragas 框架客觀評估 RAG 系統的品質。
+
+> **走 Supabase 路徑的同學注意**：Supabase RAG Schema 內建了 `query_logs` + `query_log_results` 表，可以自動記錄每次搜尋的問題、命中的 chunks、相似度分數和使用者評分。這正是下一章「評估」所需要的原始資料。詳見 [05_rag 指南 Stage 6](../supabase/05_rag/01_guide-supabase-rag.md)。
 
 ---
 

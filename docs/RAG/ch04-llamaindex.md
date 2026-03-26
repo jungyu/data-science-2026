@@ -13,7 +13,7 @@
 到目前為止，你已經手動實作了 RAG 的每一個零件：
 - 用 SimpleDirectoryReader 讀取文件
 - 用 SentenceSplitter 切分
-- 用 FAISS 建立向量索引
+- 用 FAISS（或 Qdrant / pgvector）建立向量索引
 - 用 OpenAI API 做 Embedding 和生成
 
 但每次都要從頭組裝，太累了。
@@ -755,6 +755,8 @@ print(f"\n最終答案：{response}")
 >  他會重新審視，質疑，然後再搜尋更多線索。」
 
 我們會學習讓 AI 學會反思和自我修正的 Agentic RAG。
+
+> **提示**：LlamaIndex 的 VectorStoreIndex 支援多種向量後端，包括 FAISS、Qdrant 和 **pgvector（Supabase）**。如果你正在走 [Supabase RAG 路徑](../supabase/05_rag/01_guide-supabase-rag.md)，可以用 `PGVectorStore` 直接對接 `rag.chunks` 表。
 
 ---
 

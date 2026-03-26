@@ -979,6 +979,8 @@ Ragas 使用 LLM（如 GPT-4）作為評審，本身也可能有錯。研究顯�
   - 當前最差的 10 個問題
   - 與基準線相比的改善或退步
 
+> **走 Supabase 路徑？** 不用自己設計 schema——[Supabase RAG](../supabase/05_rag/01_guide-supabase-rag.md) 的 `query_logs` + `query_log_results` 表已經幫你設計好了：每次搜尋自動記錄問題、命中 chunks、相似度分數、latency 和使用者評分（1–5）。直接用 SQL 就能分析命中率和品質趨勢。
+
 ---
 
 ## 課程總結：你已經是 RAG 大師了！
@@ -997,7 +999,7 @@ Ragas 使用 LLM（如 GPT-4）作為評審，本身也可能有錯。研究顯�
 
   ✅ 第三章：深入理解了向量 Embedding
              語意搜尋 vs 關鍵字搜尋
-             FAISS 和 Qdrant 的選擇
+             FAISS / Qdrant / pgvector 的選擇
 
   ✅ 第四章：掌握了 LlamaIndex 框架
              三種索引類型的適用場景
@@ -1023,6 +1025,27 @@ Ragas 使用 LLM（如 GPT-4）作為評審，本身也可能有錯。研究顯�
 ---
 
 *第六章完 · 課程結束*
+
+---
+
+## 下一步：Supabase RAG 實戰
+
+完成六章 RAG Pipeline 後，如果你想把向量資料庫從 FAISS/Qdrant 搬進 **Supabase + pgvector**，一個資料庫統一管理文件、向量、權限：
+
+```
+你的 RAG 進化路線
+═══════════════════════════════════════════════
+
+  Ch01–Ch06         Supabase 05_rag           整合上線
+  ┌──────────┐     ┌──────────────────┐     ┌──────────┐
+  │ 理論 + 原型│ ──→ │ pgvector + RLS    │ ──→ │ Pre-A →  │
+  │ FAISS/Qdrant│    │ rag schema       │     │ Mod A → B│
+  └──────────┘     │ Ingestion Pipeline│     └──────────┘
+                   └──────────────────┘
+```
+
+→ [Supabase RAG 指南](../supabase/05_rag/01_guide-supabase-rag.md)（Head First 風格教學）
+→ [Supabase RAG Lab](../supabase/05_rag/04_lab-rag-pipeline.md)（7 階段實操）
 
 ---
 

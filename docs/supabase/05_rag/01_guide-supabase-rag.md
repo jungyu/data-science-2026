@@ -10,7 +10,7 @@
 
 ---
 
-你在 RAG 課程裡學了很多東西：Embedding、Chunking、向量搜尋、Agentic RAG。你甚至做出了一個能回答問題的 AI 系統。
+你在 [RAG 課程](../../RAG/README.md) 裡學了很多東西：[Embedding](../../RAG/ch03-vectors-embeddings.md)、[Chunking](../../RAG/ch02-etl-chunking.md)、向量搜尋、[Agentic RAG](../../RAG/ch05-agentic-rag.md)。你甚至做出了一個能回答問題的 AI 系統。
 
 **恭喜。**
 
@@ -448,7 +448,7 @@ RAG Schema 裡的三類 trigger
 
 ### 你已經學過 Chunking
 
-在 RAG Ch02，你學會了把文件切成小塊。在 Supabase 版本裡，每個 chunk 多了一個重要的安全機制。
+在 [RAG Ch02](../../RAG/ch02-etl-chunking.md)，你學會了把文件切成小塊。在 Supabase 版本裡，每個 chunk 多了一個重要的安全機制。
 
 ```sql
 INSERT INTO chunks (document_id, content, chunk_index, ...)
@@ -1176,6 +1176,28 @@ FROM documents
 WHERE process_status NOT IN ('ready', 'failed')
   AND updated_at < NOW() - INTERVAL '1 hour';
 ```
+
+---
+
+## 下一步
+
+```
+學完 Supabase RAG 後，你有兩條路
+═══════════════════════════════════════════════
+
+  想繼續 RAG 理論？             想整合上線？
+  ┌─────────────────┐          ┌─────────────────┐
+  │ Ch04 LlamaIndex │          │ Module Pre-A    │
+  │ Ch05 Agentic RAG│          │ Module A (MCP)  │
+  │ Ch06 Evaluation │          │ Module B (UI)   │
+  └─────────────────┘          └─────────────────┘
+  回到 RAG 課程繼續              用 Supabase 當後端
+```
+
+- [回到 RAG 課程主頁](../../RAG/README.md)
+- [Ch04 LlamaIndex](../../RAG/ch04-llamaindex.md)（支援 `PGVectorStore` 對接 Supabase）
+- [Module A MCP Server](../../RAG/module-a-mcp-server.md)（用 `match_chunks()` 取代 Qdrant 搜尋）
+- [動手做 Lab](04_lab-rag-pipeline.md)（7 階段實操，邊做邊學）
 
 ---
 

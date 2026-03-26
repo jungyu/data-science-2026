@@ -3,6 +3,8 @@
 > **前置條件**：已完成 ch01–ch06（RAG Pipeline），Qdrant 中已有向量資料
 >
 > **學習成果**：自架一個 MCP Server，讓 Claude Desktop 和 Next.js Dashboard 都能呼叫你的 RAG
+>
+> **Supabase 路徑**：如果你走的是 [Supabase RAG 路徑](../supabase/05_rag/01_guide-supabase-rag.md)，向量資料改從 `rag.chunks` 表搜尋（用 `match_chunks()` 函式），其他 MCP 概念完全相同。
 
 ---
 

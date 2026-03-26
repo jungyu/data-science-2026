@@ -3,6 +3,8 @@
 > 透過 7 個漸進式練習，從建表到語意搜尋，完整走過 RAG Pipeline 的資料層操作。
 >
 > Schema v3.0 — 符合 `agent-init/skills/supabase/*.md` 全部規範。
+>
+> **先備知識**：建議先讀完 [RAG Ch02（ETL 切塊）](../../RAG/ch02-etl-chunking.md) 和 [Ch03（向量搜尋）](../../RAG/ch03-vectors-embeddings.md)，理解 Chunking 和 Embedding 的原理後再來操作。
 
 ---
 

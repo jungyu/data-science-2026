@@ -838,7 +838,7 @@ for query in queries:
 
 ---
 
-## FAISS vs Qdrant：如何選擇？
+## 向量資料庫大比拼：FAISS vs Qdrant vs pgvector
 
 ```
 選擇決策樹
@@ -853,24 +853,52 @@ for query in queries:
       │       └──► FAISS（夠用，且效能極佳）
       │
       ├── 需要過濾搜尋（只搜特定類別的文件）
-      │       └──► Qdrant（有豐富的 Payload 過濾功能）
+      │       └──► Qdrant 或 pgvector（都支援過濾）
       │
       ├── 需要即時新增/刪除文件
-      │       └──► Qdrant（支援即時更新，FAISS 不行）
+      │       └──► Qdrant 或 pgvector（都支援即時更新）
+      │
+      ├── 已經有 PostgreSQL，不想多管一套服務
+      │       └──► pgvector（Supabase 已內建！）
+      │
+      ├── 需要 RLS 多租戶隔離 + 向量搜尋
+      │       └──► pgvector + Supabase（天生整合 RLS）
       │
       └── 生產環境，需要高可用性
-              └──► Qdrant（有持久化、備份、監控等功能）
+              └──► Qdrant 或 pgvector（看你的技術棧）
 ```
 
-| 比較項目 | FAISS | Qdrant |
-|----------|-------|--------|
-| 部署難度 | 超簡單（pip install） | 需要 Docker |
-| 搜尋速度 | 極快 | 很快 |
-| 即時更新 | 不支援（需重建） | 支援 |
-| 過濾搜尋 | 不支援 | 支援 |
-| 持久化 | 手動管理 | 內建 |
-| 水平擴展 | 不支援 | 支援 |
-| 適合場景 | 快速原型、離線批次 | 生產環境 |
+| 比較項目 | FAISS | Qdrant | pgvector（Supabase） |
+|----------|-------|--------|---------------------|
+| 部署難度 | 超簡單（pip install） | 需要 Docker | 已內建於 Supabase |
+| 搜尋速度 | 極快 | 很快 | 很快（HNSW / IVFFlat） |
+| 即時更新 | 不支援（需重建） | 支援 | 支援（就是 SQL） |
+| 過濾搜尋 | 不支援 | 支援 | 支援（WHERE + 向量搜尋） |
+| 全文搜尋 | 不支援 | 不支援 | 支援（tsvector + GIN） |
+| 持久化 | 手動管理 | 內建 | 內建（PostgreSQL） |
+| 水平擴展 | 不支援 | 支援 | 有限（單機為主） |
+| 權限控制 | 無 | 無（需自行實作） | RLS 原生支援 |
+| 額外服務 | 無 | 需要獨立服務 | 和資料庫共用 |
+| 適合場景 | 快速原型、離線批次 | 專門的向量搜尋服務 | 已有 PostgreSQL 的專案 |
+
+### pgvector + Supabase：一個資料庫統治它們
+
+如果你的應用本來就在用 PostgreSQL（或 Supabase），pgvector 讓你**不需要多管一套向量資料庫**：
+
+```
+「三套服務」架構               「一個搞定」架構
+═══════════════════            ═══════════════════
+
+PostgreSQL（文件元資料）        Supabase（PostgreSQL + pgvector）
+Qdrant    （向量搜尋）    →     ┌────────────────────────┐
+Redis     （Session 快取）      │ 文件、向量、搜尋、權限  │
+                                │ 全部在同一個資料庫      │
+三個連線、三份帳單               └────────────────────────┘
+                                一個連線、一份帳單
+```
+
+> 想深入了解如何用 Supabase 實作完整的 RAG 資料層？
+> 請看 [Supabase RAG 實戰指南](../supabase/05_rag/01_guide-supabase-rag.md)，包含完整 Schema 設計、7 階段 Lab、和 Ingestion Pipeline 狀態機。
 
 ---
 
@@ -890,9 +918,10 @@ for query in queries:
 │     範圍 -1 到 1，1 表示完全相同                        │
 │     不受向量長度影響（比點積更公平）                    │
 │                                                         │
-│  🔑 FAISS vs Qdrant：                                   │
+│  🔑 FAISS vs Qdrant vs pgvector：                       │
 │     FAISS：快速、簡單、適合原型和離線場景               │
-│     Qdrant：功能完整、適合生產環境                      │
+│     Qdrant：功能完整、適合專門的向量搜尋服務            │
+│     pgvector：已有 PostgreSQL？一個資料庫全搞定          │
 │                                                         │
 │  🔑 ANN（近似最近鄰）：                                 │
 │     犧牲少量精確度換取極大的速度提升                    │
@@ -977,6 +1006,8 @@ OpenAI 的多語言 Embedding 模型對中文支援很好，可以：
 > 「LlamaIndex 就像樂高——同樣的積木，可以組出完全不同的東西。」
 
 我們會學習 LlamaIndex 的完整架構，包括各種索引類型和查詢引擎的選擇。
+
+> **想用 Supabase 當向量資料庫？** 完成本章後，可以直接跳到 [Supabase RAG 實戰指南](../supabase/05_rag/01_guide-supabase-rag.md)，學習如何用 pgvector + RLS 建立生產級 RAG 資料層，再回來繼續第四章。
 
 ---
 
