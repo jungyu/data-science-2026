@@ -1,56 +1,72 @@
-# SDD→BDD 規格編排器工作流程 v2.1
+# SDD→BDD 規格編排器工作流程 v3.0
 
 > **核心理念**: 根據功能複雜度選擇適當的規格深度，避免過度工程或規格不足。
-> **跨 Agent 相容**: 支援 Antigravity、Claude Code、Codex CLI
 
 ---
 
-## 🤖 AI Agent 適配指南
+## 統一工作流程
 
-不同 Agent 有不同強項，選擇正確的工具可提高效率：
+本框架提供兩種使用方式，共用相同的 complexity gate、spec 模板、和驗證腳本：
 
-| Agent | 強項 | 適合任務 | 注意事項 |
-|-------|------|---------|---------|
-| **Antigravity** | 長上下文、多檔案編輯 | 規格撰寫、重構 | 使用 browser_subagent 驗證 UI |
-| **Claude Code** | LSP 診斷、迭代修復 | 自動修復、迭代調試 | 設定 finish condition 避免無限迴圈 |
-| **Codex CLI** | 快速單次生成 | 快速原型、小修改 | 每次任務保持簡單 |
+### 方式 1: Slash Commands（推薦）
+
+透過 `.agent/prompts/commands/` 中的 Claude Code slash commands 驅動：
+
+```
+/specify <描述>  →  建立 feature branch + spec.md
+/clarify         →  互動式釐清模糊需求（≤5 題）
+/plan            →  產生 research.md, data-model.md, contracts/, plan.md
+/tasks           →  產生 tasks.md（依賴排序、TDD 順序）
+/implement       →  逐步執行 tasks.md
+/analyze         →  跨 artifact 一致性分析（唯讀）
+```
+
+### 方式 2: 四��咒語（輕量版）
+
+適合快速開發或非 Claude Code 環境，詳見 [04-commands.md](./04-commands.md)：
+
+```
+Spec first       →  對應 /specify + /clarify
+Scenarios         →  對應 /plan 中的 scenario 產出
+Tests first       →  對應 /tasks + /implement（測試階段）
+Refactor for swap →  對應 /implement（重構階段）
+```
+
+### 流程對照表
+
+| 階段 | Slash Command | 四句咒語 | SDD-BDD Gate | 複雜度門檻 |
+|------|--------------|---------|--------------|-----------|
+| 評估 | ���自動） | （自動） | [00-complexity-gate](./00-complexity-gate.md) | 所有 |
+| 規格 | `/specify` + `/clarify` | `Spec first` | [01-spec-gate](./01-spec-gate.md) | Standard+ |
+| 場景 | `/plan` | `Scenarios` | [02-scenario-gate](./02-scenario-gate.md) | Full |
+| 建置 | `/tasks` + `/implement` | `Tests first` + `Refactor for swap` | [03-build-gate](./03-build-gate.md) | Standard+ |
+| 驗證 | `/analyze` | `check-finish.sh` | 完成檢查 | 所有 |
 
 ---
 
-## 📊 複雜度評估與模式選擇
+## 複雜度評估與模式選擇
 
 詳細評估流程請見 [00-complexity-gate.md](./00-complexity-gate.md)
 
-| 模式 | 複雜度分數 | 預估 Token 成本 | 適用場景 | 產出 |
-|------|-----------|----------------|---------|-----|
-| **Lite** | 0-2 | ~800 | 純工具函數、型別定義 | `spec-lite.md` |
-| **Standard** | 3-5 | ~2000 | 中等功能、元件升級 | `spec.md` + 測試 |
-| **Full** | 6+ | ~5000 | 多服務整合、高風險 | 完整三關 + ADR |
+| 模式 | 複雜度分數 | 適用場景 | 產出 |
+|------|-----------|---------|-----|
+| **Lite** | 0-2 | 純工具函數、型別定義 | `spec.md`（精簡版） |
+| **Standard** | 3-5 | 中等功能、元件升級 | `spec.md` + `plan.md` + `tasks.md` |
+| **Full** | 6+ | 多服務整合、高風險 | 完整三關 + ADR |
 
 ---
 
-## 🚦 執行流程
-
-詳見 [05-execution-flow.md](./05-execution-flow.md)
-
-1. **評估** (Complexity Gate)
-2. **規格** (Spec Gate)
-3. **實作** (Build Gate)
-4. **驗證** (Check Finish)
-
----
-
-## 📁 文件結構
+## 文件結構
 
 ```
 .agent/skills/sdd-bdd-workflow/
-├── SKILL.md                    # Skill 入口 (Metadata only)
-├── README.md                   # 本文件 (詳細說明)
+├── SKILL.md                    # Skill 入口 (Metadata)
+├── README.md                   # 本文件
 ├── 00-complexity-gate.md       # 複雜度評估
 ├── 01-spec-gate.md             # Spec Gate Prompt
 ├── 02-scenario-gate.md         # Scenario Gate Prompt
 ├── 03-build-gate.md            # Build Gate Prompt
-├── 04-commands.md              # 四句咒語協議
+├── 04-commands.md              # 四句咒語協議（輕量版）
 ├── 05-execution-flow.md        # 執行流程圖
 ├── scripts/                    # 驗證腳本
 │   ├── validate-spec.sh
@@ -59,33 +75,23 @@
     ├── error-taxonomy.md
     ├── scenario-patterns.md
     └── agent-strategies.md
+
+.agent/prompts/commands/         # Slash Commands（完整版）
+├── specify.md                   # /specify — 建立 spec
+├── clarify.md                   # /clarify — 釐清需求
+├── plan.md                      # /plan — 產生設計 artifact
+├── tasks.md                     # /tasks — 產生任務清單
+├── implement.md                 # /implement — 執行實作
+└── analyze.md                   # /analyze — 一致性分析
 ```
 
 ---
 
-## 🔮 快速指令
+## 相關文件連結
 
-### 所有 Agent 通用
-
-```bash
-# Lite 模式
-Spec lite: 建立 specs/[feature]/spec-lite.md
-
-# Standard 模式
-Spec standard: 建立 specs/[feature]/spec.md
-
-# Full 模式
-Spec first: 更新 spec.md
-Scenarios: 萃取 scenarios.feature
-Tests first: 建立測試骨架
-Refactor for swap: 確保 Adapter 層
-```
-
----
-
-## 📚 相關文件連結
-
-- [00-complexity-gate.md](./00-complexity-gate.md)
-- [01-spec-gate.md](./01-spec-gate.md)
-- [04-commands.md](./04-commands.md)
-- [scripts/validate-spec.sh](./scripts/validate-spec.sh)
+- [00-complexity-gate.md](./00-complexity-gate.md) — 複雜度評估
+- [01-spec-gate.md](./01-spec-gate.md) — 規格關
+- [04-commands.md](./04-commands.md) — 四句咒語
+- [05-execution-flow.md](./05-execution-flow.md) — 執行流程圖
+- [scripts/validate-spec.sh](./scripts/validate-spec.sh) — Spec 驗證
+- [scripts/check-finish.sh](./scripts/check-finish.sh) — 完成檢查

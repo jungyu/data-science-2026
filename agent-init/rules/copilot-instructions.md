@@ -125,16 +125,18 @@ docs/AI/
 2. **遵循現有模式**：觀察專案中的既有 pattern，保持一致性
 3. **最小變更原則**：只修改達成目標所需的最少程式碼
 4. **保留註解與文件**：不得刪除有意義的註解或 JSDoc
-5. **型別安全**：不得引入 `any` type，除非有明確 justification
+5. **Constitution 原則**：遵守 `.agent/memory/constitution.md` 中的所有原則（型別安全、測試先行、安全預設等）
 6. **測試覆蓋**：新增功能須附帶對應測試
 
 ### 禁止事項
 
-1. 不得違反 `semantic-deny.md` 中的任何規則
-2. 不得跳過 `human-review-triggers.md` 中定義的審查流程
-3. 不得自行 commit / push，除非人類明確要求
-4. 不得刪除或修改 `.agent-init/` 目錄下的治理文件（LEVEL 1 觸發）
-5. 不得在回應中捏造不存在的 API、函式、或套件
+所有程式碼層級的禁止規則定義於 **`.agent/rules/semantic-deny.md`**（single source of truth）。
+操作層級的審查要求定義於 **`.agent/rules/human-review-triggers.md`**。
+
+除上述規則外，額外禁止：
+1. 不得自行 commit / push，除非人類明確要求
+2. 不得刪除或修改 `.agent/` 目錄下的治理文件（LEVEL 1 觸發）
+3. 不得在回應中捏造不存在的 API、函式、或套件
 
 ### 不確定時
 

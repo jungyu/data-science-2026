@@ -1,9 +1,7 @@
 ---
 name: sdd-bdd-workflow
 version: 2.1
-description: "規格驅動開發工作流程，依複雜度分級適用。支援 Antigravity、Claude Code、Codex CLI"
-tags: ["bdd", "tdd", "sdd", "spec", "testing", "workflow", "core"]
-
+description: "規格驅動開發工作流程，依複雜度分級適用。支援 Claude Code、Copilot、Cursor、Gemini CLI、Codex CLI"
 triggers:
   - "spec first"
   - "spec lite"
@@ -39,7 +37,7 @@ estimated_tokens:
 # SDD-BDD 分級工作流程
 
 > **核心理念**: 根據功能複雜度選擇適當的規格深度。
-> **跨 Agent 相容**: 支援 Antigravity、Claude Code、Codex CLI
+> **跨 Agent 相容**: 支援 Claude Code、Copilot、Cursor、Gemini CLI、Codex CLI
 
 詳見 [README.md](./README.md) 獲取完整說明、複雜度評估表與指令參考。
 

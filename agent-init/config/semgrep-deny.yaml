@@ -1,0 +1,202 @@
+# semgrep-deny.yaml — Machine-enforceable subset of semantic-deny.md
+#
+# These rules codify the prohibitions from .agent/rules/semantic-deny.md
+# as Semgrep patterns that can run in CI pipelines.
+#
+# Usage:
+#   semgrep --config .agent/config/semgrep-deny.yaml .
+#
+# Or in CI (GitHub Actions):
+#   - uses: returntocorp/semgrep-action@v1
+#     with:
+#       config: .agent/config/semgrep-deny.yaml
+#
+# Not all semantic-deny rules are expressible as static patterns.
+# Rules requiring runtime analysis remain prose-only in semantic-deny.md.
+
+rules:
+
+  # ============================================================
+  # GEN — 通用規則
+  # ============================================================
+
+  - id: gen-1-ts-ignore-without-justification
+    message: >
+      禁止無理由的 @ts-ignore (semantic-deny GEN-1)。
+      每個 suppression 必須附上 justification 註解。
+      正確格式：// @ts-ignore — <理由>
+    languages: [typescript, javascript]
+    severity: ERROR
+    patterns:
+      - pattern: |
+          // @ts-ignore
+      - pattern-not: |
+          // @ts-ignore — $REASON
+
+  - id: gen-1-eslint-disable-without-justification
+    message: >
+      禁止無理由的 eslint-disable (semantic-deny GEN-1)。
+      每個 suppression 必須附上 justification 註解。
+    languages: [typescript, javascript]
+    severity: ERROR
+    pattern-regex: "eslint-disable(?!.*--)"
+
+  - id: gen-1-type-ignore-without-justification
+    message: >
+      禁止無理由的 type: ignore (semantic-deny GEN-1)。
+      每個 suppression 必須附上 justification 註解。
+    languages: [python]
+    severity: ERROR
+    pattern-regex: "#\\s*type:\\s*ignore(?!\\[)"
+
+  - id: gen-1-noqa-without-code
+    message: >
+      禁止無指定規則的 noqa (semantic-deny GEN-1)。
+      請使用 # noqa: E501 等明確格式。
+    languages: [python]
+    severity: ERROR
+    pattern-regex: "#\\s*noqa(?!:)"
+
+  - id: gen-4-console-log-in-production
+    message: >
+      禁止 production code 中的 console.log (semantic-deny GEN-4)。
+      請使用專案的 logging framework。
+    languages: [typescript, javascript]
+    severity: WARNING
+    patterns:
+      - pattern-either:
+          - pattern: console.log(...)
+          - pattern: console.warn(...)
+          - pattern: console.error(...)
+          - pattern: console.info(...)
+          - pattern: console.debug(...)
+    paths:
+      exclude:
+        - "*.test.*"
+        - "*.spec.*"
+        - "__tests__/**"
+        - "scripts/**"
+
+  - id: gen-4-print-in-production
+    message: >
+      禁止 production code 中的 print() (semantic-deny GEN-4)。
+      請使用專案的 logging framework。
+    languages: [python]
+    severity: WARNING
+    pattern: print(...)
+    paths:
+      exclude:
+        - "tests/**"
+        - "scripts/**"
+        - "*_test.py"
+        - "test_*.py"
+
+  - id: gen-5-hardcoded-secret-patterns
+    message: >
+      疑似 hardcoded secret (semantic-deny GEN-5)。
+      所有 secrets 必須透過環境變數或 secret manager 注入。
+    languages: [generic]
+    severity: ERROR
+    pattern-regex: '(?i)(api_key|apikey|secret_key|password|passwd|token)\s*[:=]\s*["\x27][A-Za-z0-9+/=_-]{8,}'
+    paths:
+      exclude:
+        - "*.test.*"
+        - "*.spec.*"
+        - "*.example*"
+        - ".env.example"
+
+  # ============================================================
+  # SEC — 安全規則
+  # ============================================================
+
+  - id: sec-1-eval-usage
+    message: >
+      禁止使用 eval() 執行動態程式碼 (semantic-deny SEC-1)。
+      這是 RCE 的主要攻擊面。
+    languages: [typescript, javascript]
+    severity: ERROR
+    pattern-either:
+      - pattern: eval(...)
+      - pattern: new Function(...)
+
+  - id: sec-1-python-eval
+    message: >
+      禁止使用 eval() / exec() (semantic-deny SEC-1)。
+      請使用 ast.literal_eval() 或其他安全替代方案。
+    languages: [python]
+    severity: ERROR
+    pattern-either:
+      - pattern: eval(...)
+      - pattern: exec(...)
+
+  - id: sec-3-cors-wildcard
+    message: >
+      禁止無限制的 CORS * 設定 (semantic-deny SEC-3)。
+      CORS origin 必須限定為已知清單。
+    languages: [typescript, javascript]
+    severity: ERROR
+    pattern-either:
+      - pattern: |
+          { origin: "*" }
+      - pattern: |
+          "Access-Control-Allow-Origin": "*"
+
+  # ============================================================
+  # DB — 資料庫規則
+  # ============================================================
+
+  - id: db-2-service-role-in-frontend
+    message: >
+      禁止前端程式碼中出現 service-role key (semantic-deny DB-2)。
+    languages: [typescript, javascript]
+    severity: ERROR
+    pattern-regex: "service[_-]?role"
+    paths:
+      include:
+        - "app/**"
+        - "pages/**"
+        - "components/**"
+        - "src/components/**"
+        - "src/app/**"
+
+  - id: db-3-drop-without-if-exists
+    message: >
+      禁止不帶 IF EXISTS 的 DROP TABLE / DROP INDEX (semantic-deny DB-3)。
+    languages: [generic]
+    severity: ERROR
+    pattern-regex: 'DROP\s+(TABLE|INDEX)\s+(?!IF\s+EXISTS)'
+    paths:
+      include:
+        - "migrations/**"
+        - "*.sql"
+
+  # ============================================================
+  # AR — 架構規則
+  # ============================================================
+
+  - id: ar-2-file-too-long
+    message: >
+      檔案超過 500 行邏輯程式碼 (semantic-deny AR-2)。
+      考慮拆分為多個職責明確的模組。
+    languages: [typescript, javascript, python]
+    severity: WARNING
+    pattern-regex: ".*"
+    options:
+      # This rule works better as a custom script check
+      # Semgrep pattern is a placeholder - use file-level metrics instead
+      max_lines_per_file: 500
+
+  # ============================================================
+  # SUPPLY — 供應鏈安全規則
+  # ============================================================
+
+  - id: supply-2-git-dependency
+    message: >
+      禁止從 git URL 直接安裝套件 (semantic-deny SUPPLY-2)。
+      請使用官方 registry。
+    languages: [json]
+    severity: WARNING
+    pattern-regex: '"(git\\+https?://|github:)'
+    paths:
+      include:
+        - "package.json"

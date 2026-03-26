@@ -96,6 +96,18 @@ L3  語意禁止     程式碼層級的絕對禁令
 
 ---
 
+## 語意禁止五大類
+
+| 類別 | 代碼 | 範例 |
+|------|------|------|
+| 通用 | GEN-* | 禁止無理由 @ts-ignore、console.log |
+| 資料庫 | DB-* | 禁止繞過 ORM、前端存 admin key |
+| 安全 | SEC-* | 禁止 eval()、明文密碼、CORS * |
+| 架構 | AR-* | 禁止循環依賴、God Object |
+| 供應鏈 | SUPPLY-* | 禁止 typosquatting、非官方 registry |
+
+---
+
 ## 8 步品質驗證
 
 ```
@@ -107,6 +119,9 @@ L3  語意禁止     程式碼層級的絕對禁令
 6. 效能評估    — 效能退化？
 7. 文件檢查    — 文件更新？
 8. 整合驗證    — 系統配合？
+
+一鍵執行：.agent/skills/sdd-bdd-workflow/scripts/check-finish.sh
+支援技術棧：Node.js / Python / Rust / Go（自動偵測）
 ```
 
 ---
@@ -177,7 +192,7 @@ L3  語意禁止     程式碼層級的絕對禁令
 ## 治理框架目錄結構
 
 ```
-project/
+.agent/
 ├── CLAUDE.md                # Agent 總指令
 ├── memory/
 │   ├── constitution.md      # L0 憲法
@@ -185,13 +200,29 @@ project/
 │   ├── patterns.md          # 模式記憶
 │   └── context.md           # 專案脈絡
 ├── rules/
-│   ├── semantic-deny.md     # L3 語意禁止
+│   ├── semantic-deny.md     # L3 語意禁止（GEN/DB/SEC/AR/SUPPLY）
 │   └── human-review.md      # L2 人類審查
 ├── config/
 │   ├── settings.json        # 權限設定
-│   └── token-budget.yaml    # Token 預算
-├── templates/               # 範本庫
+│   ├── token-budget.yaml    # Token 預算
+│   └── semgrep-deny.yaml    # CI 自動化規則
+├── templates/               # 範本庫（含 YAML frontmatter）
+├── scripts/
+│   ├── setup-wizard.sh      # 互動式設定精靈
+│   └── setup-agent-links.sh # Symlink 設定
+├── evals/                   # Agent 行為評估
 └── logs/                    # 操作日誌
+```
+
+## Git Trailer（AI 溯源）
+
+```
+feat(auth): implement JWT refresh
+
+AI-Assisted-By: claude-code
+
+→ 用 git log --grep="AI-Assisted-By" 追蹤 AI 貢獻
+→ 觸及核心模組需附 ADR 或 AI-INTENT: 說明
 ```
 
 ---

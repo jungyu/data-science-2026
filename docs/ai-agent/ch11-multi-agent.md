@@ -226,9 +226,34 @@ Task("分析安全性。請用以下格式回報：
 兩個 Agent 同時修改同一個檔案
 
 解決：
-- 使用 worktree 隔離（每個 Agent 在獨立的分支）
+- 使用 Git Worktree 隔離（每個 Agent 在獨立的工作目錄和分支）
+- Claude Code 原生支援 worktree：
+  Agent(isolation: "worktree") 會自動建立隔離副本
 - 或確保任務分配時不會有檔案重疊
 ```
+
+### 挑戰 3.5：AI 程式碼追蹤
+
+```
+問題：
+多個 Agent 的產出合併後，如何分辨哪些程式碼是 AI 輔助的？
+
+解決：
+使用 Git Trailer 標記 AI 輔助的 commit：
+
+  feat(auth): implement JWT refresh
+
+  AI-Assisted-By: claude-code
+
+好處：
+- 用 git log --grep="AI-Assisted-By" 追蹤 AI 貢獻比例
+- 定期審計哪些核心模組有 AI 參與
+- 觸及核心模組時，AI-Assisted commit 需附 ADR
+```
+
+> 💡 **為什麼不用隔離區？** 早期的做法是把 AI 生成的程式碼放在 `ai-generated/`
+> 目錄隔離，但這造成不必要的摩擦。現代做法是：**通過 CI 品質門檻的程式碼就是好程式碼，
+> 不論來源。** 用 git trailer 標記來源做審計，而非物理隔離。
 
 ### 挑戰 4：成本控制
 

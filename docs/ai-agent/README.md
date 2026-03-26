@@ -146,10 +146,12 @@ Level 1  │  理解核心概念    │  ← Ch01-Ch04 基礎篇
 | 資源 | 說明 | 位置 |
 |------|------|------|
 | 🗂️ Agent 治理系統 | 完整的生產級治理框架 | `agent-init/` |
-| 📝 範本庫 | 規格、計畫、任務範本 | `agent-init/templates/` |
-| ⚙️ 配置參考 | Claude Code 設定檔 | `agent-init/config/` |
+| 📝 範本庫 | 規格、計畫、任務範本（含 YAML frontmatter） | `agent-init/templates/` |
+| ⚙️ 配置參考 | Claude Code 設定 + Semgrep CI 規則 | `agent-init/config/` |
 | 🛡️ 治理規則 | YAML 格式的自動化閘門 | `agent-init/skills/governance/` |
 | 📋 提示詞庫 | Slash command 提示詞 | `agent-init/prompts/` |
+| 🔧 設定精靈 | 互動式佔位符填寫工具 | `agent-init/scripts/setup-wizard.sh` |
+| 🧪 行為評估 | Agent 治理遵從度測試案例 | `agent-init/evals/` |
 
 ---
 

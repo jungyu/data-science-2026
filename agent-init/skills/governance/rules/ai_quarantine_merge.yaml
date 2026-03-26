@@ -1,21 +1,23 @@
 # ============================================================
-# AI Quarantine & Merge — AI 程式碼隔離與整併規則
+# AI Code Provenance & Quality Gate — AI 程式碼溯源與品質閘門
 # ============================================================
-# 確保 AI 生成的程式碼經過隔離、審查、重構後才進入生產路徑。
-# AI 是工具，不是直接的 committer。
+# 現代 AI-assisted development 模型：
+# 不再隔離 AI 生成的程式碼，而是透過 git trailer 標記來源、
+# CI 品質門檻強制執行、以及核心模組的額外審查來確保品質。
+#
+# 設計理念：通過品質門檻的程式碼就是好程式碼，不論來源。
 # ============================================================
 
-id: gov.ai_quarantine_merge.v1
-version: "1.0.0"
-name: "AI 程式碼隔離與整併"
+id: gov.ai_provenance_gate.v2
+version: "2.0.0"
+name: "AI 程式碼溯源與品質閘門"
 description: |
-  AI 產生的程式碼必須先進入隔離區（ai-generated/），
-  經人類審查、重構、測試後才可整併至生產程式碼。
-  這確保 AI 生成物符合專案慣例、品質標準與架構方向。
+  以溯源標記（git trailer）取代物理隔離。AI 輔助產生的程式碼
+  必須通過與人類撰寫程式碼相同的品質門檻（lint、type-check、
+  test coverage），並在觸及核心模組時附加審查要求。
 
 scope:
   applies_to:
-    - "ai-generated/**"
     - "{{SRC_DIR}}/**"
     - "{{API_DIR}}/**"
   trigger_on:
@@ -23,149 +25,163 @@ scope:
     - file_modify
 
 # ------------------------------------------------------------
-# 隔離區結構
+# 溯源標記規範（取代 ai-generated/ 隔離區）
 # ------------------------------------------------------------
-quarantine_structure:
-  base_path: "ai-generated/"
-  naming_convention: "ai-generated/<YYYY-MM-DD>/<topic>/"
-  required_files:
-    - "README.md"          # 說明生成目的、prompt 摘要、預期用途
-    - "merge-plan.md"      # 整併計畫：目標路徑、重構清單、測試計畫
-  optional_files:
-    - "prompt-log.md"      # 完整 prompt 記錄（供日後參考）
-    - "diff-notes.md"      # 與現有程式碼的差異分析
+provenance:
+  # Git trailer 格式，附加於 commit message footer
+  git_trailer:
+    key: "AI-Assisted-By"
+    format: "<tool-name>"
+    examples:
+      - "AI-Assisted-By: claude-code"
+      - "AI-Assisted-By: github-copilot"
+      - "AI-Assisted-By: cursor"
+  # 用於審計與統計，不影響合併流程
+  audit_purpose: |
+    透過 `git log --grep="AI-Assisted-By"` 追蹤 AI 輔助的變更，
+    用於定期審計 AI 貢獻比例、品質趨勢、以及核心模組覆蓋範圍。
 
 # ------------------------------------------------------------
 # 規則定義
 # ------------------------------------------------------------
 rules:
 
-  - id: Q1
-    name: "新 AI 生成程式碼必須進入隔離區"
+  - id: P1
+    name: "AI 輔助的 commit 必須附上溯源標記"
     description: |
-      任何由 AI 工具（Copilot、Claude、ChatGPT 等）生成的新程式碼，
-      必須先放置於 ai-generated/<date>/<topic>/ 目錄下，
-      並附上 README.md 說明生成目的。
-    severity: error
+      任何包含 AI 工具顯著貢獻的 commit（非單純 autocomplete），
+      必須在 commit message 中附上 AI-Assisted-By trailer，
+      標明使用的 AI 工具名稱。
+    severity: warning
     condition: |
-      file_is_ai_generated
-      AND file_path NOT MATCH "ai-generated/**"
-      AND file_is_new
-      AND NOT exempted
+      commit_has_ai_contribution
+      AND NOT commit_message CONTAINS "AI-Assisted-By:"
     action: warn
     message: |
-      ⚠️ 偵測到新增的 AI 生成程式碼未進入隔離區。
-      請將檔案移至 ai-generated/<date>/<topic>/ 並附上 README.md。
+      ⚠️ 此 commit 似乎包含 AI 輔助的程式碼，但缺少溯源標記。
+      請在 commit message 中加入：
+        AI-Assisted-By: <tool-name>
+      例如：AI-Assisted-By: claude-code
 
-      隔離區結構：
-      ai-generated/
-      └── YYYY-MM-DD/
-          └── <topic>/
-              ├── README.md       # 生成目的與 prompt 摘要
-              ├── merge-plan.md   # 整併計畫
-              └── <generated-files>
-
-  - id: Q2
-    name: "AI 程式碼進入生產路徑須附重構 PR 計畫"
+  - id: P2
+    name: "所有程式碼必須通過統一品質門檻"
     description: |
-      將 AI 生成的程式碼從隔離區移至生產路徑時，
-      必須建立重構 PR（Pull Request）並附上：
-      - 重構內容摘要（與原始生成物的差異）
-      - 符合專案 style canon 的確認
-      - 測試覆蓋證明
+      無論程式碼來源（人類或 AI），所有進入主分支的程式碼
+      必須通過相同的品質檢查：lint、type-check、測試覆蓋率。
+      這是品質保證的核心機制，取代隔離審查。
     severity: error
     condition: |
-      source_is_quarantine("ai-generated/**")
-      AND target_is_production(["{{SRC_DIR}}/**", "{{API_DIR}}/**"])
-      AND NOT has_merge_plan
+      target_branch IN ["main", "master"]
+      AND NOT (
+        ci_check_passed("lint")
+        AND ci_check_passed("type-check")
+        AND ci_check_passed("test")
+        AND test_coverage >= minimum_threshold
+      )
     action: block
     message: |
-      ❌ AI 生成程式碼移入生產路徑但缺少重構計畫。
-      請確保：
-      1. ai-generated/<date>/<topic>/merge-plan.md 已完成
-      2. PR 描述中列出所有重構項目
-      3. 新增的程式碼通過 lint、type check、測試
+      ❌ 程式碼未通過品質門檻，無法合併至主分支。
+      必要檢查：
+      1. ✅ Lint 通過（零 error）
+      2. ✅ Type check 通過
+      3. ✅ 測試通過
+      4. ✅ 測試覆蓋率達到門檻
 
-  - id: Q3
-    name: "AI 程式碼觸及核心模組須附 ADR 或 Intent 說明"
+  - id: P3
+    name: "AI 輔助程式碼觸及核心模組須附 ADR 或 Intent 說明"
     description: |
-      當 AI 生成的程式碼涉及核心模組（如認證、資料存取、核心業務邏輯）時，
-      必須額外建立 ADR 或在 commit message 中附 Intent 說明，
-      記錄為何使用 AI 生成此部分以及人類審查的重點。
+      當 AI 輔助的程式碼涉及核心模組（認證、資料存取、核心業務邏輯）時，
+      必須額外建立 ADR 或在 commit message 中附 AI-INTENT 說明，
+      記錄為何使用 AI 輔助此部分以及人類審查的重點。
     severity: error
     condition: |
-      source_is_ai_generated
-      AND target_touches_critical_module(["{{SRC_DIR}}/core/**", "{{SRC_DIR}}/auth/**", "{{SRC_DIR}}/data/**"])
+      commit_message CONTAINS "AI-Assisted-By:"
+      AND changed_files INTERSECT [
+        "{{SRC_DIR}}/core/**",
+        "{{SRC_DIR}}/auth/**",
+        "{{SRC_DIR}}/data/**"
+      ]
       AND NOT (
         changed_files INTERSECT ["{{ADR_DIR}}/**"]
         OR commit_message CONTAINS "AI-INTENT:"
       )
     action: block
     message: |
-      ❌ AI 生成程式碼觸及核心模組但缺少 ADR 或 Intent 說明。
+      ❌ AI 輔助程式碼觸及核心模組但缺少決策記錄。
       請選擇以下其一：
-      1. 在 {{ADR_DIR}}/ 下建立 ADR，說明 AI 生成的範圍與審查重點
+      1. 在 {{ADR_DIR}}/ 下建立 ADR，說明 AI 輔助的範圍與審查重點
       2. 在 commit message 中加入 AI-INTENT: 標記，說明決策理由
 
 # ------------------------------------------------------------
 # 封鎖條件（硬性阻擋）
 # ------------------------------------------------------------
 blocks:
-  - id: Q_BLOCK_1
-    name: "禁止 AI 直接修改生產程式碼且無隔離計畫"
+  - id: P_BLOCK_1
+    name: "禁止繞過 CI 品質檢查合併至主分支"
     description: |
-      AI 不得直接修改 {{SRC_DIR}}/** 下的檔案且沒有隔離與整併計畫。
-      這是防止 AI 生成物未經審查直接進入生產環境的最後防線。
+      任何繞過 CI 品質檢查（如 --no-verify、force merge）的行為
+      一律封鎖。這是品質保證的最後防線。
     condition: |
-      actor = ai_agent
-      AND changed_files INTERSECT ["{{SRC_DIR}}/**"]
-      AND NOT has_quarantine_plan
-      AND NOT has_merge_plan
+      target_branch IN ["main", "master"]
+      AND (
+        merge_bypasses_ci
+        OR commit_flag CONTAINS "--no-verify"
+      )
     action: block
     message: |
-      🚨 封鎖：AI 直接修改 {{SRC_DIR}}/** 且沒有隔離與整併計畫。
-
-      所有 AI 生成的生產程式碼必須：
-      1. 先進入 ai-generated/ 隔離區
-      2. 附上 merge-plan.md 整併計畫
-      3. 經人類審查後透過重構 PR 整併
+      🚨 封鎖：不得繞過 CI 品質檢查合併至主分支。
+      所有程式碼（無論來源）必須通過完整的 CI pipeline。
 
 # ------------------------------------------------------------
 # 豁免條件
 # ------------------------------------------------------------
 exemptions:
-  - description: "AI 生成的測試檔案可直接進入測試目錄"
+  - description: "測試檔案不需額外的核心模組審查（P3）"
     condition: file_path MATCH "**/*.test.*" OR file_path MATCH "**/*.spec.*"
-  - description: "AI 生成的文件可直接進入 docs/"
-    condition: file_path MATCH "docs/**"
-  - description: "AI 輔助的小幅修正（< 10 行變更）可直接提交"
-    condition: change_size < 10 AND change_type = modification
-  - description: "附有 AI-REVIEWED: 標記的已審查程式碼可跳過隔離"
+  - description: "文件檔案不需品質門檻（P2）"
+    condition: file_path MATCH "docs/**" OR file_path MATCH "**/*.md"
+  - description: "單行 autocomplete 不需溯源標記（P1）"
+    condition: change_size <= 3 AND change_type = modification
+  - description: "附有 AI-REVIEWED: 標記的已審查程式碼可跳過核心模組 ADR 要求"
     condition: commit_message CONTAINS "AI-REVIEWED:"
 
 # ------------------------------------------------------------
 # 自動修正建議
 # ------------------------------------------------------------
 suggestions:
-  - trigger: Q1
+  - trigger: P1
     hint: |
-      建議步驟：
-      1. 建立目錄：ai-generated/$(date +%Y-%m-%d)/<topic>/
-      2. 將 AI 生成的檔案移入該目錄
-      3. 撰寫 README.md（目的、prompt 摘要、預期用途）
-      4. 撰寫 merge-plan.md（目標路徑、重構項目、測試計畫）
+      在 commit message 末尾加入 trailer：
 
-  - trigger: Q2
-    hint: |
-      建議步驟：
-      1. 完成 merge-plan.md 中的所有重構項目
-      2. 確認程式碼符合 {{STYLE_CANON_PATH}} 規範
-      3. 補充測試覆蓋（至少涵蓋 happy path + error path）
-      4. 建立 PR 並在描述中引用 merge-plan.md
+      feat(module): implement feature
 
-  - trigger: Q3
+      AI-Assisted-By: claude-code
+
+  - trigger: P2
+    hint: |
+      確保 CI pipeline 包含以下步驟：
+      1. lint: `{{LINTER_CONFIG}}` 零 error
+      2. type-check: 嚴格模式通過
+      3. test: 所有測試通過，覆蓋率達標
+      4. 若任一步驟失敗，修復後重新提交
+
+  - trigger: P3
     hint: |
       建議步驟：
-      1. 評估 AI 生成的核心模組程式碼品質與安全性
+      1. 評估 AI 輔助的核心模組程式碼品質與安全性
       2. 選擇 ADR 或 AI-INTENT 標記記錄決策
       3. 在 PR 中特別標記需要重點審查的區塊
+
+# ------------------------------------------------------------
+# 遷移指南（從 v1 隔離模式遷移）
+# ------------------------------------------------------------
+migration_from_v1:
+  description: |
+    若專案先前使用 ai-generated/ 隔離區模式（v1），
+    可按以下步驟遷移至溯源標記模式（v2）：
+  steps:
+    - "將 ai-generated/ 中已審查的程式碼移至正確的生產路徑"
+    - "刪除 ai-generated/ 目錄"
+    - "在 CI pipeline 中加入 lint + type-check + test 品質門檻"
+    - "團隊約定使用 AI-Assisted-By trailer 標記 AI 輔助的 commit"
+    - "定期執行 git log --grep='AI-Assisted-By' 進行審計"

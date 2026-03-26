@@ -1,7 +1,6 @@
 ---
 name: governance
 description: "AI 協作治理框架 - 防止技術債與架構漂移的守門員"
-tags: ["governance", "architecture", "quality-control"]
 ---
 
 # AI 協作治理框架
@@ -20,10 +19,9 @@ tags: ["governance", "architecture", "quality-control"]
 任何涉及 API、型別、Schema 的變更，**必須先更新契約文件**再修改實作。
 契約是系統的 single source of truth，實作永遠追隨契約。
 
-### 2. AI Containment（AI 隔離）
+### 2. AI Provenance（AI 溯源）
 
-AI 產生的程式碼**不得直接進入生產路徑**。
-所有 AI 生成物先進隔離區，經人類審查與重構後才可整併。
+AI 輔助產生的程式碼透過 **git trailer 標記來源**，並通過與人類撰寫程式碼**相同的 CI 品質門檻**（lint、type-check、test coverage）。觸及核心模組時須附加 ADR 或 Intent 說明。
 
 ### 3. Style Consistency（風格一致性）
 
@@ -53,9 +51,10 @@ AI 產生的程式碼**不得直接進入生產路徑**。
 |----------|---------|------|
 | `contract_first_gate.yaml` | 契約與 Schema 變更 | API / 型別 / DB Schema 變更必須同步更新契約文件 |
 | `adr_gate.yaml` | 架構決策記錄 | 部署、核心依賴、版本系統變更須留 ADR |
-| `ai_quarantine_merge.yaml` | AI 程式碼隔離 | AI 生成物必須先進隔離區再整併 |
+| `ai_quarantine_merge.yaml` | AI 程式碼溯源 | AI 輔助程式碼須附 git trailer 標記，通過 CI 品質門檻 |
 | `style_canon_enforcer.yaml` | 風格一致性 | 命名、error handling、logging 必須遵循 style canon |
 | `intent_drift_detector.yaml` | 意圖漂移偵測 | 偵測偏離平台核心意圖的變更 |
+| `arch_health_report.yaml` | 架構健康報告 | 定期偵測技術債早期徵兆（依賴循環、孤兒模組、schema drift） |
 
 ---
 

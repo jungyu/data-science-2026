@@ -245,7 +245,43 @@ Agent 的工作流程：
 
 ### 基本配置
 
-把驗證步驟整合成可一鍵執行的腳本：
+把驗證步驟整合成可一鍵執行的腳本。
+
+#### 方法 1：使用 `check-finish.sh`（推薦，多技術棧通用）
+
+`agent-init/` 框架內建了一個**自動偵測技術棧**的驗證腳本：
+
+```bash
+# 一鍵執行所有品質檢查
+.agent/skills/sdd-bdd-workflow/scripts/check-finish.sh
+
+# 只跑 lint
+.agent/skills/sdd-bdd-workflow/scripts/check-finish.sh lint
+
+# 只跑測試
+.agent/skills/sdd-bdd-workflow/scripts/check-finish.sh test
+```
+
+> 🧠 **為什麼不直接寫 `npm test`？** 因為 `check-finish.sh` 會自動偵測
+> 你的專案用什麼技術棧，然後選擇對應的工具：
+
+```
+┌──────────────────────────────────────────────────┐
+│       check-finish.sh 自動偵測矩陣                │
+│                                                    │
+│  偵測到           Lint 工具           測試工具      │
+│  ─────────────   ─────────────────   ───────────  │
+│  package.json    ESLint / Biome      npm/pnpm/yarn│
+│  tsconfig.json   tsc --noEmit        vitest/jest  │
+│  pyproject.toml  Ruff / MyPy / Pyright  pytest    │
+│  Cargo.toml      cargo check + Clippy  cargo test │
+│  go.mod          go vet + golangci-lint go test    │
+│                                                    │
+│  💡 如果偵測到多個技術棧，全部都會執行             │
+└──────────────────────────────────────────────────┘
+```
+
+#### 方法 2：自訂 package.json scripts（Node.js 專案）
 
 ```json
 // package.json
@@ -266,14 +302,16 @@ Agent 可以用一行指令執行全部檢查：
 ```
 > 跑完整的品質驗證
 
-Agent: [Bash: npm run validate]
-       「所有品質閘門通過 ✅
-        - 語法：✅
-        - 型別：✅
-        - Lint：✅ (0 warnings)
-        - 安全：✅ (0 vulnerabilities)
-        - 測試：✅ (142 passed, 0 failed)
-        - 覆蓋率：87.3%」
+Agent: [Bash: .agent/skills/sdd-bdd-workflow/scripts/check-finish.sh]
+       「Detected tech stacks: node python
+        ✅ TypeScript (tsc --noEmit): PASS
+        ✅ ESLint: PASS
+        ✅ Ruff lint: PASS
+        ✅ Tests (pnpm test): PASS
+        ✅ Tests (pytest): PASS
+        ────────────────────────────
+        Summary: 5 passed, 0 failed
+        ✅ All finish conditions met!」
 ```
 
 ### 進階：Git Hook 整合
@@ -284,20 +322,11 @@ Agent: [Bash: npm run validate]
 
 echo "🔍 Running quality gates..."
 
-# Step 1-3: 語法 + 型別 + 規範
-npx lint-staged
+# 使用 check-finish.sh 自動偵測技術棧並執行檢查
+.agent/skills/sdd-bdd-workflow/scripts/check-finish.sh
 
-# Step 4: 安全掃描
-npm audit --audit-level=high
 if [ $? -ne 0 ]; then
-  echo "❌ Security vulnerabilities found!"
-  exit 1
-fi
-
-# Step 5: 測試
-npm test -- --bail
-if [ $? -ne 0 ]; then
-  echo "❌ Tests failed!"
+  echo "❌ Quality gates failed! Fix issues before committing."
   exit 1
 fi
 

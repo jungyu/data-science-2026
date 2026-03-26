@@ -30,17 +30,26 @@
 │   ├── patterns.md          # 模式記憶
 │   └── context.md           # 專案脈絡
 ├── rules/
-│   ├── semantic-deny.md     # 語意禁止（L3）
+│   ├── semantic-deny.md     # 語意禁止（L3）— 含 GEN/DB/SEC/AR/SUPPLY 五大類
 │   └── human-review.md      # 人類審查（L2）
 ├── config/
 │   ├── settings.json        # Agent 權限設定
-│   └── token-budget.yaml    # Token 預算
-├── templates/
+│   ├── token-budget.yaml    # Token 預算
+│   └── semgrep-deny.yaml    # Semgrep CI 規則（semantic-deny 自動化）
+├── templates/               # 含 YAML frontmatter 供機器驗證
 │   ├── spec-template.md     # 規格範本
 │   └── task-template.md     # 任務範本
+├── scripts/
+│   ├── setup-wizard.sh      # 互動式佔位符設定精靈
+│   └── setup-agent-links.sh # Symlink 設定
+├── evals/                   # Agent 行為評估案例
+│   └── cases/               # 驗證 Agent 是否遵守治理規則
 └── logs/
     └── README.md            # 日誌格式說明
 ```
+
+> 💡 **快速開始**：`agent-init/` 目錄已經包含上述所有元件的範本。
+> 只要複製到你的專案、跑 `setup-wizard.sh` 填寫佔位符，就能立即啟用。
 
 ---
 
@@ -195,30 +204,34 @@ Status: active
 - 做技術決策時先查 diary.md
 - 完成任務後執行品質檢查
 - 觸發 L1 規則時立即停止
+
+## Git Commit 規範
+- AI 輔助的 commit 須附 trailer：AI-Assisted-By: claude-code
+- 觸及核心模組的 AI 輔助 commit 須附 ADR 或 AI-INTENT: 說明
 ```
 
 ---
 
 ## Step 5：設定品質管線
 
-### 建立 validate 命令
+### 建立品質檢查（推薦：使用 check-finish.sh）
 
-```json
-{
-  "scripts": {
-    "validate": "npm run lint && npm run typecheck && npm test",
-    "lint": "eslint . --max-warnings 0",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run"
-  }
-}
+```bash
+# 自動偵測技術棧，執行 lint + test
+.agent/skills/sdd-bdd-workflow/scripts/check-finish.sh
+
+# 或自訂 package.json scripts（Node.js 專案）
+# npm run validate
 ```
+
+> `check-finish.sh` 支援 TypeScript/Python/Rust/Go 自動偵測，
+> 不需要為每個技術棧寫不同的指令。
 
 ### 在 CLAUDE.md 中加入
 
 ```markdown
 ## 品質檢查
-- 每次修改後執行：npm run validate
+- 每次修改後執行：.agent/skills/sdd-bdd-workflow/scripts/check-finish.sh
 - 新增功能必須有測試
 - 提交前確認所有檢查通過
 ```

@@ -29,10 +29,14 @@ ln -sf ../.agent/prompts/commands .claude/commands
 ln -sf ../.agent/config/claude-settings.json .claude/settings.local.json
 echo "✅ Linked .claude/ directories"
 
-# 3. GitHub Skill (Optional, for reference)
-# Expects: .github/skill.md
-# Source: .agent/skills/github-skill.md
-ln -sf ../.agent/skills/github-skill.md .github/skill.md
-echo "✅ Linked .github/skill.md"
+# 3. AGENTS.md (GitHub Copilot Coding Agent)
+# Expects: .github/AGENTS.md
+# Source: .agent/rules/AGENTS.md
+if [ -d ".github" ]; then
+    ln -sf ../.agent/rules/AGENTS.md .github/AGENTS.md
+    echo "✅ Linked .github/AGENTS.md"
+else
+    echo "⚠️ .github directory not found, skipping AGENTS.md link."
+fi
 
 echo "🎉 Agent symlinks setup complete. Tools should now see .agent/ contents correctly."

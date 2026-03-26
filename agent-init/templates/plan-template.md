@@ -1,3 +1,15 @@
+---
+type: plan
+version: "1.0"
+status: draft          # draft | in_progress | complete | blocked
+feature_branch: "[###-feature-name]"
+created: "[DATE]"
+phases:
+  phase_0_research: pending     # pending | complete | error | skipped
+  phase_1_design: pending
+  phase_2_tasks: pending        # planned by /plan, executed by /tasks
+constitution_check: pending     # pending | pass | violations_documented
+---
 
 # Implementation Plan: [FEATURE]
 

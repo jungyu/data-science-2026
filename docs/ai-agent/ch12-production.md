@@ -231,8 +231,11 @@ budgets:
 
 做什麼：
 - 全團隊開始使用
+- 跑 setup-wizard.sh 完成框架佔位符設定
 - 建立 constitution.md 和 semantic-deny
 - 設定 human-review-triggers
+- 約定 Git Trailer 標記 AI 輔助的 commit：
+    AI-Assisted-By: claude-code
 - 開始記錄 decision diary
 - 建立 Token 預算
 
@@ -240,6 +243,10 @@ budgets:
 - 不做自動化部署
 - 不讓 Agent 無監督地大量修改
 ```
+
+> 💡 **Setup Wizard**：`agent-init/` 提供互動式設定精靈
+> `scripts/setup-wizard.sh`，可以在 5 分鐘內引導團隊完成所有佔位符的填寫，
+> 大幅降低導入門檻。
 
 ### 第三階段：成熟（持續）
 

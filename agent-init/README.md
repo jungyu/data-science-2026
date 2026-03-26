@@ -32,25 +32,29 @@
 cp -r path/to/.agent-init .agent
 ```
 
-### 2. 執行 symlink 設定
+### 2. 執行 Setup Wizard
 
 ```bash
-chmod +x .agent/scripts/setup-agent-links.sh
+chmod +x .agent/scripts/setup-wizard.sh .agent/scripts/setup-agent-links.sh
+.agent/scripts/setup-wizard.sh
+```
+
+Wizard 會互動式引導你填寫所有佔位符（`{{PROJECT_NAME}}`、`{{TECH_STACK}}` 等）。
+完成後自動顯示剩餘未填的佔位符。
+
+### 3. 建立 Symlinks
+
+```bash
 .agent/scripts/setup-agent-links.sh
 ```
 
 這會建立以下 symlink：
 - `.github/copilot-instructions.md` → `.agent/rules/copilot-instructions.md`
+- `.github/AGENTS.md` → `.agent/rules/AGENTS.md`
 - `.claude/commands` → `.agent/prompts/commands`
 - `.claude/settings.local.json` → `.agent/config/claude-settings.json`
 
-### 3. 自訂佔位符
-
-搜尋所有 `{{` 佔位符並替換為你的專案資訊：
-
-```bash
-grep -rn '{{' .agent/ | head -20
-```
+> **手動填寫**：也可以直接搜尋 `grep -rn '{{' .agent/` 手動替換。
 
 **必要的佔位符**：
 
@@ -78,14 +82,14 @@ grep -rn '{{' .agent/ | head -20
 │
 ├── config/                         # ⚙️ 工具設定
 │   ├── claude-settings.json        #   ├── Claude Code 權限矩陣
-│   └── token-budget.yaml           #   └── Token 成本意識指引
+│   ├── token-budget.yaml           #   ├── Token 成本意識指引
+│   └── semgrep-deny.yaml           #   └── Semgrep CI 規則（semantic-deny 自動化）
 │
 ├── rules/                          # 📏 開發規則
 │   ├── copilot-instructions.md     #   ├── 所有 AI 工具統一規範
 │   ├── AGENTS.md                   #   ├── 多 Agent 協作規則
 │   ├── human-review-triggers.md    #   ├── 人類審核觸發條件（3 級）
-│   ├── semantic-deny.md            #   ├── 語意層級禁止規則
-│   ├── skill-development-guide.md  #   ├── Skill 開發規範
+│   ├── semantic-deny.md            #   ├── 語意層級禁止規則（GEN/DB/SEC/AR/SUPPLY）
 │   └── _module-rules-template.md   #   └── 模組規則範本（用於新增）
 │
 ├── prompts/                        # 💬 命令提示詞
@@ -124,9 +128,18 @@ grep -rn '{{' .agent/ | head -20
 │       ├── scripts/ (validate-spec.sh, check-finish.sh)
 │       └── references/ (error-taxonomy, scenario-patterns, agent-strategies)
 │
+├── evals/                          # 🧪 Agent 行為評估
+│   ├── README.md                   #   ├── 評估框架說明
+│   └── cases/                      #   └── 測試案例（semantic-deny、HITL）
+│
 └── scripts/                        # 🔧 自動化腳本
+    ├── setup-wizard.sh             #   ├── 互動式佔位符填寫
     ├── setup-agent-links.sh        #   ├── Symlink 設定
-    └── bash/common.sh              #   └── 共用 Bash 工具
+    └── bash/                       #   └── 共用腳本
+        ├── common.sh               #       ├── 共用 Bash 工具
+        ├── check-prerequisites.sh  #       ├── 前置條件檢查
+        ├── create-new-feature.sh   #       ├── 建立 feature branch
+        └── setup-plan.sh           #       └── 初始化 plan
 ```
 
 ---
@@ -196,7 +209,7 @@ Standard 之上再加：
 1. 複製 `skills/_skill-template.md` 到 `skills/{{skill-name}}/SKILL.md`
 2. 填入 YAML frontmatter（name, triggers, finish_conditions）
 3. 根據需要新增 scripts/、references/、templates/ 子目錄
-4. 詳見 `rules/skill-development-guide.md`
+4. 參考 `skills/_skill-template.md` 的結構說明
 
 ### 如何新增治理閘門
 
@@ -226,6 +239,10 @@ Standard 之上再加：
 | Task Pack | 最小權限（POLA） | `tasks/` | L5 操作 |
 | Token Budget | 成本管理 | `config/token-budget.yaml` | Config |
 | Action Log | 可觀測性 | `logs/` | Ops |
+| Policy-as-Code | Semgrep (2017+) | `config/semgrep-deny.yaml` | CI |
+| AI Provenance | Git Trailers + CI Gates | `governance/rules/ai_quarantine_merge.yaml` | L4 閘門 |
+| Supply Chain Security | SLSA / OWASP | `rules/semantic-deny.md` SUPPLY-* | L2 語意 |
+| Agent Evals | AI 安全評估 | `evals/` | QA |
 
 ---
 

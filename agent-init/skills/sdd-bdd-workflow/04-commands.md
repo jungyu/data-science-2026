@@ -1,12 +1,16 @@
-# 四句咒語協議 - AI 任務交辦指令
+# 四句咒語協議 - AI 任務交辦指令（輕量版）
 
 > **目的**: 標準化與 AI Agent 的溝通協議，確保規格驅動開發。
+>
+> **完整版**: 若使用 Claude Code，建議改用功能更完整的 slash commands：
+> `/specify` → `/clarify` → `/plan` → `/tasks` → `/implement` → `/analyze`
+> 詳見 `.agent/prompts/commands/` 目錄。
 
 ---
 
-## 🔮 四句咒語
+## 四句咒語
 
-在與 AI Agent（Copilot CLI, Antigravity, Claude Code, Codex）交辦任務時，請使用以下指令：
+適合非 Claude Code 環境或快速開發場景：
 
 ### 1️⃣ Spec first
 

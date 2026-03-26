@@ -1,3 +1,19 @@
+---
+type: tasks
+version: "1.0"
+status: pending        # pending | in_progress | complete | blocked
+feature_branch: "[###-feature-name]"
+created: "[DATE]"
+total_tasks: 0
+completed_tasks: 0
+phases:
+  setup: pending       # pending | in_progress | complete
+  tests: pending
+  core: pending
+  integration: pending
+  polish: pending
+---
+
 # Tasks: [FEATURE NAME]
 
 **Input**: Design documents from `/specs/[###-feature-name]/`

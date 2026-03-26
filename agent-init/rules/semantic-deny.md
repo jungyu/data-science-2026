@@ -53,6 +53,17 @@ tags: ["governance", "safety", "deny", "cross-cutting"]
 
 ---
 
+## SUPPLY — 供應鏈安全規則
+
+| ID | 規則 | 說明 | 偵測方式 |
+|----|------|------|----------|
+| SUPPLY-1 | 禁止安裝名稱相似的可疑套件（typosquatting） | 新增依賴前須確認套件名稱正確，避免安裝惡意的名稱相似套件（如 `lod-ash` 冒充 `lodash`） | 比對套件名稱與已知熱門套件的 Levenshtein 距離；檢查 npm/PyPI 上的下載量與發佈歷史 |
+| SUPPLY-2 | 禁止從非官方 registry 安裝套件 | 所有套件必須來自官方 registry（npm registry、PyPI、crates.io 等），禁止使用未經審核的私有 registry 或直接 git URL 安裝 | 檢查 `.npmrc`、`pip.conf`、`Cargo.toml` 中的 registry 設定；搜尋 `git+https://` 或 `github:` 格式的依賴 |
+| SUPPLY-3 | 禁止引入具有 `postinstall` / `preinstall` 腳本的未知套件 | 安裝前須檢查套件是否包含 lifecycle scripts，已知安全套件除外（如 `husky`、`esbuild`） | 執行 `npm pack --dry-run` 或檢查套件的 `package.json` scripts 欄位 |
+| SUPPLY-4 | 禁止 pin 到已知有漏洞的版本 | 所有依賴版本不得包含已公開的 critical/high severity CVE | 使用 `npm audit` / `pip audit` / `cargo audit` 驗證 |
+
+---
+
 ## 自我檢查流程
 
 AI agent 在生成或修改程式碼時，須執行以下自我檢查：
@@ -76,6 +87,13 @@ AI agent 在生成或修改程式碼時，須執行以下自我檢查：
 3. 填寫：規則名稱、說明（為何禁止）、偵測方式
 4. 在 PR description 中標示 `[semantic-deny: NEW RULE]`
 5. 經團隊 review 後合併
+
+**現有分類**：
+- `GEN-*`：通用規則
+- `DB-*`：資料庫規則
+- `SEC-*`：安全規則
+- `AR-*`：架構規則
+- `SUPPLY-*`：供應鏈安全規則
 
 **分類擴展建議**：
 - `PERF-*`：效能相關禁止規則

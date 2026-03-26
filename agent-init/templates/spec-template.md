@@ -1,8 +1,24 @@
+---
+type: spec
+version: "1.0"
+status: draft          # draft | review | approved
+complexity: null       # 0-2 lite | 3-5 standard | 6+ full (from complexity gate)
+feature_branch: "[###-feature-name]"
+created: "[DATE]"
+sections:
+  scope: incomplete    # incomplete | complete | needs_review
+  user_scenarios: incomplete
+  functional_requirements: incomplete
+  key_entities: incomplete
+  edge_cases: incomplete
+  clarifications: incomplete
+---
+
 # Feature Specification: [FEATURE NAME]
 
-**Feature Branch**: `[###-feature-name]`  
-**Created**: [DATE]  
-**Status**: Draft  
+**Feature Branch**: `[###-feature-name]`
+**Created**: [DATE]
+**Status**: Draft
 **Input**: User description: "$ARGUMENTS"
 
 ## Execution Flow (main)

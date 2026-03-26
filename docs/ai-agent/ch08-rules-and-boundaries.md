@@ -128,6 +128,38 @@ AR-003: 禁止跳過 Linter
   替代: 修正問題而非禁用規則
 ```
 
+#### 5. 供應鏈安全規則（SUPPLY）
+
+> 🧠 **為什麼需要這個？** 2025 年最常見的攻擊手法之一是「供應鏈攻擊」——
+> 攻擊者上傳名稱相似的惡意套件到 npm/PyPI，等你打錯字就中招。
+> Agent 安裝套件的速度比人快 100 倍，所以更需要護欄。
+
+```yaml
+SUPPLY-001: 禁止安裝名稱可疑的套件（typosquatting）
+  觸發: 新增的套件名稱與知名套件相似（如 lod-ash vs lodash）
+  理由: 可能是冒名的惡意套件
+  偵測: 比對 Levenshtein 距離、檢查下載量與發佈歷史
+  替代: 確認拼寫正確，檢查套件的 npm/PyPI 頁面
+
+SUPPLY-002: 禁止從非官方 Registry 安裝
+  觸發: .npmrc / pip.conf 指向非官方來源，或使用 git+https:// 安裝
+  理由: 非官方來源的套件缺乏安全審核
+  替代: 使用官方 registry（npm、PyPI、crates.io）
+
+SUPPLY-003: 禁止安裝有 postinstall 腳本的未知套件
+  觸發: 新套件的 package.json 包含 postinstall/preinstall scripts
+  理由: 生命週期腳本可在安裝時執行任意程式碼
+  替代: 審查腳本內容，或使用已知安全的套件
+
+SUPPLY-004: 禁止 pin 到已知有漏洞的版本
+  觸發: 依賴版本包含 critical/high severity CVE
+  理由: 已知漏洞是低懸果實攻擊目標
+  偵測: npm audit / pip audit / cargo audit
+```
+
+> 💡 **Semgrep 自動化**：`SUPPLY` 和其他 `semantic-deny` 規則可以用 Semgrep
+> 轉成 CI 管線中的自動化檢查。範本在 `agent-init/config/semgrep-deny.yaml`。
+
 ---
 
 ## 人類審查觸發機制（Human Review Triggers）
