@@ -87,20 +87,68 @@ default_pool_size = 50
 
 ---
 
-## Scaling Checklist
+## Layer 8: Cross-Schema Analytics（跨領域觀測）
 
-所有期末專題 / 進階專案應通過：
+**來自 `migrations/005_analytics_schema.sql`**：
 
+### Append-Only Event Log
+
+所有 schema 的關鍵事件匯入統一事件表，**永遠不 UPDATE/DELETE**。
+
+```sql
+CREATE TABLE IF NOT EXISTS analytics.events (
+  id          TEXT PRIMARY KEY DEFAULT public.generate_ulid(),
+  schema_name TEXT        NOT NULL,    -- 'shop', 'crawler', 'rag'
+  event_type  TEXT        NOT NULL,    -- 'order.created', 'crawl.completed'
+  entity_type TEXT        NOT NULL,
+  entity_id   TEXT,
+  actor_id    TEXT,
+  payload     JSONB       NOT NULL DEFAULT '{}'::JSONB,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT ck_events_type CHECK (event_type ~ '^[a-z_]+\.[a-z_]+$')
+);
+
+CREATE INDEX idx_events_schema_type ON analytics.events(schema_name, event_type, created_at DESC);
+CREATE INDEX idx_events_payload ON analytics.events USING GIN(payload);
 ```
-□ 無 OFFSET pagination
-□ RLS 使用 helper function
-□ Append 表有 partition 策略
-□ 大表 Migration 安全（CONCURRENTLY）
-□ JSONB 不做列表過濾
-□ ETL 有 batch 截斷
-□ 聚合查詢有時間邊界
-□ Realtime 訂閱有 scope filter
+
+### Daily Snapshot Tables（每日聚合快照）
+
+**為什麼不用 Materialized View 就好？** 因為 MATVIEW REFRESH 整張重建，歷史資料會丟失。Snapshot table 保留每一天的快照，可做趨勢分析。
+
+```sql
+CREATE TABLE IF NOT EXISTS analytics.daily_shop_stats (
+  id              TEXT PRIMARY KEY DEFAULT public.generate_ulid(),
+  stat_date       DATE NOT NULL,
+  total_orders    INTEGER NOT NULL DEFAULT 0,
+  total_revenue   NUMERIC(14,2) NOT NULL DEFAULT 0,
+  avg_order_value NUMERIC(12,2) NOT NULL DEFAULT 0,
+  CONSTRAINT uq_daily_shop_stats_date UNIQUE (stat_date)
+);
 ```
+
+### Materialized View + REFRESH CONCURRENTLY
+
+```sql
+CREATE MATERIALIZED VIEW IF NOT EXISTS analytics.mv_product_performance AS
+  SELECT p.id, p.title, count(DISTINCT oi.order_id) AS order_count, ...
+  FROM shop.products p JOIN shop.order_items oi ON ...
+  GROUP BY p.id;
+
+-- REFRESH CONCURRENTLY 需要 UNIQUE INDEX
+CREATE UNIQUE INDEX idx_mv_product_perf_id ON analytics.mv_product_performance(id);
+
+-- pg_cron 排程：SELECT cron.schedule('refresh-mv', '0 * * * *', 'REFRESH MATERIALIZED VIEW CONCURRENTLY analytics.mv_product_performance');
+```
+
+### 何時用什麼
+
+| 需求 | 方案 | 範例 |
+|------|------|------|
+| 即時事件追蹤 | Event log（append-only） | `analytics.events` |
+| 每日趨勢分析 | Daily snapshot table | `analytics.daily_shop_stats` |
+| 快速查詢聚合結果 | Materialized View + cron refresh | `analytics.mv_product_performance` |
+| 前端 dashboard | PostgREST function（bridge） | `public.api_analytics_dashboard()` |
 
 ---
 
@@ -110,11 +158,33 @@ default_pool_size = 50
 DB = source of truth + secure enclave
 Storage = 大檔案 + 歷史資料
 Workers = ETL + heavy jobs
+Analytics schema = 跨領域觀測層（不存原始資料，只存聚合/事件/快照）
 ```
 
 **"不是資料庫慢，是查詢寫錯了。"**
 
+## Scaling Checklist
+
+所有期末專題 / 進階專案應通過：
+
+```
+□ 無 OFFSET pagination
+□ RLS 使用 helper function
+□ Append 表有 partition 策略
+□ 大表 Migration 安全（CONCURRENTLY）
+□ JSONB 不做列表過濾（有 GIN index）
+□ 向量搜尋有 HNSW index
+□ 全文搜尋有 GIN index
+□ ETL 有 batch 截斷
+□ 聚合查詢有時間邊界
+□ Realtime 訂閱有 scope filter
+□ Cross-schema analytics 不直接查原始表
+□ 大型欄位用 VIEW 遮蔽
+```
+
 ## 參考來源
 
+- `docs/supabase/migrations/005_analytics_schema.sql` — Event log + Snapshot + MATVIEW
+- `docs/supabase/migrations/006_public_api.sql` — Cross-schema analytics RPC
 - `docs/supabase/e-Commerce/README.md` — Stage 8-10
 - `docs/supabase/crawler/HEAD-FIRST-crawler-db.md` — Stage 5

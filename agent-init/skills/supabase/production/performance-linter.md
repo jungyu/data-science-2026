@@ -70,6 +70,41 @@ SELECT * FROM articles WHERE payload->>'status' = 'failed'  -- ❌
 
 ---
 
+## Rule Group 3a: Index 策略（來自 migrations）
+
+### ❌ JSONB 欄位缺 GIN index
+```sql
+-- ❌ JSONB 被查詢但無 GIN index
+SELECT * FROM rag.chunks WHERE metadata @> '{"lang":"zh"}'::JSONB;
+```
+→ ✅ `CREATE INDEX idx_chunks_metadata ON rag.chunks USING GIN(metadata);`
+
+### ❌ 全文搜尋缺 GIN index
+```sql
+-- ❌ FTS 無 index → seq scan
+WHERE to_tsvector('simple', content) @@ plainto_tsquery('simple', query)
+```
+→ ✅ `CREATE INDEX idx_chunks_fts ON rag.chunks USING GIN(to_tsvector('simple', content));`
+
+### ❌ 向量搜尋缺 HNSW index
+```sql
+-- ❌ embedding <=> query_embedding 無 HNSW → brute force
+ORDER BY embedding <=> query_embedding LIMIT 5;
+```
+→ ✅ `CREATE INDEX idx_chunks_embedding_hnsw ON rag.chunks USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);`
+
+### ❌ Partial index 未使用
+```sql
+-- ❌ 大量 NULL 的 FK 欄位全量 index
+CREATE INDEX idx_pages_crawl_run ON source_pages(crawl_run_id);
+```
+→ ✅ `CREATE INDEX idx_pages_crawl_run ON crawler.source_pages(crawl_run_id) WHERE crawl_run_id IS NOT NULL;`
+
+### ❌ 防重複 pending 任務缺 unique partial index
+→ ✅ `CREATE UNIQUE INDEX uq_crawl_queue_pending ON crawler.crawl_queue(source_id, url) WHERE status = 'pending';`
+
+---
+
 ## Rule Group 4: Migration Safety
 
 ### ❌ 大表建 index 禁止不加 CONCURRENTLY
@@ -118,6 +153,10 @@ CREATE INDEX idx_articles_source ON articles(source_id);  -- ❌ 鎖表
 | 無 PARTITION | Partition + vacuum tuning |
 | BULK DELETE 無 LIMIT | LIMIT 50,000 分批 |
 | 無邊界聚合 | 加時間範圍 |
+| JSONB 無 GIN index | `USING GIN(metadata)` |
+| FTS 無 GIN index | `USING GIN(to_tsvector(...))` |
+| 向量搜尋無 HNSW | `USING hnsw (embedding vector_cosine_ops)` |
+| 大量 NULL FK 全量 index | Partial index `WHERE col IS NOT NULL` |
 
 ---
 

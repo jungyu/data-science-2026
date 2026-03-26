@@ -83,50 +83,160 @@ $$;
 GRANT EXECUTE ON FUNCTION public.is_project_member(TEXT) TO authenticated;
 ```
 
-### 4. Policy 欄位必須有 Index
+### 4. JWT app_metadata 多租戶隔離
+
+**來自 `migrations/003_crawler_schema.sql`**：用 JWT custom claim 做租戶 scoping，不需要 `project_members` 表。
+
+```sql
+-- Helper: 取得當前用戶可存取的 project_ids（從 JWT app_metadata）
+CREATE OR REPLACE FUNCTION crawler.get_my_project_ids()
+RETURNS TEXT[]
+LANGUAGE SQL
+STABLE
+SECURITY DEFINER
+SET search_path = crawler
+AS $$
+  SELECT COALESCE(
+    ARRAY(
+      SELECT jsonb_array_elements_text(
+        (SELECT auth.jwt()) -> 'app_metadata' -> 'project_ids'
+      )
+    ),
+    '{}'::TEXT[]
+  );
+$$;
+
+GRANT EXECUTE ON FUNCTION crawler.get_my_project_ids() TO authenticated;
+
+-- Helper: 檢查用戶是否可存取特定 project
+CREATE OR REPLACE FUNCTION crawler.has_project_access(p_project_id TEXT)
+RETURNS BOOLEAN
+LANGUAGE SQL
+STABLE
+SECURITY DEFINER
+SET search_path = crawler
+AS $$
+  SELECT p_project_id = ANY(crawler.get_my_project_ids());
+$$;
+
+GRANT EXECUTE ON FUNCTION crawler.has_project_access(TEXT) TO authenticated;
+```
+
+**JWT app_metadata 設定方式**：
+
+```sql
+-- Supabase Dashboard → Authentication → Users → Edit User
+-- 或用 SQL：
+UPDATE auth.users SET raw_app_meta_data =
+  raw_app_meta_data || '{"project_ids":["demo-project"]}'::JSONB
+WHERE id = 'user-uuid';
+```
+
+**兩種 Helper 模式比較**：
+
+| 模式 | 資料來源 | 適用場景 |
+|------|---------|---------|
+| `is_project_member()` | `project_members` 表 | 需要角色/權限層級（admin/editor/viewer）|
+| `has_project_access()` | JWT `app_metadata` | 簡單租戶隔離，不需額外表 |
+
+### 5. 多層級 RLS Policy 模式
+
+**來自 `migrations/003_crawler_schema.sql`**：不同類型的表需要不同 RLS 策略。
+
+#### 主表（有 project_id）— 直接 tenant scoping
+
+```sql
+-- sources, crawl_runs, articles 等
+CREATE POLICY "sources_select" ON crawler.sources
+  FOR SELECT TO authenticated
+  USING (crawler.has_project_access(project_id));
+CREATE POLICY "sources_insert" ON crawler.sources
+  FOR INSERT TO authenticated
+  WITH CHECK (crawler.has_project_access(project_id));
+CREATE POLICY "sources_update" ON crawler.sources
+  FOR UPDATE TO authenticated
+  USING (crawler.has_project_access(project_id));
+CREATE POLICY "sources_delete" ON crawler.sources
+  FOR DELETE TO authenticated
+  USING (crawler.has_project_access(project_id));
+```
+
+#### Reference 表（有 project_id + 公開讀取）
+
+```sql
+-- tags, publish_targets — authenticated + anon 可讀
+CREATE POLICY "tags_select" ON crawler.tags
+  FOR SELECT TO authenticated, anon
+  USING (crawler.has_project_access(project_id));
+CREATE POLICY "tags_insert" ON crawler.tags
+  FOR INSERT TO authenticated
+  WITH CHECK (crawler.has_project_access(project_id));
+```
+
+#### Junction 表（無 project_id）— 透過 FK 繼承
+
+```sql
+-- article_tags, article_publications — 無自身 project_id
+CREATE POLICY "article_tags_select" ON crawler.article_tags
+  FOR SELECT TO authenticated, anon USING (true);
+CREATE POLICY "article_tags_insert" ON crawler.article_tags
+  FOR INSERT TO authenticated WITH CHECK (true);
+```
+
+#### Owner-Based（RAG 模式）
+
+**來自 `migrations/004_rag_schema.sql`**：用反正規化 `owner_id` + 組合條件。
+
+```sql
+-- collections: owner 可寫，active 的任何人可讀
+CREATE POLICY "collections_read" ON rag.collections
+  FOR SELECT TO authenticated, anon
+  USING (is_active = TRUE OR owner_id = rag.get_current_owner_id());
+CREATE POLICY "collections_insert" ON rag.collections
+  FOR INSERT TO authenticated
+  WITH CHECK (owner_id = rag.get_current_owner_id());
+
+-- documents: 透過 collection owner 判斷寫入權限
+CREATE POLICY "documents_write" ON rag.documents
+  FOR INSERT TO authenticated
+  WITH CHECK (rag.is_collection_owner(collection_id));
+```
+
+#### 批次建立 Policy（DRY）
+
+```sql
+-- 來自 003_crawler_schema.sql：用 DO block 批次建立
+DO $$
+DECLARE tbl TEXT;
+BEGIN
+  FOREACH tbl IN ARRAY ARRAY[
+    'crawl_runs', 'crawl_queue', 'source_pages', 'articles', 'article_assets'
+  ]
+  LOOP
+    EXECUTE format('
+      CREATE POLICY "%1$s_select" ON crawler.%1$s
+        FOR SELECT TO authenticated
+        USING (crawler.has_project_access(project_id));
+      CREATE POLICY "%1$s_service_role" ON crawler.%1$s
+        FOR ALL TO service_role USING (true) WITH CHECK (true);
+    ', tbl);
+  END LOOP;
+END;
+$$;
+```
+
+### 6. Policy 欄位必須有 Index
 
 ```sql
 -- 單欄 FK index（每張表都要）
-CREATE INDEX idx_<table>_project ON public.<table>(project_id);
+CREATE INDEX idx_<table>_project ON <schema>.<table>(project_id);
 
 -- 權限表的 composite index（效能關鍵）
 CREATE INDEX idx_project_members_project_user_status
   ON public.project_members(project_id, user_id, status);
 ```
 
-### 5. 新表 Policy 模板
-
-```sql
--- 啟用 RLS
-ALTER TABLE public.<table> ENABLE ROW LEVEL SECURITY;
-
--- READ：project member 可讀
-CREATE POLICY "<table>_read_access"
-  ON public.<table> FOR SELECT TO authenticated
-  USING (public.is_project_member(project_id));
-
--- WRITE：project editor 可寫
-CREATE POLICY "<table>_write_access"
-  ON public.<table> FOR INSERT TO authenticated
-  WITH CHECK (public.is_project_member(project_id));
-
--- DELETE：admin only
-CREATE POLICY "<table>_delete_access"
-  ON public.<table> FOR DELETE TO authenticated
-  USING (public.is_project_admin(project_id));
-
--- Service role（ETL/Cron 用）
-CREATE POLICY "<table>_service_role"
-  ON public.<table> FOR ALL TO service_role
-  USING (true) WITH CHECK (true);
-
--- GRANT
-GRANT SELECT ON public.<table> TO authenticated, anon;
-GRANT INSERT, UPDATE, DELETE ON public.<table> TO authenticated;
-GRANT ALL ON public.<table> TO service_role;
-```
-
-### 6. Service Role 使用限制
+### 7. Service Role 使用限制
 
 **僅允許**：
 1. ETL Pipeline（無使用者 Session）
@@ -147,8 +257,13 @@ GRANT ALL ON public.<table> TO service_role;
 | 忘記 SECURITY DEFINER | RLS 遞迴錯誤 | 加在 helper function |
 | 忘記 GRANT | 使用者無法存取 | 加 GRANT 語句 |
 | ETL 被 RLS 擋住 | INSERT 失敗 | 加 service_role policy |
+| Junction 表用 project_id scoping | 無法 JOIN | Junction 表用 `USING (true)` |
+| Helper 沒有 `SET search_path` | search_path injection | 加 `SET search_path = <schema>` |
+| JWT claim 不存在 | policy 永遠 false | 確保 `app_metadata` 有設定 |
 
 ## 參考來源
 
+- `docs/supabase/migrations/003_crawler_schema.sql` — JWT app_metadata + 多層級 RLS
+- `docs/supabase/migrations/004_rag_schema.sql` — Owner-based RLS + 反正規化 owner_id
 - `docs/supabase/e-Commerce/README.md` — Stage 9: 完整 RLS 架構
 - `docs/supabase/crawler/HEAD-FIRST-crawler-db.md` — Stage 4: RLS 修正

@@ -139,6 +139,49 @@ status TEXT NOT NULL DEFAULT 'pending'
 
 避免無效狀態值進入資料庫。
 
+**進階預告**：在生產級 migration 中，狀態機可以更複雜（來自 `migrations/004_rag_schema.sql`）：
+
+```sql
+-- RAG 文件處理管線的完整狀態機
+process_status TEXT NOT NULL DEFAULT 'uploaded',
+CONSTRAINT ck_documents_process_status
+  CHECK (process_status IN (
+    'uploaded', 'parsed', 'chunked', 'embedded', 'ready', 'failed', 'stale'
+  ))
+```
+
+### 6. Audit Trail — created_by
+
+使用者操作的資料，除了時間戳還要記錄「誰做的」：
+
+```sql
+CREATE TABLE predictions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL,
+  -- ... 業務欄位 ...
+  created_by TEXT,                                  -- 誰建立的（audit trail）
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+```
+
+**`created_at` vs `created_by`**：
+- `created_at` = **何時**建立（自動填入）
+- `created_by` = **誰**建立（需要 application 層填入，或 trigger 從 auth.uid() 填入）
+
+### 7. Domain Schema 預告
+
+在基礎階段，所有表放在 `public` schema。但進階專案會用**領域隔離**（來自 `migrations/001_extensions.sql`）：
+
+```sql
+CREATE SCHEMA IF NOT EXISTS shop;       -- 電商
+CREATE SCHEMA IF NOT EXISTS crawler;    -- 爬蟲
+CREATE SCHEMA IF NOT EXISTS rag;        -- 向量搜尋
+CREATE SCHEMA IF NOT EXISTS analytics;  -- 分析觀測
+```
+
+進階內容見 `production/schema-design.md`。
+
 ---
 
 ## 完整範例：hw-01 風格的電商表
@@ -191,8 +234,13 @@ CREATE INDEX idx_orders_customer ON orders(customer_id);
 
 完成基礎後，進入 `production/schema-design.md` 學習：
 - ULID 強制（TEXT PK）
+- Domain-scoped schema（shop/crawler/rag/analytics）
 - 資料分層架構（Raw → Staging → Analytics）
 - 多租戶模型（project_id scoping）
+- 反正規化 + Trigger 同步
+- 狀態機模式（Process State Machine）
+- 欄位級存取控制（Views）
+- 軟外鍵 / 多型關聯
 
 ## 參考來源
 
