@@ -11,6 +11,8 @@ Ch03-03 — 鍵盤快捷鍵與滑鼠操作。
     python ch03-interaction/03_keyboard_mouse.py
 """
 
+import platform
+
 from playwright.sync_api import sync_playwright
 
 
@@ -43,7 +45,7 @@ def main():
         input_box.click()
 
         # 全選文字
-        modifier = "Meta" if p.chromium.name else "Control"  # macOS 用 Meta
+        modifier = "Meta" if platform.system() == "Darwin" else "Control"  # macOS → Meta, 其他 → Control
         page.keyboard.press(f"{modifier}+a")
         print("[鍵盤] 全選文字")
 
