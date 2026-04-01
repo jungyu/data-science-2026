@@ -125,7 +125,7 @@ class WorkerProcessor(Protocol):
 ## 頁面擷取器
 
 ```python
-from playwright.async_api import Page
+from typing import Any
 
 from .db_types import SourceRow
 from .types import (
@@ -136,17 +136,21 @@ from .types import (
 
 class PageExtractor(Protocol):
     async def extract_list(
-        self, page: Page, source: SourceRow
+        self, page: Any, source: SourceRow
     ) -> ListExtractionResult:
         """從列表頁面擷取連結與分頁資訊。"""
         ...
 
     async def extract_article(
-        self, page: Page, source: SourceRow
+        self, page: Any, source: SourceRow
     ) -> ExtractedArticleDraft:
         """從文章頁面擷取正規化的文章內容。"""
         ...
 ```
+
+> `page: Any` 刻意不 import `playwright.async_api.Page`，使 Protocol 本身不依賴 Playwright 套件。
+> 實作端（`ListExtractor`、`ArticleExtractor`）在方法內部自然得到正確的 Playwright `Page` 物件，
+> 型別安全由呼叫端（`PageRunner`）保證。
 
 ---
 

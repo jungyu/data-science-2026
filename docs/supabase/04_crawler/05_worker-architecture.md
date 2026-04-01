@@ -96,7 +96,7 @@ Cloud Run Worker：負責實際 Playwright 執行。
 
 ## 模組結構
 
-### 目前 repo 的實際位置（可執行）
+### Repo 實際位置
 
 ```text
 project-playwright/
@@ -112,31 +112,24 @@ project-playwright/
     worker/
       types.py                # Layer 2：LeasedJob, ProcessResult, WorkerError 等
       service_inputs.py       # Layer 3：Protocol 介面 + ServiceInput dataclass
-      retry.py                # decide_retry(), SourceHealthTracker, DomainLimiter
-      browser_pool.py         # BrowserPool（async，供 Phase 2 使用）
+      retry.py                # decide_retry(), SourceHealthTracker, DomainLimiter（核心邏輯）
+      browser_pool.py         # BrowserPool（async Playwright 瀏覽器池）
+      main.py                 # 持續消費迴圈入口（async）
+      consumer.py             # SupabaseQueueConsumer（實作 QueueConsumer Protocol）
+      page_runner.py          # PageRunner（實作 WorkerProcessor Protocol）
+      extractors/
+        list_extractor.py     # 實作 PageExtractor.extract_list
+        article_extractor.py  # 實作 PageExtractor.extract_article
+      persistence/
+        source_repo.py        # SupabaseSourceRepo（實作 SourceRepository）
+        source_page_repo.py   # SupabaseSourcePageRepo
+        article_repo.py       # SupabaseArticleRepo
+      policies/
+        retry_policy.py       # 薄封裝：re-export retry.py 的 decide_retry()
+        rate_limit_policy.py  # 薄封裝：re-export retry.py 的 DomainLimiter, SourceHealthTracker
 ```
 
-### 生產架構建議（Phase 2+，尚未實作）
-
-```text
-worker/                        ← 獨立部署的 Worker package
-  main.py                      # consume loop 入口（async）
-  consumer.py                  # SupabaseQueueConsumer（實作 QueueConsumer）
-  page_runner.py               # PageRunner（實作 WorkerProcessor）
-  extractors/
-    list_extractor.py          # 實作 PageExtractor.extract_list
-    article_extractor.py       # 實作 PageExtractor.extract_article
-  persistence/
-    source_repo.py             # SupabaseSourceRepo（實作 SourceRepository）
-    source_page_repo.py        # SupabaseSourcePageRepo
-    article_repo.py            # SupabaseArticleRepo
-  policies/
-    retry_policy.py            # decide_retry(), _calculate_backoff()
-    rate_limit_policy.py       # DomainLimiter, SourceHealthTracker
-    robots_policy.py
-```
-
-> 型別定義（`db_types.py`、`types.py`、`service_inputs.py`）兩套架構共用，路徑可隨部署方式調整。
+> 型別定義（`db_types.py`、`types.py`、`service_inputs.py`）與 ch08 同步版共用，路徑不依賴部署方式。
 
 ---
 

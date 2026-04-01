@@ -53,11 +53,12 @@ Json = str | int | float | bool | None | dict[str, Any] | list[Any]
 以下 enum 定義於 `db_types`，在此重新匯出以方便使用：
 
 ```python
-from .db_types import (
+from utils.db_types import (
     CrawlPageType,
     CrawlQueueStatus,
-    CrawlRunStatus,
     CrawlRunLog,
+    CrawlRunStatus,
+    SourcePageSnapshot,
     TaxonomyType,
 )
 ```
@@ -261,7 +262,7 @@ PolicyDecision = PolicyDecisionAllow | PolicyDecisionDelay | PolicyDecisionDeny
 ### 來源頁面快照
 
 ```python
-from .db_types import SourcePageSnapshot  # 重用資料庫型別
+from utils.db_types import SourcePageSnapshot  # 重用資料庫型別
 ```
 
 ### 列表擷取結果
