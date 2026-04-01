@@ -184,7 +184,7 @@ Worker 會：
 | 資料表 | 預期資料 |
 |-------|---------|
 | `sources` | 1 筆（Hacker News 設定） |
-| `crawl_queue` | 2 筆 seed + ~30 筆文章 URL（status: done 或 pending） |
+| `crawl_queue` | 2 筆 seed（done）+ 最多 20 筆文章 URL（pending） |
 | `crawl_runs` | 1 筆（status: success） |
 | `source_pages` | 1 筆（HN 首頁的 raw HTML） |
 | `articles` | ~28 筆（HN 熱門文章） |
@@ -197,7 +197,8 @@ Worker 會：
 
 **接下來可以做的事：**
 
-- 再跑一次 `04_single_job_worker.py`——消費佇列裡的文章 URL，看 `articles` 怎麼去重
+- 再跑一次 `04_single_job_worker.py`——消費一筆文章 URL 任務，看 `articles` 被補入 `content_text` 和 `abstract`
+- 想觀察 **content_hash 去重**：先執行 `03_enqueue_urls.py` 重新塞入 seed URL，再跑 `04_single_job_worker.py`，舊文章的 `updated_at` 不會改變
 - 讀 [03_schema-to-pipeline.md](03_schema-to-pipeline.md)——用圖解理解剛才每一步動了哪張表
 - 讀 [04_data-flow-overview.md](04_data-flow-overview.md)——深入了解 lease 機制與 content_hash
 - 修改 `02_seed_source.py`，換一個你自己想爬的網站試試

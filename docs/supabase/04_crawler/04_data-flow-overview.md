@@ -435,15 +435,18 @@ python ch08-supabase/04_single_job_worker.py
 
 **練習 2：觀察 content_hash 去重**
 
-```bash
-# 跑兩次 Worker，第二次跑同一個 URL 時，articles 的 updated_at 不變
-python ch08-supabase/04_single_job_worker.py   # 第一次：新增
-python ch08-supabase/04_single_job_worker.py   # 消費第二個 URL...
+> **注意**：直接跑兩次 Worker 不會觀察到去重——第二次消費的是佇列裡的下一筆任務（不同 URL）。
+> 要觀察同一 URL 的去重，需要把 seed URL 重新塞回佇列：
 
-# 或手動再塞同一個 seed URL 回佇列，讓 Worker 重抓同一頁
+```bash
+# 把 seed URL 再塞一次回佇列（已完成的 URL 不受 partial unique index 限制）
 python ch08-supabase/03_enqueue_urls.py
+
+# Worker 重抓同一個 HN 首頁
 python ch08-supabase/04_single_job_worker.py
-# → 在 Supabase 查 articles，比對 updated_at 時間
+
+# → 到 Supabase 查 articles：文章 updated_at 沒有改變
+#   因為 content_hash 相同，upsert_article() 跳過了
 ```
 
 **練習 3：觀察 Partial unique index 防重複入列**

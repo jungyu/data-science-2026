@@ -39,8 +39,16 @@ PageRunner                 ← 只依賴 Protocol，不依賴 Supabase
 
 ## 本文件各 Protocol 的對應實作
 
-| Protocol | 實作位置 | 說明 |
-|----------|---------|------|
+> ⚠️ **以下表格是 Phase 2 規劃位置，目前 repo 中尚未存在這些模組。**
+> `consumer.py`、`page_runner.py`、`persistence/`、`extractors/` 是生產架構的設計目標，
+> 見 [05_worker-architecture.md](05_worker-architecture.md) 的「生產架構建議（Phase 2+，尚未實作）」。
+>
+> 目前 repo 中已存在的實作：
+> - **`utils/worker/service_inputs.py`** — 本文件所有 Protocol 定義所在
+> - **`ch08-supabase/04_single_job_worker.py`** — 同步簡化版，可直接執行
+
+| Protocol | Phase 2 規劃實作位置 | 說明 |
+|----------|---------------------|------|
 | `QueueConsumer` | `consumer.py` → `SupabaseQueueConsumer` | Lease RPC 操作 |
 | `WorkerProcessor` | `page_runner.py` → `PageRunner` | 單任務完整處理 |
 | `PageExtractor` | `extractors/` → `ListExtractor` / `ArticleExtractor` | 頁面內容擷取 |
