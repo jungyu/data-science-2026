@@ -7,10 +7,17 @@ Ch05-01 — 提取文字、屬性、HTML 內容。
     python ch05-data-extraction/01_text_extraction.py
 """
 
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from utils.console import setup_stdout
+
 from playwright.sync_api import sync_playwright
 
 
 def main():
+    setup_stdout()
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()

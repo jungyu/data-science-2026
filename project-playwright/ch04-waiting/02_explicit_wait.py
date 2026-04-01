@@ -11,10 +11,17 @@ Ch04-02 — 顯式等待策略。
     python ch04-waiting/02_explicit_wait.py
 """
 
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from utils.console import setup_stdout
+
 from playwright.sync_api import sync_playwright
 
 
 def main():
+    setup_stdout()
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
@@ -59,11 +66,11 @@ def main():
 
         # 斷言元素可見（會自動重試直到通過或超時）
         expect(page.locator("article")).to_be_visible()
-        print("[斷言] article 確認可見 ✓")
+        print("[斷言] article 確認可見")
 
         # 斷言頁面標題包含特定文字
         expect(page).to_have_title("Installation | Playwright Python")
-        print(f"[斷言] 頁面標題正確 ✓")
+        print("[斷言] 頁面標題正確")
 
         browser.close()
 

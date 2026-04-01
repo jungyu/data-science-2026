@@ -12,11 +12,17 @@ Ch03-03 — 鍵盤快捷鍵與滑鼠操作。
 """
 
 import platform
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from utils.console import setup_stdout
 
 from playwright.sync_api import sync_playwright
 
 
 def main():
+    setup_stdout()
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
@@ -53,18 +59,19 @@ def main():
         page.keyboard.press("Backspace")
         print("[鍵盤] 刪除選取內容")
 
-        # --- type()：逐字輸入（模擬真實打字速度）---
-        input_box.type("Playwright 很好用", delay=50)
+        # --- press_sequentially()：逐字輸入（模擬真實打字速度）---
+        # 注意：舊式 locator.type() 已棄用，改用 press_sequentially()
+        input_box.press_sequentially("Playwright 很好用", delay=50)
         print(f"[打字] 逐字輸入完成: {input_box.input_value()}")
 
         # --- 鍵盤：在 textarea 中輸入多行 ---
         textarea = page.locator("#textarea1")
         textarea.click()
-        textarea.type("第一行文字")
+        textarea.press_sequentially("第一行文字")
         page.keyboard.press("Enter")
-        textarea.type("第二行文字")
+        textarea.press_sequentially("第二行文字")
         page.keyboard.press("Enter")
-        textarea.type("第三行文字")
+        textarea.press_sequentially("第三行文字")
         print("[多行] 已在 textarea 輸入三行")
 
         # --- 滑鼠：hover ---
@@ -72,7 +79,7 @@ def main():
         hover_target.hover()
         hover_result = page.locator("#hover-result")
         is_visible = hover_result.is_visible()
-        print(f"\n[滑鼠] Hover 結果: {'偵測成功 ✓' if is_visible else '未偵測到'}")
+        print(f"\n[滑鼠] Hover 結果: {'偵測成功' if is_visible else '未偵測到'}")
 
         # --- 鍵盤：Tab 在欄位間切換 ---
         input_box.focus()

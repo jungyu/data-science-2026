@@ -10,7 +10,12 @@ Ch05-03 — 匯出為 JSON 和 CSV。
 
 import csv
 import json
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from utils.console import setup_stdout
+
 from playwright.sync_api import sync_playwright
 
 OUTPUT_DIR = Path(__file__).parent.parent / "output"
@@ -57,6 +62,7 @@ def export_csv(data: list[dict], filepath: Path):
 
 
 def main():
+    setup_stdout()
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     with sync_playwright() as p:
@@ -68,17 +74,10 @@ def main():
         page.wait_for_load_state("domcontentloaded")
 
         data = scrape_links(page)
-        print(f"[擷取] 共取得 {len(data)} 個連結\n")
+        print(f"[擷取] 共取得 {len(data)} 個連結")
 
-        # 預覽前 5 筆
-        for item in data[:5]:
-            icon = "🌐" if item["is_external"] else "📄"
-            print(f"  {icon} [{item['text'][:30]}] → {item['url'][:50]}")
-
-        # 匯出 JSON
+        # 先匯出檔案，確保資料落地後再印預覽
         export_json(data, OUTPUT_DIR / "links.json")
-
-        # 匯出 CSV
         export_csv(data, OUTPUT_DIR / "links.csv")
 
         # 匯出統計摘要
@@ -90,10 +89,17 @@ def main():
         }
         with open(OUTPUT_DIR / "links_summary.json", "w", encoding="utf-8") as f:
             json.dump(summary, f, ensure_ascii=False, indent=2)
-        print(f"[JSON] 已匯出摘要 → {OUTPUT_DIR / 'links_summary.json'}")
+        print(f"[JSON] 已匯出摘要 -> {OUTPUT_DIR / 'links_summary.json'}")
 
         browser.close()
-        print(f"\n✅ 所有檔案已匯出至 {OUTPUT_DIR}/")
+
+    # 預覽前 5 筆（在瀏覽器關閉後印出，不影響匯出流程）
+    print("\n[預覽] 前 5 筆連結：")
+    for item in data[:5]:
+        icon = "[EXT]" if item["is_external"] else "[INT]"
+        print(f"  {icon} [{item['text'][:30]}] -> {item['url'][:50]}")
+
+    print(f"\n[完成] 所有檔案已匯出至 {OUTPUT_DIR}/")
 
 
 if __name__ == "__main__":

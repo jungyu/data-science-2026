@@ -7,13 +7,19 @@ Ch01-03 — 將網頁匯出為 PDF。
     python ch01-first-steps/03_pdf_export.py
 """
 
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from utils.console import setup_stdout
+
 from playwright.sync_api import sync_playwright
 
 OUTPUT_DIR = Path(__file__).parent.parent / "output"
 
 
 def main():
+    setup_stdout()
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     with sync_playwright() as p:

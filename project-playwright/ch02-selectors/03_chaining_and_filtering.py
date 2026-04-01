@@ -8,10 +8,17 @@ Ch02-03 — 鏈式選擇（Chaining）與篩選（Filtering）。
     python ch02-selectors/03_chaining_and_filtering.py
 """
 
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from utils.console import setup_stdout
+
 from playwright.sync_api import sync_playwright
 
 
 def main():
+    setup_stdout()
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
@@ -38,8 +45,12 @@ def main():
         if nav_links.count() > 0:
             first_link = nav_links.first
             last_link = nav_links.last
-            print(f"\n[nth] 第一個導覽連結: {first_link.text_content().strip()}")
-            print(f"[nth] 最後一個導覽連結: {last_link.text_content().strip()}")
+            # text_content() 可能為 None（icon-only link）；退而顯示 href
+            def link_label(loc) -> str:
+                text = (loc.text_content() or "").strip()
+                return text or loc.get_attribute("href") or "<no text>"
+            print(f"\n[nth] 第一個導覽連結: {link_label(first_link)}")
+            print(f"[nth] 最後一個導覽連結: {link_label(last_link)}")
 
         # --- 實用模式：逐一處理匹配結果 ---
         print("\n所有導覽連結的 href：")

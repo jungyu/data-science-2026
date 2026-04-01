@@ -5,7 +5,6 @@
 - 模擬使用者操作：點擊、輸入、選擇
 - 表單填寫與送出
 - 鍵盤與滑鼠進階操作
-- 檔案上傳
 
 ## 核心觀念
 
@@ -23,6 +22,6 @@ page.get_by_role("button", name="送出").click()
 
 | 檔案 | 說明 |
 |------|------|
-| `01_click_and_type.py` | 基本點擊與文字輸入 |
-| `02_form_operations.py` | 下拉選單、核取方塊、單選鈕 |
-| `03_keyboard_mouse.py` | 鍵盤快捷鍵與滑鼠操作 |
+| `01_click_and_type.py` | 基本點擊與文字輸入（使用 DuckDuckGo，selector 可能隨網站改版變動） |
+| `02_form_operations.py` | 下拉選單、核取方塊、單選鈕（使用自建 HTML，結果穩定） |
+| `03_keyboard_mouse.py` | 鍵盤快捷鍵與滑鼠操作（使用自建 HTML，結果穩定） |

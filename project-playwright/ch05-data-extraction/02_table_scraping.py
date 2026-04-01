@@ -8,6 +8,12 @@ Ch05-02 — 表格資料爬取與結構化。
     python ch05-data-extraction/02_table_scraping.py
 """
 
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from utils.console import setup_stdout
+
 from playwright.sync_api import sync_playwright
 
 
@@ -42,6 +48,7 @@ def scrape_table(page, table_selector: str) -> list[dict]:
 
 
 def main():
+    setup_stdout()
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
@@ -55,7 +62,7 @@ def main():
                     <tr>
                         <th>城市</th>
                         <th>人口（萬）</th>
-                        <th>面積（km²）</th>
+                        <th>面積（km^2）</th>
                         <th>人口密度</th>
                     </tr>
                 </thead>
@@ -75,10 +82,10 @@ def main():
         data = scrape_table(page, "#population")
 
         print(f"[表格] 爬取到 {len(data)} 筆資料\n")
-        print(f"{'城市':<8} {'人口（萬）':>10} {'面積（km²）':>12} {'人口密度':>10}")
+        print(f"{'城市':<8} {'人口（萬）':>10} {'面積（km^2）':>12} {'人口密度':>10}")
         print("-" * 48)
         for row in data:
-            print(f"{row['城市']:<8} {row['人口（萬）']:>10} {row['面積（km²）']:>12} {row['人口密度']:>10}")
+            print(f"{row['城市']:<8} {row['人口（萬）']:>10} {row['面積（km^2）']:>12} {row['人口密度']:>10}")
 
         # 如果有安裝 pandas，可直接轉成 DataFrame
         try:

@@ -11,10 +11,17 @@ Ch02-01 — Locator API 基礎用法。
     python ch02-selectors/01_locator_basics.py
 """
 
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from utils.console import setup_stdout
+
 from playwright.sync_api import sync_playwright
 
 
 def main():
+    setup_stdout()
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
@@ -28,8 +35,9 @@ def main():
         docs_link = page.locator("text=Docs")
         print(f"[Text] 'Docs' 連結存在: {docs_link.count() > 0}")
 
-        # --- 組合選擇器：CSS + 文字 ---
-        nav_docs = page.locator("nav >> text=Docs")
+        # --- 組合選擇器：先定位 nav，再用文字縮小範圍 ---
+        # 注意：舊式 "nav >> text=Docs" 語法已棄用，改用鏈式 locator
+        nav_docs = page.locator("nav").get_by_text("Docs")
         print(f"[組合] nav 中的 'Docs': {nav_docs.count() > 0}")
 
         # --- 屬性選擇器 ---

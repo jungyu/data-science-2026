@@ -10,13 +10,20 @@ Ch01-02 — 導航至多個頁面並截圖。
     python ch01-first-steps/02_navigate_and_screenshot.py
 """
 
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from utils.console import setup_stdout
+
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 from playwright.sync_api import sync_playwright
 
 OUTPUT_DIR = Path(__file__).parent.parent / "output" / "screenshots"
 
 
-def main():
+def main() -> None:
+    setup_stdout()
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     with sync_playwright() as p:
@@ -38,14 +45,23 @@ def main():
         )
         print(f"[截圖] playwright.dev 全頁 → {OUTPUT_DIR / 'playwright_fullpage.png'}")
 
-        # --- 範例 3：指定元素截圖 ---
-        hero = page.locator("main .hero")
-        if hero.count() > 0:
-            hero.first.screenshot(path=str(OUTPUT_DIR / "playwright_hero.png"))
-            print(f"[截圖] hero 區塊 → {OUTPUT_DIR / 'playwright_hero.png'}")
+        # --- 範例 3：指定元素截圖（外部網站 DOM 可能隨時更新，允許略過）---
+        # 注意：selector 依賴第三方網站結構，若找不到元素會提示略過而非報錯
+        try:
+            hero = page.locator("h1").first
+            if hero.count() > 0:
+                hero.screenshot(path=str(OUTPUT_DIR / "playwright_hero.png"))
+                print(f"[截圖] h1 標題區塊 → {OUTPUT_DIR / 'playwright_hero.png'}")
+            else:
+                print("[略過] 找不到 h1 元素，跳過區塊截圖。")
+        except PlaywrightTimeoutError:
+            print("[略過] 元素截圖逾時，跳過區塊截圖。")
+        except Exception as e:
+            print(f"[略過] 元素截圖失敗（{e}），跳過區塊截圖。")
 
         browser.close()
-        print("\n✅ 所有截圖完成！請查看 output/screenshots/ 資料夾。")
+
+    print("\n[完成] 所有截圖完成，請查看 output/screenshots/ 資料夾。")
 
 
 if __name__ == "__main__":

@@ -8,10 +8,17 @@ Ch03-02 — 表單操作：下拉選單、核取方塊、單選鈕。
     python ch03-interaction/02_form_operations.py
 """
 
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from utils.console import setup_stdout
+
 from playwright.sync_api import sync_playwright
 
 
 def main():
+    setup_stdout()
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
@@ -66,7 +73,7 @@ def main():
         # 驗證核取狀態
         is_python = page.get_by_label("Python").is_checked()
         is_js = page.get_by_label("JavaScript").is_checked()
-        print(f"  Python: {'✓' if is_python else '✗'}, JavaScript: {'✓' if is_js else '✗'}")
+        print(f"  Python: {'OK' if is_python else 'NO'}, JavaScript: {'OK' if is_js else 'NO'}")
 
         # --- check()：單選鈕 ---
         page.get_by_label("中級").check()

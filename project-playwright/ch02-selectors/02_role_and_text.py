@@ -8,10 +8,17 @@ Playwright 的 get_by_role() 對應 ARIA 角色，是最推薦的選擇方式，
     python ch02-selectors/02_role_and_text.py
 """
 
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from utils.console import setup_stdout
+
 from playwright.sync_api import sync_playwright
 
 
 def main():
+    setup_stdout()
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()

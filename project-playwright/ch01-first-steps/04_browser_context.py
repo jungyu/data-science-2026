@@ -12,10 +12,17 @@ BrowserContext 類似「無痕視窗」，每個 Context 有獨立的：
     python ch01-first-steps/04_browser_context.py
 """
 
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from utils.console import setup_stdout
+
 from playwright.sync_api import sync_playwright
 
 
 def main():
+    setup_stdout()
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
 

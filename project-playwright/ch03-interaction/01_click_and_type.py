@@ -10,20 +10,31 @@ Ch03-01 — 基本點擊與文字輸入。
     python ch03-interaction/01_click_and_type.py
 """
 
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from utils.console import setup_stdout
+
 from playwright.sync_api import sync_playwright
 
 
 def main():
+    setup_stdout()
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
 
         # 導航至 DuckDuckGo
-        page.goto("https://duckduckgo.com")
+        # wait_until="domcontentloaded" 確保 DOM 就緒再找搜尋框
+        page.goto("https://duckduckgo.com", wait_until="domcontentloaded")
         print(f"[導航] {page.url}")
 
         # --- fill()：清除並填入文字 ---
-        search_box = page.get_by_role("textbox", name="Search")
+        # 注意：get_by_role("textbox", name="Search") 依賴 accessible name，
+        # DuckDuckGo 改版後可能失效；改用 attribute selector 更穩定。
+        search_box = page.locator("input[name='q']").first
+        search_box.wait_for()
         search_box.fill("Playwright Python tutorial")
         print("[輸入] 已填入搜尋關鍵字")
 
@@ -31,8 +42,9 @@ def main():
         search_box.press("Enter")
         print("[按鍵] 按下 Enter")
 
-        # 等待搜尋結果載入
+        # 等待搜尋結果載入：先等導航完成，再等結果清單出現
         page.wait_for_load_state("domcontentloaded")
+        page.wait_for_selector("[data-testid='result']", timeout=10000)
         print(f"[結果] 頁面標題: {page.title()}")
 
         # --- click()：點擊元素 ---

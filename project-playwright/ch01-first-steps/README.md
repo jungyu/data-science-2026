@@ -33,6 +33,6 @@ with sync_playwright() as p:
 
 ## 練習
 
-1. 修改 `01_open_browser.py`，改用 `headed` 模式觀察瀏覽器實際動作
+1. 執行 `01_open_browser.py`（預設 headed 模式），觀察瀏覽器開啟過程；再加上 `--headless` 旗標比較兩者差異
 2. 在 `02_navigate_and_screenshot.py` 中加入你常用的網站
 3. 嘗試用 `firefox` 取代 `chromium` 看看有什麼差異

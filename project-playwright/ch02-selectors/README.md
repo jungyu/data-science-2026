@@ -39,6 +39,10 @@ element = page.query_selector("button.submit")
 | `02_role_and_text.py` | 以角色和文字定位元素 |
 | `03_chaining_and_filtering.py` | 鏈式選擇與篩選技巧 |
 
+## 注意事項
+
+本章範例使用真實網站（`playwright.dev`）作為練習對象。網站改版後，元素數量、導覽結構和文字內容可能改變。學習重點應放在 **selector 的語意與策略**，而非固定的匹配數量。
+
 ## 練習
 
 1. 用 `get_by_role()` 找到頁面上所有的連結
