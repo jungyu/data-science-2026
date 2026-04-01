@@ -23,9 +23,25 @@ def test_example(page):
 
 ## 執行測試
 
+測試分兩類：
+
+| 類別 | 標記 | 說明 |
+|------|------|------|
+| 基礎測試 | 無（預設執行） | `test_basic.py`：example.com / playwright.dev，穩定 |
+| E2E 測試 | `@pytest.mark.network` | `test_e2e_search.py`：DuckDuckGo，依賴外站 DOM |
+
+E2E 測試預設跳過，避免學生因外站 DOM 改版或網路問題
+誤以為是自己的程式寫錯。
+
 ```bash
-# 基本執行
+# 基礎測試（預設，不跑 E2E）
 pytest ch07-testing/
+
+# 全部執行，包含 E2E
+pytest ch07-testing/ --run-network
+
+# 只跑 E2E
+pytest ch07-testing/ -m network --run-network
 
 # 顯示瀏覽器畫面
 pytest ch07-testing/ --headed

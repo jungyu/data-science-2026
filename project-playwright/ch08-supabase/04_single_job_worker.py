@@ -90,13 +90,19 @@ def finish_run(run_id: str, stats: dict) -> None:
 # ── Step 2: crawl_queue（lease） ──────────────────────────────────
 
 def lease_next_job(source_id: str) -> dict | None:
-    """從 crawl_queue 搶一筆 pending 任務（lease）。
+    """從 crawl_queue 搶一筆屬於指定 source 的 pending 任務（lease）。
 
     使用 crawler.lease_next_crawl_job() RPC，內部以
     FOR UPDATE SKIP LOCKED 實現多 Worker 並行安全搶單。
 
+    ⚠️  RPC 不過濾 source_id（依優先度搶全局最高優先任務）。
+    搶到後做 post-lease 檢查：若不屬於目標 source，
+    立即釋放回 pending，讓其他 Worker 或下次呼叫再接手。
+
+    這是在 RPC 不支援 source 過濾時的標準處理模式。
+
     Returns:
-        搶到的佇列列（dict），或 None（佇列空）
+        搶到的佇列行（dict），或 None（佇列空 / 無該 source 任務）
     """
     result = (
         get_supabase()
@@ -109,6 +115,25 @@ def lease_next_job(source_id: str) -> dict | None:
         return None
 
     job = jobs[0]
+
+    # Post-lease source 驗證：確認租到的任務確實屬於指定 source
+    if job["source_id"] != source_id:
+        logger.warning(
+            "租到的任務屬於不同 source（預期 %s，得到 %s）→ 釋放回佇列",
+            source_id, job["source_id"],
+        )
+        # 用 lease_token 作樂觀鎖釋放：重設為 pending，清除 lease 欄位
+        # 如果 lease 在這期間過期，update 會因 token 不符而靜默失效——沒關係，
+        # 到期後佇列會自動回收。
+        get_crawler_table("crawl_queue").update({
+            "status": CrawlQueueStatus.PENDING.value,
+            "lease_token": None,
+            "leased_at": None,
+            "lease_expires_at": None,
+            "worker_id": None,
+        }).eq("id", job["id"]).eq("lease_token", job["lease_token"]).execute()
+        return None
+
     logger.info("lease 成功：job_id=%s url=%s", job["id"], job["url"])
     return job
 
@@ -224,6 +249,46 @@ def extract_hn_articles(page) -> list[dict]:
     return articles
 
 
+# ── Step 5b: 擷取文章頁內容 ──────────────────────────────────────
+
+def extract_article_page(page) -> dict:
+    """從任意文章頁面擷取最小可用內容。
+
+    HN 的文章 URL 指向外部網站，各站結構差異極大。
+    這裡只取三件事：title、meta description、正文前 2000 字。
+    生產環境會為各站寫專屬 extractor；此處示範通用最小版。
+
+    對應 docs 的 extractors/article_extractor.py 職責：
+    給定已載入的 page，回傳結構化的文章草稿。
+    """
+    title = page.title() or ""
+
+    # meta description（大多數站都有）
+    abstract = ""
+    meta_el = page.locator('meta[name="description"]')
+    if meta_el.count() > 0:
+        abstract = meta_el.get_attribute("content") or ""
+
+    # 正文前段：優先 <article>，其次 <main>，fallback <body>
+    # 取前 2000 字避免存入過多雜訊
+    content_text = ""
+    for selector in ["article", "main", "body"]:
+        el = page.locator(selector)
+        if el.count() > 0:
+            try:
+                content_text = el.first.inner_text()[:2000]
+            except Exception:
+                pass
+            if content_text.strip():
+                break
+
+    return {
+        "title": title,
+        "abstract": abstract,
+        "content_text": content_text,
+    }
+
+
 # ── Step 6: articles upsert ───────────────────────────────────────
 
 def compute_content_hash(title: str, source_url: str) -> str:
@@ -277,6 +342,57 @@ def upsert_article(
         extraction_data=ArticleExtractionData(
             extractor_version="ch08-v1",
         ),
+    )
+    result = (
+        get_crawler_table("articles")
+        .upsert(to_insert_dict(insert), on_conflict="source_id,source_url")
+        .execute()
+    )
+    return result.data[0]["id"], True
+
+
+def upsert_article_content(
+    source_id: str,
+    source_page_id: str,
+    url: str,
+    content: dict,
+) -> tuple[str, bool]:
+    """用抓到的文章頁面內容更新 articles（以 source_url 定位）。
+
+    列表頁 worker 執行時已建立骨架（title + source_url）；
+    文章頁 worker 負責補入 content_text、abstract、content_hash。
+
+    若文章骨架尚未存在（直接 crawl article URL 的情況），
+    則插入新記錄。
+
+    使用 content_text 的 hash 做去重：內容未變則不更新。
+    """
+    content_text = content.get("content_text") or ""
+    new_hash = hashlib.sha256(content_text.encode()).hexdigest()
+
+    # 查現有記錄（可能由列表頁 worker 建立）
+    existing = (
+        get_crawler_table("articles")
+        .select("id, content_hash")
+        .eq("source_id", source_id)
+        .eq("source_url", url)
+        .execute()
+    )
+    if existing.data and existing.data[0]["content_hash"] == new_hash:
+        return existing.data[0]["id"], False  # 內容未變，跳過
+
+    title = content.get("title") or url  # fallback to URL if page has no title
+
+    insert = ArticleInsert(
+        project_id=PROJECT_ID,
+        source_id=source_id,
+        source_page_id=source_page_id,
+        title=title,
+        source_url=url,
+        abstract=content.get("abstract") or None,
+        content_text=content_text or None,
+        content_hash=new_hash,
+        extraction_data=ArticleExtractionData(extractor_version="ch08-article-v1"),
     )
     result = (
         get_crawler_table("articles")
@@ -369,26 +485,41 @@ def run_single_job(source_code: str) -> None:
             logger.info("source_page 已儲存：%s（HTTP %s）", source_page_id, http_status)
 
             # ── Step 5 & 6: 擷取 + upsert 文章 ──────────────────
-            articles_data = []
+            #
+            # page_type == list：從列表頁解析文章骨架（title + url），
+            #   upsert 到 articles，並將文章 URL 加入佇列等待 article worker。
+            #
+            # page_type == article：訪問文章頁本身，擷取 content_text，
+            #   更新 articles 記錄（補入列表頁 worker 留下的骨架）。
+            #
+            new_urls_to_enqueue = []
+
             if page_type == CrawlPageType.LIST.value:
                 articles_data = extract_hn_articles(page)
-                logger.info("擷取到 %d 篇文章", len(articles_data))
+                logger.info("擷取到 %d 篇文章連結", len(articles_data))
 
-            new_urls_to_enqueue = []
-            for article_data in articles_data:
-                article_id, updated = upsert_article(
-                    source_id, source_page_id, article_data
+                for article_data in articles_data:
+                    article_id, updated = upsert_article(
+                        source_id, source_page_id, article_data
+                    )
+                    if updated:
+                        stats["articles_extracted"] += 1
+                        logger.info("  [新增/更新] %s", article_data["title"][:50])
+                        # 收集外部文章 URL 以便後續排入佇列
+                        if article_data["source_url"].startswith("http"):
+                            new_urls_to_enqueue.append(article_data["source_url"])
+
+            elif page_type == CrawlPageType.ARTICLE.value:
+                # 文章頁：擷取內容並補全 articles 記錄
+                content = extract_article_page(page)
+                article_id, updated = upsert_article_content(
+                    source_id, source_page_id, url, content
                 )
                 if updated:
                     stats["articles_extracted"] += 1
-                    logger.info(
-                        "  [%s] %s",
-                        "新增" if updated else "跳過",
-                        article_data["title"][:50],
-                    )
-                    # 收集外部文章 URL 以便後續排入佇列
-                    if article_data["source_url"].startswith("http"):
-                        new_urls_to_enqueue.append(article_data["source_url"])
+                    logger.info("  [內容更新] %s", content["title"][:50])
+                else:
+                    logger.info("  [內容未變，跳過] %s", url)
 
             # 將發現的文章 URL 塞入 crawl_queue（priority 較低）
             if new_urls_to_enqueue:
