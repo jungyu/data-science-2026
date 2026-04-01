@@ -124,11 +124,14 @@ python ch08-supabase/02_seed_source.py
 # 3. 塞入種子 URL
 python ch08-supabase/03_enqueue_urls.py
 
-# 4. 執行單次 Worker（消費一筆佇列任務）
+# 4a. 單次執行（消費一筆佇列任務）
 python ch08-supabase/04_single_job_worker.py
 
-# 重複執行 04 以消化更多佇列任務
-python ch08-supabase/04_single_job_worker.py
+# 4b. 連續消費（自動跑完全部 pending 任務）
+python ch08-supabase/04_single_job_worker.py --loop
+
+# 4c. 連續消費，自訂空佇列等待時間
+python ch08-supabase/04_single_job_worker.py --loop --idle-wait 5
 ```
 
 **Windows PowerShell：**
@@ -139,6 +142,7 @@ python ch08-supabase\01_connect_supabase.py
 python ch08-supabase\02_seed_source.py
 python ch08-supabase\03_enqueue_urls.py
 python ch08-supabase\04_single_job_worker.py
+python ch08-supabase\04_single_job_worker.py --loop
 ```
 
 ---

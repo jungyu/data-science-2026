@@ -96,74 +96,33 @@ def finish_run(run_id: str, stats: dict, *, run_status: CrawlRunStatus) -> None:
 
 # ── Step 2: crawl_queue（lease） ──────────────────────────────────
 
-# RPC 不支援 source 過濾，最多嘗試幾次以找到目標 source 的任務。
-# 若佇列中有低優先度的目標任務，但更高優先任務全屬其他 source，
-# 有界重試能找到它；達到上限才認定「無匹配任務」。
-_MAX_LEASE_ATTEMPTS = 5
-
-
-def _release_job(job: dict) -> None:
-    """用 lease_token 樂觀鎖把任務釋放回 pending。
-
-    若 lease 已到期被其他 Worker 接手，update 因 token 不符而靜默失效——
-    到期後佇列會自動回收，不需額外處理。
-    """
-    get_crawler_table("crawl_queue").update({
-        "status": CrawlQueueStatus.PENDING.value,
-        "lease_token": None,
-        "leased_at": None,
-        "lease_expires_at": None,
-        "worker_id": None,
-    }).eq("id", job["id"]).eq("lease_token", job["lease_token"]).execute()
-
-
 def lease_next_job(source_id: str) -> dict | None:
     """從 crawl_queue 搶一筆屬於指定 source 的 pending 任務（lease）。
 
-    使用 crawler.lease_next_crawl_job() RPC，內部以
-    FOR UPDATE SKIP LOCKED 實現多 Worker 並行安全搶單。
-
-    ⚠️  RPC 不過濾 source_id（依優先度搶全局最高優先任務）。
-    搶到後做 post-lease 檢查：若不屬於目標 source，
-    釋放回 pending，再試一次，最多重試 _MAX_LEASE_ATTEMPTS 次。
-
-    有界重試的意義：若目標 source 的任務優先度較低，
-    上方有其他 source 的任務，有界重試能「跳過」它們找到正確任務，
-    而不是在第一次不符就誤報「佇列空」。
+    使用 crawler.lease_next_crawl_job(source_id, worker_id) RPC，
+    DB 內部直接過濾 source_id，以 FOR UPDATE SKIP LOCKED 原子搶單，
+    無需應用層 retry / release loop。
 
     Returns:
-        搶到的佇列行（dict），或 None（佇列空 / 無該 source 任務）
+        搶到的佇列行（dict），或 None（佇列空 / 無該 source 的 pending 任務）
     """
-    for attempt in range(1, _MAX_LEASE_ATTEMPTS + 1):
-        result = (
-            get_supabase()
-            .schema("crawler")
-            .rpc("lease_next_crawl_job", {"p_worker_id": WORKER_ID})
-            .execute()
-        )
-        jobs = result.data or []
-        if not jobs:
-            logger.info("佇列已空（第 %d 次嘗試）", attempt)
-            return None
-
-        job = jobs[0]
-
-        if job["source_id"] == source_id:
-            logger.info("lease 成功（第 %d 次）：job_id=%s url=%s", attempt, job["id"], job["url"])
-            return job
-
-        # source 不符：釋放回 pending，下一輪再試
-        logger.warning(
-            "第 %d/%d 次：租到不同 source 的任務（預期 %s，得到 %s）→ 釋放，繼續尋找",
-            attempt, _MAX_LEASE_ATTEMPTS, source_id, job["source_id"],
-        )
-        _release_job(job)
-
-    logger.info(
-        "達到最大嘗試次數（%d），找不到 source='%s' 的待執行任務",
-        _MAX_LEASE_ATTEMPTS, source_id,
+    result = (
+        get_supabase()
+        .schema("crawler")
+        .rpc("lease_next_crawl_job", {
+            "p_source_id": source_id,
+            "p_worker_id": WORKER_ID,
+        })
+        .execute()
     )
-    return None
+    jobs = result.data or []
+    if not jobs:
+        logger.info("佇列已空，無 source='%s' 的待執行任務", source_id)
+        return None
+
+    job = jobs[0]
+    logger.info("lease 成功：job_id=%s url=%s", job["id"], job["url"])
+    return job
 
 
 def finish_job(job: dict, status: CrawlQueueStatus, error_msg: str | None = None) -> None:
@@ -464,7 +423,7 @@ def run_single_job(source_code: str) -> None:
     if job is None:
         logger.info("找不到屬於 source='%s' 的待執行任務（請先執行 03_enqueue_urls.py）", source_code)
         finish_run(run_id, stats, run_status=CrawlRunStatus.SUCCESS)
-        return
+        raise _QueueEmpty(source_code)
 
     url = job["url"]
     page_type = job["page_type"]
@@ -604,22 +563,72 @@ def run_single_job(source_code: str) -> None:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="執行一次 Playwright Worker")
+    parser = argparse.ArgumentParser(description="Playwright Worker")
     parser.add_argument(
         "--source", default="hacker-news",
         help="source code（預設：hacker-news）"
     )
+    parser.add_argument(
+        "--loop", action="store_true",
+        help="持續消費佇列，直到無 pending 任務為止"
+    )
+    parser.add_argument(
+        "--idle-wait", type=int, default=3, metavar="SEC",
+        help="--loop 模式下佇列為空時的等待秒數（預設：3）"
+    )
     args = parser.parse_args()
 
     print("=" * 50)
-    print(f"Ch08-04 — Single Job Worker（{WORKER_ID}）")
+    print(f"Ch08-04 — Worker（{WORKER_ID}）")
+    if args.loop:
+        print("模式：連續消費（--loop）")
+    else:
+        print("模式：單次執行")
     print("=" * 50)
 
     try:
-        run_single_job(args.source)
+        if args.loop:
+            _run_loop(args.source, idle_wait=args.idle_wait)
+        else:
+            run_single_job(args.source)
     except ValueError as e:
         print(f"[NG] {e}")
         sys.exit(1)
+    except KeyboardInterrupt:
+        print("\n[停止] 收到中斷信號，Worker 已退出。")
+
+
+def _run_loop(source_code: str, idle_wait: int = 3) -> None:
+    """持續消費佇列，直到連續 idle_wait 秒無任務才停止。
+
+    每跑完一個 job 立即嘗試搶下一個，佇列空時等待後再試。
+    按 Ctrl-C 可安全中斷（當前 job 完成後退出）。
+    """
+    import time
+
+    total_jobs = 0
+    consecutive_empty = 0
+    # 連續 3 次空佇列（共等 idle_wait*3 秒）才視為佇列耗盡而退出
+    _MAX_EMPTY = 3
+
+    print(f"[loop] 開始連續消費 source={source_code}，空佇列等待 {idle_wait}s x {_MAX_EMPTY} 次後退出")
+
+    while True:
+        try:
+            run_single_job(source_code)
+            total_jobs += 1
+            consecutive_empty = 0
+        except _QueueEmpty:
+            consecutive_empty += 1
+            if consecutive_empty >= _MAX_EMPTY:
+                print(f"\n[loop] 佇列連續空 {_MAX_EMPTY} 次，退出。共處理 {total_jobs} 個任務。")
+                return
+            logger.info("佇列暫時為空（%d/%d），等待 %ds...", consecutive_empty, _MAX_EMPTY, idle_wait)
+            time.sleep(idle_wait)
+
+
+class _QueueEmpty(Exception):
+    """佇列無可用任務時由 run_single_job 拋出，供 loop 模式偵測。"""
 
 
 if __name__ == "__main__":
