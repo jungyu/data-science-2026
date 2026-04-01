@@ -17,9 +17,8 @@ def verify():
         version = playwright.__version__
         print(f"[✓] playwright 套件已安裝 (版本: {version})")
     except ImportError:
-        errors.append("playwright 套件未安裝，請執行: pip install playwright")
         print("[✗] playwright 套件未安裝")
-        print("\n".join(f"  - {e}" for e in errors))
+        print("  請執行: pip install playwright")
         return False
 
     # 2. 嘗試啟動瀏覽器
@@ -49,12 +48,6 @@ def verify():
         errors.append(f"瀏覽器啟動失敗: {e}")
         print(f"[✗] 瀏覽器啟動失敗: {e}")
         print("\n  請執行: playwright install chromium")
-        return False
-
-    if errors:
-        print("\n以下項目需要修正：")
-        for err in errors:
-            print(f"  - {err}")
         return False
 
     print("\n🎉 環境設置完成！可以開始學習了。")

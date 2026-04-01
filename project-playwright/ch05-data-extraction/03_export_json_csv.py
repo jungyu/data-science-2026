@@ -88,7 +88,9 @@ def main():
             "internal_links": sum(1 for d in data if not d["is_external"]),
             "source_url": page.url,
         }
-        export_json([summary], OUTPUT_DIR / "links_summary.json")
+        with open(OUTPUT_DIR / "links_summary.json", "w", encoding="utf-8") as f:
+            json.dump(summary, f, ensure_ascii=False, indent=2)
+        print(f"[JSON] 已匯出摘要 → {OUTPUT_DIR / 'links_summary.json'}")
 
         browser.close()
         print(f"\n✅ 所有檔案已匯出至 {OUTPUT_DIR}/")

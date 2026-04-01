@@ -38,3 +38,11 @@ for i in range(rows.count()):
 - 無 API 的網站 → 用 Playwright 擷取
 - 動態載入的內容（JavaScript 渲染）→ Playwright 可以等待完成
 - 需要登入才能看到的資料 → 搭配 ch06 Session 管理
+
+## 道德與法律提醒
+
+- 擷取前請確認目標網站的 `robots.txt` 是否允許爬取
+- 遵守網站服務條款（Terms of Service）
+- 控制請求頻率，避免對伺服器造成過大負擔
+- 爬取的資料僅限學術研究和個人使用，勿用於商業目的
+- 涉及個人資料時需遵守個資法與隱私保護法規

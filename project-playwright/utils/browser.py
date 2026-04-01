@@ -19,15 +19,37 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Stealth JS（從 ch06 提取為共用版本）
+# Stealth JS（從 ch06 提取為共用版本，與 ch06/01_stealth_mode.py 保持一致）
 _STEALTH_JS = """
 () => {
+    // 1. 隱藏 navigator.webdriver
     Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+
+    // 2. 偽造 navigator.plugins
     Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
+
+    // 3. 偽造 navigator.languages
     Object.defineProperty(navigator, 'languages', {
         get: () => ['zh-TW', 'zh', 'en-US', 'en'],
     });
+
+    // 4. 修正 Chrome 特有屬性
     window.chrome = { runtime: {}, loadTimes: function() {}, csi: function() {}, app: {} };
+
+    // 5. 修正 Permissions API
+    const originalQuery = window.navigator.permissions.query;
+    window.navigator.permissions.query = (parameters) => (
+        parameters.name === 'notifications'
+            ? Promise.resolve({ state: Notification.permission })
+            : originalQuery(parameters)
+    );
+
+    // 6. 隱藏自動化相關的 console 訊息
+    const originalLog = console.log;
+    console.log = (...args) => {
+        if (args[0]?.toString().includes('cdc_')) return;
+        originalLog.apply(console, args);
+    };
 }
 """
 
@@ -52,7 +74,10 @@ class BrowserManager:
         self.headless = headless if headless is not None else os.getenv("HEADLESS", "true").lower() == "true"
         self.browser_type = browser_type or os.getenv("BROWSER_TYPE", "chromium")
         self.stealth = stealth
-        self.slow_mo = slow_mo or int(os.getenv("SLOW_MO", "0"))
+        try:
+            self.slow_mo = slow_mo if slow_mo is not None else int(os.getenv("SLOW_MO", "0"))
+        except ValueError:
+            self.slow_mo = 0
         self.locale = locale
         self.timezone_id = timezone_id
         self.user_agent = user_agent
@@ -66,6 +91,7 @@ class BrowserManager:
         self._playwright = None
         self._browser: Browser | None = None
         self._context: BrowserContext | None = None
+        self._contexts: list[BrowserContext] = []
 
     def __enter__(self):
         self.start()
@@ -111,6 +137,7 @@ class BrowserManager:
         if self.stealth:
             context.add_init_script(_STEALTH_JS)
 
+        self._contexts.append(context)
         self._context = context
         return context
 
@@ -129,9 +156,10 @@ class BrowserManager:
 
     def close(self):
         """關閉所有資源。"""
-        if self._context:
-            self._context.close()
-            self._context = None
+        for ctx in self._contexts:
+            ctx.close()
+        self._contexts.clear()
+        self._context = None
         if self._browser:
             self._browser.close()
             self._browser = None

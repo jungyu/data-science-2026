@@ -18,6 +18,7 @@ import json
 import sys
 import time
 from pathlib import Path
+from urllib.parse import urlparse
 
 # 將專案根目錄加入 path 以便 import utils
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -96,7 +97,6 @@ def main():
         urls_with_domain = [a for a in articles if a["url"].startswith("http")]
         domains = {}
         for article in urls_with_domain:
-            from urllib.parse import urlparse
             domain = urlparse(article["url"]).netloc
             domains[domain] = domains.get(domain, 0) + 1
 

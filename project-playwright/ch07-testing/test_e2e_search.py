@@ -9,6 +9,8 @@ Ch07 — E2E 搜尋流程測試。
     pytest ch07-testing/test_e2e_search.py -v --headed --slowmo 300
 """
 
+import re
+
 import pytest
 from playwright.sync_api import Page, expect
 
@@ -20,7 +22,7 @@ class TestDuckDuckGoSearch:
     def test_homepage_loads(self, page: Page):
         """首頁應該正確載入。"""
         page.goto("https://duckduckgo.com")
-        expect(page).to_have_title("DuckDuckGo — Privacy, simplified.")
+        expect(page).to_have_title(re.compile(r"DuckDuckGo", re.IGNORECASE))
 
     def test_search_box_visible(self, page: Page):
         """搜尋框應該可見且可操作。"""

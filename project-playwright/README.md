@@ -52,6 +52,7 @@ cp .env.example .env
 | **ch05** | 資料擷取 | 文字提取、表格爬取、匯出 JSON/CSV |
 | **ch06** | 進階技巧 | Stealth 模式、Session 管理、Proxy |
 | **ch07** | 測試整合 | pytest-playwright、E2E 測試 |
+| **ch08** | Supabase 整合 | crawl_queue、Lease 機制、content_hash 去重 |
 
 ## 專案結構
 
@@ -68,13 +69,14 @@ project-playwright/
 ├── ch05-data-extraction/   # 資料擷取與匯出
 ├── ch06-advanced/          # 進階：隱匿、Session、代理
 ├── ch07-testing/           # pytest-playwright 測試
+├── ch08-supabase/          # Supabase 整合（Pipeline 終點）
 ├── utils/                  # 共用工具模組
 └── examples/               # 完整實戰範例
 ```
 
 ## 學習建議
 
-1. **依序學習**：ch00 → ch07，每章建立在前一章基礎上
+1. **依序學習**：ch00 → ch08，每章建立在前一章基礎上
 2. **動手執行**：每個 `.py` 檔都可獨立跑，先跑再讀程式碼
 3. **修改實驗**：改 selector、改目標網址、觀察不同結果
 4. **搭配文件**：善用 [Playwright Python 官方文件](https://playwright.dev/python/)
