@@ -1,10 +1,10 @@
 # Playwright Worker — Consume Loop 與 Browser Pool（Python）
 
-> **前置閱讀**：[05_worker-architecture.md](05_worker-architecture.md) 說明各元件的角色分工。這份文件是那份設計的 **Phase 2 參考實作**。
+> **前置閱讀**：[05_worker-architecture.md](05_worker-architecture.md) 說明各元件的角色分工。這份文件是那份設計的具體實作。
 >
-> ⚠️ **目前 repo 中尚未存在 `consumer.py`、`page_runner.py`、`persistence/` 等模組**（見 05 的「生產架構建議，尚未實作」說明）。
-> 本文件描述的是「完整生產 Worker 應該長什麼樣」，供架構理解用。
-> 可以直接執行的是 `ch08-supabase/04_single_job_worker.py`（同步簡化版）。
+> **兩種執行方式的對應關係**：
+> - `ch08-supabase/04_single_job_worker.py`：同步單次版，教學用，一次消費一筆
+> - `utils/worker/main.py`（本文件）：非同步持續版，生產用，持續輪詢直到閒置逾時
 
 ## 本文件的各部分如何組合？
 
@@ -38,10 +38,6 @@ main() 消費迴圈
 ## 主消費迴圈
 
 ```python
-# ── Phase 2 設計參考（模組尚未在 repo 中落地）─────────────────────
-# consumer.py、page_runner.py、policies/ 等檔案是規劃中的生產架構。
-# 目前可執行的同步簡化版在 ch08-supabase/04_single_job_worker.py。
-# ─────────────────────────────────────────────────────────────────
 import asyncio
 import logging
 import uuid
