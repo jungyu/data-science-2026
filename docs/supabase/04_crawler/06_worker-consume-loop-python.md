@@ -71,10 +71,20 @@ async def main(supabase_client: AsyncClient) -> None:
     health_tracker = SourceHealthTracker()
     domain_limiter = DomainLimiter(default_max=1)
 
+    source_repo = SupabaseSourceRepo(supabase_client)
+    source_page_repo = SupabaseSourcePageRepo(supabase_client)
+    article_repo = SupabaseArticleRepo(supabase_client)
+
     async with async_playwright() as pw:
         pool = BrowserPool(pw)
         await pool.start()
-        runner = PageRunner(pool)
+        runner = PageRunner(
+            pool=pool,
+            consumer=consumer,
+            source_repo=source_repo,
+            source_page_repo=source_page_repo,
+            article_repo=article_repo,
+        )
 
         empty_polls = 0
 
@@ -308,14 +318,21 @@ logger = logging.getLogger(__name__)
 
 
 class PageRunner:
-    def __init__(self, pool: BrowserPool) -> None:
+    def __init__(
+        self,
+        pool: BrowserPool,
+        consumer: SupabaseQueueConsumer,
+        source_repo: SupabaseSourceRepo,
+        source_page_repo: SupabaseSourcePageRepo,
+        article_repo: SupabaseArticleRepo,
+    ) -> None:
         self._pool = pool
+        self._consumer = consumer
+        self._source_repo = source_repo
+        self._source_page_repo = source_page_repo
+        self._article_repo = article_repo
         self._list_extractor = ListExtractor()
         self._article_extractor = ArticleExtractor()
-        self._source_repo = SupabaseSourceRepo()
-        self._source_page_repo = SupabaseSourcePageRepo()
-        self._article_repo = SupabaseArticleRepo()
-        self._queue_consumer = SupabaseQueueConsumer()
 
     async def process(self, job: LeasedJob) -> ProcessResult:
         ctx: BrowserContext | None = None
