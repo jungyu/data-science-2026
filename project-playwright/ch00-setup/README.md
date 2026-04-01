@@ -66,6 +66,7 @@ python3 ch00-setup/verify_install.py
 ### Windows 10 / 11
 
 > 建議使用 **PowerShell** 或 **Windows Terminal**，不建議用舊版 CMD。
+> 詳細實戰說明（含常見障礙排除）：[windows-install.md](windows-install.md)
 
 ```powershell
 # 1. 建立虛擬環境並啟動
@@ -74,13 +75,13 @@ python -m venv .venv
 .venv\Scripts\activate
 
 # 2. 安裝套件
-pip install -e ".[all]"
+python -m pip install -e ".[all]"
 
 # 3. 安裝 Chromium
 playwright install chromium
 
 # 4. 驗證安裝
-python ch00-setup/verify_install.py
+python ch00-setup\verify_install.py
 ```
 
 > **注意**：Windows 上的 Python 指令是 `python`，不是 `python3`。
@@ -130,6 +131,13 @@ playwright install chromium
 # 允許本機腳本執行（僅限目前使用者）
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 .venv\Scripts\activate
+```
+
+### Q: Windows — 出現 `UnicodeEncodeError`
+
+```powershell
+# 強制 Python 使用 UTF-8 輸出
+$env:PYTHONUTF8="1"
 ```
 
 ### Q: `playwright install` 下載緩慢或失敗

@@ -23,7 +23,7 @@
 
 | 檔案 | 說明 |
 |------|------|
-| `01_stealth_mode.py` | Stealth JS 注入，隱藏自動化特徵 |
+| `01_stealth_mode.py` | Stealth JS 注入，示範部分自動化特徵的改寫方式 |
 | `02_session_management.py` | 儲存/載入 Cookie 與 localStorage |
 | `03_proxy_and_headers.py` | Proxy 設定與自訂 HTTP 標頭 |
 | `04_popup_handler.py` | 處理 Cookie Banner 與彈窗 |

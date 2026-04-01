@@ -143,7 +143,7 @@ def main():
         new_page.close()
 
         browser.close()
-        print("\n✅ 彈窗處理示範完成。")
+        print("\n[完成] 彈窗處理示範結束。")
 
 
 if __name__ == "__main__":

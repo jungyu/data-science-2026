@@ -26,17 +26,18 @@ class TestDuckDuckGoSearch:
 
     def test_search_box_visible(self, page: Page):
         """搜尋框應該可見且可操作。"""
-        page.goto("https://duckduckgo.com")
-        search_box = page.get_by_role("textbox", name="Search")
-        expect(search_box).to_be_visible()
+        page.goto("https://duckduckgo.com", wait_until="domcontentloaded")
+        search_box = page.locator("input[name='q']").first
+        expect(search_box).to_be_visible(timeout=5000)
         expect(search_box).to_be_editable()
 
     def test_search_returns_results(self, page: Page):
         """輸入關鍵字後應該回傳搜尋結果。"""
-        page.goto("https://duckduckgo.com")
+        page.goto("https://duckduckgo.com", wait_until="domcontentloaded")
 
         # 輸入搜尋關鍵字
-        search_box = page.get_by_role("textbox", name="Search")
+        search_box = page.locator("input[name='q']").first
+        search_box.wait_for()
         search_box.fill("Playwright Python")
         search_box.press("Enter")
 
@@ -50,9 +51,10 @@ class TestDuckDuckGoSearch:
 
     def test_search_results_contain_keyword(self, page: Page):
         """搜尋結果應該包含搜尋關鍵字。"""
-        page.goto("https://duckduckgo.com")
+        page.goto("https://duckduckgo.com", wait_until="domcontentloaded")
 
-        search_box = page.get_by_role("textbox", name="Search")
+        search_box = page.locator("input[name='q']").first
+        search_box.wait_for()
         search_box.fill("Playwright automation")
         search_box.press("Enter")
 

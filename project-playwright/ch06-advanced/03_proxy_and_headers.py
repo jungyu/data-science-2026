@@ -47,6 +47,7 @@ def demo_custom_headers():
         content = page.locator("pre").text_content()
         print("=== 自訂 HTTP 標頭 ===")
         print(f"  回應內容（前 500 字元）:\n{content[:500]}")
+        print("  注意：僅修改 user_agent，不代表 client hints（如 Sec-CH-UA）也會同步偽裝。")
 
         context.close()
         browser.close()
@@ -91,7 +92,7 @@ def demo_proxy():
 def main():
     demo_custom_headers()
     demo_proxy()
-    print("\n✅ 標頭與 Proxy 設定示範完成。")
+    print("\n[完成] 標頭與 Proxy 設定示範結束。")
 
 
 if __name__ == "__main__":

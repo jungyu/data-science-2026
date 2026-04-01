@@ -20,9 +20,9 @@ STEALTH_JS = """
         get: () => undefined,
     });
 
-    // 2. 偽造 navigator.plugins（正常瀏覽器至少有幾個 plugin）
+    // 2. 偽造 navigator.plugins（模擬有 5 個插件的 PluginArray 結構）
     Object.defineProperty(navigator, 'plugins', {
-        get: () => [1, 2, 3, 4, 5],
+        get: () => ({ length: 5, 0: {}, 1: {}, 2: {}, 3: {}, 4: {} }),
     });
 
     // 3. 偽造 navigator.languages
@@ -30,13 +30,15 @@ STEALTH_JS = """
         get: () => ['zh-TW', 'zh', 'en-US', 'en'],
     });
 
-    // 4. 修正 Chrome 特有屬性
-    window.chrome = {
-        runtime: {},
-        loadTimes: function() {},
-        csi: function() {},
-        app: {},
-    };
+    // 4. 修正 Chrome 特有屬性（用 defineProperty 確保覆寫生效）
+    Object.defineProperty(window, 'chrome', {
+        get: () => ({
+            runtime: {},
+            loadTimes: function() {},
+            csi: function() {},
+            app: {},
+        }),
+    });
 
     // 5. 修正 Permissions API
     const originalQuery = window.navigator.permissions.query;
@@ -120,7 +122,9 @@ def main():
         ctx_stealth.close()
         browser_stealth.close()
 
-        print("\n✅ Stealth 模式能有效隱藏大部分自動化特徵。")
+        print("\n[說明] navigator.webdriver 已被改寫（False）。")
+        print("       其他特徵（plugins 長度、languages、chrome 物件）偽裝效果視環境而異，")
+        print("       請以上方實測數值為準，不保證對所有 anti-bot 系統有效。")
 
 
 if __name__ == "__main__":

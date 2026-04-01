@@ -96,7 +96,7 @@ def main():
         print(f"  Origins 數: {len(data.get('origins', []))}")
 
         browser.close()
-        print("\n✅ Session 管理完成！重複執行可保持登入狀態。")
+        print("\n[完成] Session 管理示範結束，重複執行可驗證狀態持久性。")
 
 
 if __name__ == "__main__":

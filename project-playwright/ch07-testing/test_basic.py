@@ -27,11 +27,10 @@ def test_example_com_heading(page: Page):
 
 
 def test_example_com_has_link(page: Page):
-    """驗證 example.com 有「More information」連結。"""
+    """驗證 example.com 有指向 IANA 說明頁的連結。"""
     page.goto("https://example.com")
-    link = page.get_by_role("link", name="More information")
+    link = page.locator("a[href='https://www.iana.org/domains/example']")
     expect(link).to_be_visible()
-    expect(link).to_have_attribute("href", "https://www.iana.org/domains/example")
 
 
 def test_playwright_docs_navigation(page: Page):
