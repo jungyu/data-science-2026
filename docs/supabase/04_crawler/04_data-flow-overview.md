@@ -410,10 +410,77 @@ foreach tbl in array array[
 
 ## 動手做
 
-1. **模擬多 Worker 搶單**：開兩個 SQL Editor tab，同時執行 `select * from crawler.lease_next_crawl_job('worker-X')`，觀察它們拿到不同任務。
+### A — 用真實程式碼觀察（推薦先做）
 
-2. **模擬 lease 過期**：搶單後手動把 `lease_expires_at` 設為過去時間，再用另一個 Worker 搶單，觀察它接手了過期任務。
+如果你已完成 [quickstart](00_quickstart.md)，資料庫裡已經有真實資料了。下面的練習讓你用程式碼直接驗證本文所說的機制：
 
-3. **測試 content_hash 去重**：插入一筆 article，記下 content_hash。再用相同 hash upsert 一次，觀察 `updated_at` 沒變（因為 hash 相同可以在應用層跳過）。
+**練習 1：觀察 lease 狀態機**
 
-4. **測試 Multi-Tenant 隔離**：用兩個不同 JWT（不同 `project_ids`），分別查 `crawler.sources`，確認看到不同的資料。
+```bash
+cd project-playwright
+
+# 先確認佇列裡有 pending 任務
+python -c "
+from utils.supabase_client import get_crawler_table
+rows = get_crawler_table('crawl_queue').select('url,status,lease_token').execute()
+for r in rows.data: print(r['status'], r['url'][:60])
+"
+
+# 跑一次 Worker，觀察任務從 pending → leased → running → done
+python ch08-supabase/04_single_job_worker.py
+
+# 再查一次，確認狀態已更新
+# 同時注意：發現的文章 URL 以 status='pending' 出現在佇列
+```
+
+**練習 2：觀察 content_hash 去重**
+
+```bash
+# 跑兩次 Worker，第二次跑同一個 URL 時，articles 的 updated_at 不變
+python ch08-supabase/04_single_job_worker.py   # 第一次：新增
+python ch08-supabase/04_single_job_worker.py   # 消費第二個 URL...
+
+# 或手動再塞同一個 seed URL 回佇列，讓 Worker 重抓同一頁
+python ch08-supabase/03_enqueue_urls.py
+python ch08-supabase/04_single_job_worker.py
+# → 在 Supabase 查 articles，比對 updated_at 時間
+```
+
+**練習 3：觀察 Partial unique index 防重複入列**
+
+```bash
+# 多次執行，佇列不會累積重複的 pending 任務
+python ch08-supabase/03_enqueue_urls.py   # 第一次：新增 2 筆
+python ch08-supabase/03_enqueue_urls.py   # 第二次：跳過 2 筆（輸出：新增 0 筆，跳過重複 2 筆）
+```
+
+---
+
+### B — SQL Editor 模擬（深入理解底層）
+
+> 以下練習需要在 `crawl_queue` 裡有資料。可先跑 quickstart 再做。
+
+1. **模擬多 Worker 搶單**：開兩個 SQL Editor tab，同時執行 `select * from crawler.lease_next_crawl_job('worker-X')` 和 `select * from crawler.lease_next_crawl_job('worker-Y')`，觀察它們拿到**不同任務**（不重疊）。
+
+2. **模擬 lease 過期回收**：搶單後手動執行：
+   ```sql
+   UPDATE crawler.crawl_queue
+   SET lease_expires_at = now() - interval '1 second'
+   WHERE status = 'leased';
+   ```
+   再用另一個 Worker 搶單，觀察它接手了剛才「過期」的任務。
+
+3. **驗證 content_hash 去重**：
+   ```sql
+   -- 插入測試文章
+   INSERT INTO crawler.articles (project_id, source_id, title, source_url, content_hash)
+   VALUES ('test', 'src-xxx', 'Test', 'https://example.com', 'hash-abc');
+
+   -- 用相同 hash upsert，觀察 updated_at 沒變
+   INSERT INTO crawler.articles (project_id, source_id, title, source_url, content_hash)
+   VALUES ('test', 'src-xxx', 'Test', 'https://example.com', 'hash-abc')
+   ON CONFLICT (source_id, source_url) DO UPDATE SET content_hash = EXCLUDED.content_hash;
+   ```
+   （應用層在偵測到 hash 相同時根本不會觸發此 upsert；這個練習模擬萬一觸發了會怎樣）
+
+4. **測試 Multi-Tenant 隔離**：用兩個不同 JWT（不同 `project_ids`）分別查 `crawler.sources`，確認看到不同的資料集。
