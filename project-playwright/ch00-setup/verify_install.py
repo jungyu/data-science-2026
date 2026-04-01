@@ -7,14 +7,51 @@ Ch00 — 驗證 Playwright 安裝是否正確。
   步驟 1-3：離線驗證（只要 pip install + playwright install 就能過）
   步驟 4（--online）：線上連線測試（可選）
 
-執行方式：
+執行方式（三個平台通用）：
     python ch00-setup/verify_install.py            # 離線驗證
     python ch00-setup/verify_install.py --online   # 加測對外連線
 """
 
 import argparse
+import platform
 import sys
 from pathlib import Path
+
+
+def _browser_fix_hint() -> None:
+    """依作業系統印出對應的瀏覽器修復指令。"""
+    system = platform.system()
+    print()
+    if system == "Linux":
+        print("    常見原因（Linux / WSL）：")
+        print("      1. chromium 尚未下載：")
+        print("         playwright install chromium")
+        print()
+        print("      2. 系統缺少共享函式庫（最常見）：")
+        print("         playwright install-deps chromium")
+        print("         playwright install chromium")
+        print()
+        print("      3. WSL1 不支援 GUI，但 headless=True 不需要顯示器，應可正常運作。")
+        print("         若仍失敗，請升級至 WSL2 或確認 WSLg 已啟用。")
+    elif system == "Darwin":
+        print("    常見原因（macOS）：")
+        print("      1. chromium 尚未下載：")
+        print("         playwright install chromium")
+        print()
+        print("      2. 安全性隔離（Gatekeeper）封鎖瀏覽器：")
+        print("         xattr -cr ~/Library/Caches/ms-playwright")
+        print("         playwright install chromium")
+    elif system == "Windows":
+        print("    常見原因（Windows）：")
+        print("      1. chromium 尚未下載：")
+        print("         playwright install chromium")
+        print()
+        print("      2. 防毒軟體封鎖：暫時停用防毒後再安裝。")
+        print()
+        print("      3. 未在虛擬環境中執行：")
+        print("         確認已執行 .venv\\Scripts\\activate")
+    else:
+        print("    請執行：playwright install chromium")
 
 
 def verify_offline() -> bool:
@@ -26,7 +63,9 @@ def verify_offline() -> bool:
         print(f"[✓] playwright 套件已安裝（版本：{playwright.__version__}）")
     except ImportError:
         print("[✗] playwright 套件未安裝")
+        print()
         print("    請執行：pip install playwright")
+        print("    （確認已進入虛擬環境）")
         return False
 
     # ── 步驟 2：瀏覽器是否可啟動（用 about:blank，不需網路）──────
@@ -52,9 +91,7 @@ def verify_offline() -> bool:
 
     except Exception as e:
         print(f"[✗] 瀏覽器啟動失敗：{e}")
-        print()
-        print("    常見原因：chromium 尚未安裝")
-        print("    請執行：playwright install chromium")
+        _browser_fix_hint()
         return False
 
     return True

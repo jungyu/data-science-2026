@@ -18,27 +18,32 @@
 
 ## 快速開始
 
+**macOS / Linux（含 WSL）**
+
 ```bash
-# 1. 進入專案目錄
 cd project-playwright
-
-# 2. 建立虛擬環境
 python3 -m venv .venv
-source .venv/bin/activate  # macOS/Linux
-# .venv\Scripts\activate   # Windows
-
-# 3. 安裝依賴
+source .venv/bin/activate
 pip install -e ".[all]"
-
-# 4. 安裝 Playwright 瀏覽器
+playwright install-deps chromium  # Linux/WSL 必要；macOS 可跳過
 playwright install chromium
-
-# 5. 驗證安裝
 python3 ch00-setup/verify_install.py
-
-# 6. 複製環境設定
 cp .env.example .env
 ```
+
+**Windows（PowerShell）**
+
+```powershell
+cd project-playwright
+python -m venv .venv
+.venv\Scripts\activate
+pip install -e ".[all]"
+playwright install chromium
+python ch00-setup/verify_install.py
+copy .env.example .env
+```
+
+> 詳細說明與常見問題請見 [ch00-setup/README.md](ch00-setup/README.md)。
 
 ## 章節導覽
 
