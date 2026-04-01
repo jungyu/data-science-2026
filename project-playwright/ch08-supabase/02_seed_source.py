@@ -109,14 +109,14 @@ def main():
 
     try:
         source = seed_source()
-        print(f"\n[✓] 寫入成功")
+        print(f"\n[OK] 寫入成功")
         print(f"  source.id         : {source['id']}")
         print(f"  source.created_at : {source['created_at']}")
         print(f"  source.updated_at : {source['updated_at']}")
-        print(f"\n  → 下一步：執行 03_enqueue_urls.py 加入種子 URL")
+        print(f"\n  -> 下一步：執行 03_enqueue_urls.py 加入種子 URL")
         return source
     except Exception as e:
-        print(f"\n[✗] 寫入失敗：{e}")
+        print(f"\n[NG] 寫入失敗：{e}")
         raise
 
 

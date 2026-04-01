@@ -96,14 +96,21 @@ def enqueue_urls(source_id: str, seed_jobs: list[dict]) -> tuple[int, int]:
         )
         payloads.append(to_insert_dict(insert))
 
-    # ignoreDuplicates：遇到 unique conflict 時靜默跳過，不拋錯
-    result = (
+    # 查出此 source 目前 pending 的 URL，只插入尚未存在的項目
+    existing = (
         get_crawler_table("crawl_queue")
-        .insert(payloads, ignore_duplicates=True)
+        .select("url")
+        .eq("source_id", source_id)
+        .eq("status", "pending")
         .execute()
     )
+    existing_urls = {row["url"] for row in (existing.data or [])}
+    new_payloads = [p for p in payloads if p["url"] not in existing_urls]
 
-    enqueued = len(result.data) if result.data else 0
+    if new_payloads:
+        get_crawler_table("crawl_queue").insert(new_payloads).execute()
+
+    enqueued = len(new_payloads)
     skipped = len(payloads) - enqueued
     return enqueued, skipped
 
@@ -148,7 +155,7 @@ def main():
     try:
         source_id, source_name = get_source_id(args.source)
     except ValueError as e:
-        print(f"[✗] {e}")
+        print(f"[NG] {e}")
         sys.exit(1)
 
     print(f"  source : {source_name}（{args.source}）")
@@ -157,13 +164,13 @@ def main():
 
     try:
         enqueued, skipped = enqueue_urls(source_id, HN_SEED_URLS)
-        print(f"\n[✓] 寫入完成：新增 {enqueued} 筆，跳過重複 {skipped} 筆")
+        print(f"\n[OK] 寫入完成：新增 {enqueued} 筆，跳過重複 {skipped} 筆")
     except Exception as e:
-        print(f"\n[✗] 寫入失敗：{e}")
+        print(f"\n[NG] 寫入失敗：{e}")
         raise
 
     show_queue_stats(source_id)
-    print("\n  → 下一步：執行 04_single_job_worker.py 消費佇列任務")
+    print("\n  -> 下一步：執行 04_single_job_worker.py 消費佇列任務")
 
 
 if __name__ == "__main__":

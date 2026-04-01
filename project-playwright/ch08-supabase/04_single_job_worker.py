@@ -563,10 +563,18 @@ def run_single_job(source_code: str) -> None:
                     ))
                     for u in new_urls_to_enqueue[:20]  # 每次最多加 20 筆
                 ]
-                get_crawler_table("crawl_queue").insert(
-                    new_jobs, ignore_duplicates=True
-                ).execute()
-                logger.info("已將 %d 個文章 URL 加入佇列", len(new_urls_to_enqueue[:20]))
+                existing = (
+                    get_crawler_table("crawl_queue")
+                    .select("url")
+                    .eq("source_id", source_id)
+                    .eq("status", "pending")
+                    .execute()
+                )
+                existing_urls = {row["url"] for row in (existing.data or [])}
+                unique_jobs = [j for j in new_jobs if j["url"] not in existing_urls]
+                if unique_jobs:
+                    get_crawler_table("crawl_queue").insert(unique_jobs).execute()
+                logger.info("已將 %d 個文章 URL 加入佇列", len(unique_jobs))
 
         # ── Step 7: 任務完成 ─────────────────────────────────────
         finish_job(job, CrawlQueueStatus.DONE)
@@ -610,7 +618,7 @@ def main():
     try:
         run_single_job(args.source)
     except ValueError as e:
-        print(f"[✗] {e}")
+        print(f"[NG] {e}")
         sys.exit(1)
 
 

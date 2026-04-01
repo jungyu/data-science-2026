@@ -24,13 +24,13 @@ def check_connection() -> bool:
         supabase = get_supabase()
         # 用最輕量的查詢確認連線：select 1 筆 sources（即使空表也不會報錯）
         get_crawler_table("sources").select("id").limit(1).execute()
-        print("[✓] Supabase 連線成功")
+        print("[OK] Supabase 連線成功")
         return True
     except EnvironmentError as e:
-        print(f"[✗] 環境設定錯誤：{e}")
+        print(f"[NG] 環境設定錯誤：{e}")
         return False
     except Exception as e:
-        print(f"[✗] 連線失敗：{e}")
+        print(f"[NG] 連線失敗：{e}")
         print("    請確認：")
         print("    1. .env 的 SUPABASE_URL / SUPABASE_SERVICE_KEY 是否正確")
         print("    2. Supabase Dashboard → Settings → API → Extra schemas 是否已加入 crawler")
@@ -53,9 +53,9 @@ def check_schema_tables() -> bool:
             result = get_crawler_table(table).select("id").limit(1).execute()
             count_result = get_crawler_table(table).select("*", count="exact").execute()
             count = count_result.count if count_result.count is not None else "?"
-            print(f"  [✓] crawler.{table:<25} （現有 {count} 筆）")
+            print(f"  [OK] crawler.{table:<25} （現有 {count} 筆）")
         except Exception as e:
-            print(f"  [✗] crawler.{table:<25} 存取失敗：{e}")
+            print(f"  [NG] crawler.{table:<25} 存取失敗：{e}")
             all_ok = False
     return all_ok
 
@@ -76,8 +76,8 @@ def list_sources() -> None:
     print(f"  {'code':<20} {'name':<25} {'enabled':<10} last_run_at")
     print("  " + "-" * 70)
     for s in sources:
-        enabled = "✓" if s["is_enabled"] else "✗"
-        last_run = s["last_run_at"] or "—"
+        enabled = "Y" if s["is_enabled"] else "N"
+        last_run = s["last_run_at"] or "-"
         print(f"  {s['code']:<20} {s['name']:<25} {enabled:<10} {last_run}")
 
 
@@ -94,12 +94,12 @@ def check_rpc() -> bool:
             "lease_next_crawl_job",
             {"p_worker_id": "probe-worker"},
         ).execute()
-        print("  [✓] lease_next_crawl_job() 可呼叫")
+        print("  [OK] lease_next_crawl_job() 可呼叫")
         if not result.data:
             print("  [i] 佇列目前為空（執行 03_enqueue_urls.py 加入任務）")
         return True
     except Exception as e:
-        print(f"  [✗] RPC 呼叫失敗：{e}")
+        print(f"  [NG] RPC 呼叫失敗：{e}")
         print("  請確認 crawler schema 已在 Supabase → Settings → API → Extra schemas 中")
         return False
 
@@ -118,7 +118,7 @@ def main() -> bool:
     list_sources()
     check_rpc()
 
-    print("\n🎉 環境就緒，可以開始 ch08 整合！")
+    print("\n[完成] 環境就緒，可以開始 ch08 整合！")
     return True
 
 
