@@ -23,7 +23,7 @@
 cd project-playwright
 
 # 2. 建立虛擬環境
-python -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate  # macOS/Linux
 # .venv\Scripts\activate   # Windows
 
@@ -34,7 +34,7 @@ pip install -e ".[all]"
 playwright install chromium
 
 # 5. 驗證安裝
-python ch00-setup/verify_install.py
+python3 ch00-setup/verify_install.py
 
 # 6. 複製環境設定
 cp .env.example .env

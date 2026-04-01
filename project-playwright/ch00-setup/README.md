@@ -12,7 +12,7 @@
 
 ```bash
 cd project-playwright
-python -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate  # macOS/Linux
 ```
 
@@ -35,15 +35,20 @@ playwright install
 ### 4. 驗證安裝
 
 ```bash
-python ch00-setup/verify_install.py
+python3 ch00-setup/verify_install.py
 ```
 
-成功會看到：
+成功會看到（步驟 1-3 不需要網路）：
 ```
-[✓] playwright 套件已安裝 (版本: x.xx.x)
-[✓] chromium 瀏覽器可用
-[✓] 成功開啟瀏覽器並導航至測試頁面
-[✓] 截圖已儲存
+── 離線驗證（步驟 1-3）──
+[✓] playwright 套件已安裝（版本：x.xx.x）
+[✓] chromium 瀏覽器可啟動
+[✓] 瀏覽器可開啟頁面（about:blank，離線）
+[✓] 截圖功能正常 → output/screenshots/verify_install.png
+
+  若要同時測試對外連線，加上 --online 參數：
+  python3 ch00-setup/verify_install.py --online
+
 🎉 環境設置完成！可以開始學習了。
 ```
 

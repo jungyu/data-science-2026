@@ -77,17 +77,45 @@ def start_run(source_id: str) -> str:
     return run_id
 
 
-def finish_run(run_id: str, stats: dict) -> None:
-    """更新 crawl_runs 的最終統計與狀態。"""
+def finish_run(run_id: str, stats: dict, *, run_status: CrawlRunStatus) -> None:
+    """更新 crawl_runs 的最終統計與狀態。
+
+    run_status 由呼叫端根據 error_count 決定：
+      - SUCCESS：任務完成，無錯誤
+      - PARTIAL ：任務完成，但 error_count > 0（有部分失敗）
+      - FAILED  ：任務本身未執行（極少發生）
+    不在這裡硬寫 SUCCESS，讓 crawl_runs 的狀態真實反映爬取結果。
+    """
     get_crawler_table("crawl_runs").update({
-        "run_status": CrawlRunStatus.SUCCESS.value,
+        "run_status": run_status.value,
         "finished_at": now_iso(),
         **stats,
     }).eq("id", run_id).execute()
-    logger.info("crawl_run 完成：%s %s", run_id, stats)
+    logger.info("crawl_run 完成：%s status=%s %s", run_id, run_status.value, stats)
 
 
 # ── Step 2: crawl_queue（lease） ──────────────────────────────────
+
+# RPC 不支援 source 過濾，最多嘗試幾次以找到目標 source 的任務。
+# 若佇列中有低優先度的目標任務，但更高優先任務全屬其他 source，
+# 有界重試能找到它；達到上限才認定「無匹配任務」。
+_MAX_LEASE_ATTEMPTS = 5
+
+
+def _release_job(job: dict) -> None:
+    """用 lease_token 樂觀鎖把任務釋放回 pending。
+
+    若 lease 已到期被其他 Worker 接手，update 因 token 不符而靜默失效——
+    到期後佇列會自動回收，不需額外處理。
+    """
+    get_crawler_table("crawl_queue").update({
+        "status": CrawlQueueStatus.PENDING.value,
+        "lease_token": None,
+        "leased_at": None,
+        "lease_expires_at": None,
+        "worker_id": None,
+    }).eq("id", job["id"]).eq("lease_token", job["lease_token"]).execute()
+
 
 def lease_next_job(source_id: str) -> dict | None:
     """從 crawl_queue 搶一筆屬於指定 source 的 pending 任務（lease）。
@@ -97,45 +125,45 @@ def lease_next_job(source_id: str) -> dict | None:
 
     ⚠️  RPC 不過濾 source_id（依優先度搶全局最高優先任務）。
     搶到後做 post-lease 檢查：若不屬於目標 source，
-    立即釋放回 pending，讓其他 Worker 或下次呼叫再接手。
+    釋放回 pending，再試一次，最多重試 _MAX_LEASE_ATTEMPTS 次。
 
-    這是在 RPC 不支援 source 過濾時的標準處理模式。
+    有界重試的意義：若目標 source 的任務優先度較低，
+    上方有其他 source 的任務，有界重試能「跳過」它們找到正確任務，
+    而不是在第一次不符就誤報「佇列空」。
 
     Returns:
         搶到的佇列行（dict），或 None（佇列空 / 無該 source 任務）
     """
-    result = (
-        get_supabase()
-        .schema("crawler")
-        .rpc("lease_next_crawl_job", {"p_worker_id": WORKER_ID})
-        .execute()
-    )
-    jobs = result.data or []
-    if not jobs:
-        return None
-
-    job = jobs[0]
-
-    # Post-lease source 驗證：確認租到的任務確實屬於指定 source
-    if job["source_id"] != source_id:
-        logger.warning(
-            "租到的任務屬於不同 source（預期 %s，得到 %s）→ 釋放回佇列",
-            source_id, job["source_id"],
+    for attempt in range(1, _MAX_LEASE_ATTEMPTS + 1):
+        result = (
+            get_supabase()
+            .schema("crawler")
+            .rpc("lease_next_crawl_job", {"p_worker_id": WORKER_ID})
+            .execute()
         )
-        # 用 lease_token 作樂觀鎖釋放：重設為 pending，清除 lease 欄位
-        # 如果 lease 在這期間過期，update 會因 token 不符而靜默失效——沒關係，
-        # 到期後佇列會自動回收。
-        get_crawler_table("crawl_queue").update({
-            "status": CrawlQueueStatus.PENDING.value,
-            "lease_token": None,
-            "leased_at": None,
-            "lease_expires_at": None,
-            "worker_id": None,
-        }).eq("id", job["id"]).eq("lease_token", job["lease_token"]).execute()
-        return None
+        jobs = result.data or []
+        if not jobs:
+            logger.info("佇列已空（第 %d 次嘗試）", attempt)
+            return None
 
-    logger.info("lease 成功：job_id=%s url=%s", job["id"], job["url"])
-    return job
+        job = jobs[0]
+
+        if job["source_id"] == source_id:
+            logger.info("lease 成功（第 %d 次）：job_id=%s url=%s", attempt, job["id"], job["url"])
+            return job
+
+        # source 不符：釋放回 pending，下一輪再試
+        logger.warning(
+            "第 %d/%d 次：租到不同 source 的任務（預期 %s，得到 %s）→ 釋放，繼續尋找",
+            attempt, _MAX_LEASE_ATTEMPTS, source_id, job["source_id"],
+        )
+        _release_job(job)
+
+    logger.info(
+        "達到最大嘗試次數（%d），找不到 source='%s' 的待執行任務",
+        _MAX_LEASE_ATTEMPTS, source_id,
+    )
+    return None
 
 
 def finish_job(job: dict, status: CrawlQueueStatus, error_msg: str | None = None) -> None:
@@ -434,11 +462,8 @@ def run_single_job(source_code: str) -> None:
     # ── Step 2: 搶一筆任務 ────────────────────────────────────────
     job = lease_next_job(source_id)
     if job is None:
-        logger.info("佇列空，無任務可執行（請先執行 03_enqueue_urls.py）")
-        get_crawler_table("crawl_runs").update({
-            "run_status": CrawlRunStatus.SUCCESS.value,
-            "finished_at": now_iso(),
-        }).eq("id", run_id).execute()
+        logger.info("找不到屬於 source='%s' 的待執行任務（請先執行 03_enqueue_urls.py）", source_code)
+        finish_run(run_id, stats, run_status=CrawlRunStatus.SUCCESS)
         return
 
     url = job["url"]
@@ -553,7 +578,10 @@ def run_single_job(source_code: str) -> None:
         finish_job(job, CrawlQueueStatus.FAILED, error_msg=str(e))
 
     # ── Step 8: 更新 crawl_run ────────────────────────────────────
-    finish_run(run_id, stats)
+    # error_count > 0 表示任務執行中有部分失敗，用 PARTIAL 而非 SUCCESS，
+    # 讓學生在 crawl_runs 裡能直接看出「跑過但有問題」。
+    run_status = CrawlRunStatus.PARTIAL if stats["error_count"] > 0 else CrawlRunStatus.SUCCESS
+    finish_run(run_id, stats, run_status=run_status)
 
     # ── 結果摘要 ─────────────────────────────────────────────────
     print("\n" + "=" * 50)
