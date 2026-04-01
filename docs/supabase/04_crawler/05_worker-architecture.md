@@ -52,7 +52,7 @@ Supabase:
 
 從佇列取出任務，分配給 Worker。
 
-**簡化版**：每個 Worker 直接呼叫 `lease_next_job()`。
+**簡化版**：每個 Worker 直接呼叫 `lease_next_crawl_job()`。
 日後可擴充為獨立的 Coordinator。
 
 ### 3. Worker（工作者）
@@ -94,31 +94,61 @@ Cloud Run Worker：負責實際 Playwright 執行。
 
 ---
 
-## 建議模組結構
+## 模組結構
+
+### 目前 repo 的實際位置（可執行）
 
 ```text
-worker/
-  __init__.py
-  main.py                # 進入點，consume loop
-  consumer.py            # SupabaseQueueConsumer（QueueConsumer protocol）
-  browser_pool.py        # BrowserPool, BrowserPoolConfig
-  page_runner.py         # PageRunner（WorkerProcessor protocol）
-  db_types.py            # 所有 DB row/insert/update dataclass + enum
-  types.py               # Worker 專用型別（LeasedJob, WorkerError 等）
-  service_inputs.py      # EnqueueUrlInput, SaveFetchedPageInput 等
+project-playwright/
+  ch08-supabase/
+    01_connect_supabase.py    # 驗證連線
+    02_seed_source.py         # 建立來源設定（sources）
+    03_enqueue_urls.py        # 種子 URL 入佇列（crawl_queue）
+    04_single_job_worker.py   # 單次 Worker（完整 pipeline，同步版）
+
+  utils/
+    supabase_client.py        # get_supabase() / get_crawler_table()
+    db_types.py               # Layer 1：DB Row/Insert/Update dataclass
+    worker/
+      types.py                # Layer 2：LeasedJob, ProcessResult, WorkerError 等
+      service_inputs.py       # Layer 3：Protocol 介面 + ServiceInput dataclass
+      retry.py                # decide_retry(), SourceHealthTracker, DomainLimiter
+      browser_pool.py         # BrowserPool（async，供 Phase 2 使用）
+```
+
+### 生產架構建議（Phase 2+，尚未實作）
+
+```text
+worker/                        ← 獨立部署的 Worker package
+  main.py                      # consume loop 入口（async）
+  consumer.py                  # SupabaseQueueConsumer（實作 QueueConsumer）
+  page_runner.py               # PageRunner（實作 WorkerProcessor）
   extractors/
-    __init__.py
-    list_extractor.py    # 實作 PageExtractor.extract_list
-    article_extractor.py # 實作 PageExtractor.extract_article
+    list_extractor.py          # 實作 PageExtractor.extract_list
+    article_extractor.py       # 實作 PageExtractor.extract_article
   persistence/
-    __init__.py
-    source_repo.py       # SupabaseSourceRepo
-    queue_repo.py        # SupabaseQueueConsumer
-    source_page_repo.py  # SupabaseSourcePageRepo
-    article_repo.py      # SupabaseArticleRepo
+    source_repo.py             # SupabaseSourceRepo（實作 SourceRepository）
+    source_page_repo.py        # SupabaseSourcePageRepo
+    article_repo.py            # SupabaseArticleRepo
   policies/
-    __init__.py
-    retry_policy.py      # decide_retry, _calculate_backoff
-    rate_limit_policy.py # DomainLimiter, SourceHealthTracker
+    retry_policy.py            # decide_retry(), _calculate_backoff()
+    rate_limit_policy.py       # DomainLimiter, SourceHealthTracker
     robots_policy.py
 ```
+
+> 型別定義（`db_types.py`、`types.py`、`service_inputs.py`）兩套架構共用，路徑可隨部署方式調整。
+
+---
+
+## 下一步：看實作如何對應這份設計
+
+上面定義了「誰做什麼」。接下來 [06_worker-consume-loop-python.md](06_worker-consume-loop-python.md) 會展示完整的 Python 實作，你可以對照：
+
+| 這份文件（設計）| 06（實作）|
+|---------------|---------|
+| Consumer / Dispatcher | `SupabaseQueueConsumer.lease_next_job()` |
+| Worker | `PageRunner.process()` |
+| Persistence Layer | `SupabaseSourcePageRepo`, `SupabaseArticleRepo` |
+| Browser Pool | `BrowserPool.new_context()` |
+
+07 則說明 Consumer 在拿到 `ProcessResult` 之後，如何決定重試、失敗或停用。

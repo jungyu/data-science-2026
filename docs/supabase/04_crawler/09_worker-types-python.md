@@ -1,11 +1,35 @@
-# Playwright Worker — Python 型別參考
+# Playwright Worker — Python 型別參考（Layer 2）
 
-Worker 層型別，使用 `dataclasses`、`Literal` 與 `enum`。
+> **這份文件的定位**：三層型別架構的中間層，專屬於 Worker pipeline，不綁定資料庫 schema。
 
-> 資料庫列型別（SourceRow、ArticleRow 等）定義於 `08_db-types-python.md`。
-> 本檔案僅包含**與 Worker 相關**且不綁定資料庫表的型別。
->
+## 這層型別在 pipeline 的哪裡？
+
+```
+crawl_queue (DB)
+    ↓ lease_next_crawl_job()
+  LeasedJob          ← Worker 搶到任務後，拿到的是這個，不是 CrawlQueueRow
+    ↓ PageRunner.process()
+  ProcessResult      ← 任務的結果：Done / Retry / Failed / Skipped（四選一）
+    ↓ 依結果型別
+  RetryDecision      ← 如果是 Retry，decide_retry() 決定何時重試
+```
+
+**為什麼不直接用 `CrawlQueueRow`？**
+`CrawlQueueRow` 含有所有 DB 欄位（30 個），但 Worker 在處理任務時只需要其中幾個（url、page_type、lease_token、retry_count）。
+`LeasedJob` 只保留 Worker 真正需要的欄位，讓程式碼不必依賴完整的 DB 結構。
+
+**為什麼 `ProcessResult` 是 union type？**
+一個任務的結果只有四種可能，且每種後續處理方式完全不同：
+- `Done` → 呼叫 `complete_job()`
+- `Retry` → 呼叫 `requeue_job()`，帶 `retry_at`
+- `Failed` → 呼叫 `fail_job()`，永久失敗
+- `Skipped` → 呼叫 `complete_job()`，但不計入成功統計
+
+用 union type 配合 `isinstance()` 判斷，比用 `status` 字串欄位更安全（型別檢查器會提醒你沒處理到某種情況）。
+
 > 已對齊 `003_crawler_schema.sql` v3.0（ULID text PK）。所有 ID 欄位皆為 `str`。
+
+---
 
 ---
 

@@ -1,8 +1,32 @@
-# Playwright Crawler — Python 資料庫列型別
+# Playwright Crawler — Python 資料庫列型別（Layer 1）
 
-所有資料庫列/插入/更新型別皆以 Python `dataclass` 定義，與 `003_crawler_schema.sql` 對齊。
+> **這份文件的定位**：三層型別架構的最底層，直接對應資料庫 schema。
+> 讀這份文件之前，建議先知道「為什麼要分三層」——
 
-> 從 `12_typescript-types.md` 轉換而來。此為權威性的 Python 版本。
+## 為什麼要分三層型別？
+
+想像你正在寫 `upsert_article()`。你需要：
+
+1. **從資料庫讀回**一篇已存在的文章 → 你需要 `ArticleRow`（含 `id`、`created_at` 等 DB 自動產生的欄位）
+2. **寫入**一篇新文章 → 你需要 `ArticleInsert`（只含你要填的欄位，省略 DB 自動產生的部分）
+3. **在 Worker 內部傳遞**文章草稿 → 你需要 `ExtractedArticleDraft`（不綁 DB，純 pipeline 中間結果）
+
+如果把這三種需求全塞進同一個 class，哪天資料庫加了一欄，你得改動 Worker 邏輯；哪天 Worker 邏輯改了，你又得擔心有沒有影響 DB 寫入。
+
+所以分成三層：
+
+```
+Layer 1 (這份文件)  ── 對應資料表，給 repository 存取 DB 用
+Layer 2 (09_)       ── Worker pipeline 中間型別，不綁 DB
+Layer 3 (10_)       ── 跨層的輸入規格 + Protocol 介面
+```
+
+**本文件的型別命名規則：**
+- `*Row`：從 DB 讀回的完整列（含 id / created_at / updated_at）
+- `*Insert`：寫入 DB 時使用（省略 DB 自動產生的欄位）
+- `*Update`：部分更新（所有欄位皆可選）
+- `*Status`：對應 CHECK constraint 的 Enum
+
 > 已對齊 `003_crawler_schema.sql` v3.0（ULID text PK + project_id 多租戶）。
 
 ---

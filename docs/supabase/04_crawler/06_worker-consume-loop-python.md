@@ -1,5 +1,34 @@
 # Playwright Worker — Consume Loop 與 Browser Pool（Python）
 
+> **前置閱讀**：[05_worker-architecture.md](05_worker-architecture.md) 說明各元件的角色分工。這份文件是那份設計的具體實作。
+
+## 本文件的各部分如何組合？
+
+閱讀本文件之前，先看清楚各元件的呼叫順序：
+
+```
+main() 消費迴圈
+  │
+  ├─ SupabaseQueueConsumer.lease_next_job()   ← 搶一筆任務
+  │
+  ├─ SourceHealthTracker.is_available()        ← 來源是否在冷卻？（07 的邏輯）
+  │
+  ├─ DomainLimiter.acquire()                   ← 等待 domain 並行名額
+  │
+  ├─ PageRunner.process()                      ← 實際爬取（BrowserPool + 擷取 + 存 DB）
+  │     └─ 回傳 ProcessResult（Done/Retry/Failed/Skipped）
+  │
+  ├─ 依 ProcessResult 類型：
+  │     Done     → consumer.complete_job()
+  │     Retry    → health_tracker.record_failure() + consumer.requeue_job()
+  │     Failed   → health_tracker.record_failure() + consumer.fail_job()
+  │     Skipped  → consumer.complete_job()（不計統計）
+  │
+  └─ DomainLimiter.release()
+```
+
+`retry_policy.decide_retry()` 在 [07_worker-retry-and-anti-ban.md](07_worker-retry-and-anti-ban.md) 定義，由 `PageRunner._make_retry_or_fail()` 呼叫（在 `process()` 內部，遇到 error 時）。
+
 ---
 
 ## 主消費迴圈

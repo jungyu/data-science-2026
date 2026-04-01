@@ -1,11 +1,25 @@
-# Crawler Schema vs Supabase Guidelines — Strict Audit
+# 附錄：Crawler Schema vs Supabase Guidelines — 歷史審計報告
+
+> ---
+> ## ⛔ 初次學習請先停在這裡
+>
+> **這是歷史文件。** 以下 29 項 violation 已於 `003_crawler_schema.sql` v3.0 **全數修正**。
+> 你不需要讀這篇來理解現行系統的運作。
+>
+> **如果你想學這個系統，請從這裡開始：**
+> - Schema 設計邏輯 → [01_HEAD-FIRST-crawler-db.md](01_HEAD-FIRST-crawler-db.md)
+> - 一個 URL 怎麼流過系統 → [03_schema-to-pipeline.md](03_schema-to-pipeline.md)
+>
+> **這篇適合你讀，如果你是：**
+> - 想了解 Schema 是「從哪個狀態演化到現在」的開發者
+> - 想知道 Supabase guidelines 的 29 項具體規範是什麼
+> - 想追溯某個設計決策的來龍去脈
+> ---
 
 Audit of `003_crawler_schema.sql` against `agent-init/skills/supabase/*.md`.
 
-> **⚠️ 歷史文件**：以下 29 項 violation 已於 `003_crawler_schema.sql` v3.0 全數修正。
-> 本文件保留作為設計決策紀錄與學習參考。現行 schema 教學請見 [01_HEAD-FIRST-crawler-db.md](01_HEAD-FIRST-crawler-db.md)。
-
 > Verdict (original): **29 violations** across 7 categories. 6 Critical, 14 High, 8 Medium, 1 Info.
+> **現況**：v3.0 全數修正完畢。
 
 ---
 

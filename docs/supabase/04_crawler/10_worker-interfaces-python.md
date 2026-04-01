@@ -1,11 +1,57 @@
-# Playwright Worker - Python 介面（Protocol）
+# Playwright Worker — Python 介面（Protocol，Layer 3）
 
-所有核心介面皆使用 `typing.Protocol` 實現結構化子型別。
+> **這份文件的定位**：三層型別架構的最外層，定義各元件「要做什麼」，不定義「怎麼做」。
 
-> 資料庫列型別從 `db_types` 模組匯入（參見 `08_db-types-python.md`）。
-> Worker 型別從 `types` 模組匯入（參見 `09_worker-types-python.md`）。
->
+## Protocol 設計的用意
+
+`typing.Protocol` 在 Python 裡是「結構化子型別」：只要一個 class 有符合的方法簽名，它就自動滿足這個 Protocol，不需要繼承。
+
+這套系統用 Protocol 把「介面」和「實作」分開，帶來兩個好處：
+
+**1. 可以抽換實作**
+
+```python
+# 測試時，用記憶體版本
+class FakeQueueConsumer:
+    async def lease_next_job(self, worker_id: str) -> LeasedJob | None:
+        return self._jobs.pop() if self._jobs else None
+
+# 生產時，用 Supabase 版本
+class SupabaseQueueConsumer:
+    async def lease_next_job(self, worker_id: str) -> LeasedJob | None:
+        result = await self._client.schema("crawler").rpc(...)
+        ...
+```
+
+兩個 class 都滿足 `QueueConsumer` Protocol，`PageRunner` 不需要知道用的是哪個。
+
+**2. 依賴方向清晰**
+
+```
+QueueConsumer (Protocol)   ← 定義在這裡（Layer 3）
+      ↑
+SupabaseQueueConsumer      ← 實作在 consumer.py（具體依賴 supabase）
+      ↑
+PageRunner                 ← 只依賴 Protocol，不依賴 Supabase
+```
+
+`PageRunner` 依賴「抽象」，不依賴「具體」。換掉 Supabase 不影響 `PageRunner`。
+
+## 本文件各 Protocol 的對應實作
+
+| Protocol | 實作位置 | 說明 |
+|----------|---------|------|
+| `QueueConsumer` | `consumer.py` → `SupabaseQueueConsumer` | Lease RPC 操作 |
+| `WorkerProcessor` | `page_runner.py` → `PageRunner` | 單任務完整處理 |
+| `PageExtractor` | `extractors/` → `ListExtractor` / `ArticleExtractor` | 頁面內容擷取 |
+| `CrawlPolicyEngine` | `policies/` → 各 Policy class | 重試/限流決策 |
+| `SourceRepository` | `persistence/source_repo.py` | sources 表存取 |
+| `SourcePageRepository` | `persistence/source_page_repo.py` | source_pages 表存取 |
+| `ArticleRepository` | `persistence/article_repo.py` | articles 表存取 |
+
 > 已對齊 `003_crawler_schema.sql` v3.0（ULID text PK）。所有 ID 參數皆為 `str`。
+
+---
 
 ---
 
