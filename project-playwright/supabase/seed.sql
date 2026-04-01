@@ -1,0 +1,8 @@
+-- seed.sql
+-- 本機開發用初始資料（選填）
+-- 執行時機：supabase db reset 完成 migration 後自動套用
+--
+-- 範例：若要預先植入測試用 source，可取消以下註解
+-- insert into crawler.sources (project_id, code, name, crawler_url)
+-- values ('demo-project', 'test', 'Test Source', 'https://example.com')
+-- on conflict (project_id, code) do nothing;
