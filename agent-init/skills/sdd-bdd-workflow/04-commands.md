@@ -1,6 +1,11 @@
-# 四句咒語協議 - AI 任務交辦指令（輕量版）
+# 工匠四步驟 - AI 任務交辦指令（輕量版）
 
 > **目的**: 標準化與 AI Agent 的溝通協議，確保規格驅動開發。
+>
+> **與「四句咒語」的區別**: `docs/workflow/` 教學中的「四句咒語」
+> （specify → clarify → plan → implement）是**流程心法**，適合學習理解。
+> 本文的「工匠四步驟」（Spec first → Scenarios → Tests first → Refactor for swap）
+> 是面向**實作細節**的 Agent 操作協議，兩者互補但層級不同。
 >
 > **完整版**: 若使用 Claude Code，建議改用功能更完整的 slash commands：
 > `/specify` → `/clarify` → `/plan` → `/tasks` → `/implement` → `/analyze`
@@ -8,7 +13,7 @@
 
 ---
 
-## 四句咒語
+## 工匠四步驟
 
 適合非 Claude Code 環境或快速開發場景：
 

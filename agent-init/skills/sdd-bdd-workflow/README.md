@@ -21,7 +21,7 @@
 /analyze         →  跨 artifact 一致性分析（唯讀）
 ```
 
-### 方式 2: 四��咒語（輕量版）
+### 方式 2: 工匠四步驟（輕量版）
 
 適合快速開發或非 Claude Code 環境，詳見 [04-commands.md](./04-commands.md)：
 
@@ -34,9 +34,9 @@ Refactor for swap →  對應 /implement（重構階段）
 
 ### 流程對照表
 
-| 階段 | Slash Command | 四句咒語 | SDD-BDD Gate | 複雜度門檻 |
+| 階段 | Slash Command | 工匠四步驟 | SDD-BDD Gate | 複雜度門檻 |
 |------|--------------|---------|--------------|-----------|
-| 評估 | ���自動） | （自動） | [00-complexity-gate](./00-complexity-gate.md) | 所有 |
+| 評估 | （自動） | （自動） | [00-complexity-gate](./00-complexity-gate.md) | 所有 |
 | 規格 | `/specify` + `/clarify` | `Spec first` | [01-spec-gate](./01-spec-gate.md) | Standard+ |
 | 場景 | `/plan` | `Scenarios` | [02-scenario-gate](./02-scenario-gate.md) | Full |
 | 建置 | `/tasks` + `/implement` | `Tests first` + `Refactor for swap` | [03-build-gate](./03-build-gate.md) | Standard+ |
@@ -66,7 +66,7 @@ Refactor for swap →  對應 /implement（重構階段）
 ├── 01-spec-gate.md             # Spec Gate Prompt
 ├── 02-scenario-gate.md         # Scenario Gate Prompt
 ├── 03-build-gate.md            # Build Gate Prompt
-├── 04-commands.md              # 四句咒語協議（輕量版）
+├── 04-commands.md              # 工匠四步驟（輕量版）
 ├── 05-execution-flow.md        # 執行流程圖
 ├── scripts/                    # 驗證腳本
 │   ├── validate-spec.sh
@@ -91,7 +91,7 @@ Refactor for swap →  對應 /implement（重構階段）
 
 - [00-complexity-gate.md](./00-complexity-gate.md) — 複雜度評估
 - [01-spec-gate.md](./01-spec-gate.md) — 規格關
-- [04-commands.md](./04-commands.md) — 四句咒語
+- [04-commands.md](./04-commands.md) — 工匠四步驟
 - [05-execution-flow.md](./05-execution-flow.md) — 執行流程圖
 - [scripts/validate-spec.sh](./scripts/validate-spec.sh) — Spec 驗證
 - [scripts/check-finish.sh](./scripts/check-finish.sh) — 完成檢查

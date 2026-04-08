@@ -32,10 +32,10 @@ flowchart TD
     CHK1 -->|Fail| FIX_SPEC[修正規格]
     FIX_SPEC --> CHK1
     
-    CHK1 -->|Pass| IMPL[實作/測試]
+    CHK1 -->|Pass, Lite/Standard| IMPL[實作/測試]
     
-    %% Full Mode Extra Steps
-    FULL -->|Parallel| F3[Scenario Gate]
+    %% Full Mode Extra Steps (sequential after Spec Gate passes)
+    CHK1 -->|Pass, Full| F3[Scenario Gate]
     F3 --> F4[Build Gate]
     F4 --> IMPL
     

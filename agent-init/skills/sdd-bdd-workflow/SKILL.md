@@ -53,5 +53,6 @@ estimated_tokens:
 
 1. **評估**: [00-complexity-gate.md](./00-complexity-gate.md)
 2. **規格**: [01-spec-gate.md](./01-spec-gate.md)
-3. **實作**: [03-build-gate.md](./03-build-gate.md)
-4. **驗證**: `./scripts/check-finish.sh`
+3. **情境**: [02-scenario-gate.md](./02-scenario-gate.md)（Full 模式）
+4. **實作**: [03-build-gate.md](./03-build-gate.md)
+5. **驗證**: `./scripts/check-finish.sh`
