@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p /Users/aaron/Projects/data-science-2026/project-destiny/docs/adr)",
+      "Bash(mkdir -p /Users/aaron/Projects/data-science-2026/project-destiny/docs/specs)",
+      "Bash(mkdir -p /Users/aaron/Projects/data-science-2026/project-destiny/docs/architecture)",
+      "Bash(mkdir -p /Users/aaron/Projects/data-science-2026/project-destiny/schemas)",
+      "Bash(mkdir -p /Users/aaron/Projects/data-science-2026/project-destiny/migrations)"
+    ]
+  }
+}
