@@ -1,0 +1,322 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dataslates.local/schemas/tcm/knowledge-atom.schema.json",
+  "title": "TCM Knowledge Atom",
+  "description": "Schema for a normalized TCM knowledge atom used by ingestion, parsing, embedding, and retrieval pipelines.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "atom_type",
+    "title",
+    "canonical_name",
+    "body_markdown",
+    "embedding_text",
+    "metadata"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Stable atom identifier, preferably ULID-like text.",
+      "minLength": 8,
+      "maxLength": 64,
+      "pattern": "^[A-Za-z0-9_\\-]+$"
+    },
+    "source_document_id": {
+      "type": ["string", "null"],
+      "description": "Reference to source_documents.id.",
+      "minLength": 8,
+      "maxLength": 64
+    },
+    "atom_type": {
+      "type": "string",
+      "enum": [
+        "symptom",
+        "sign",
+        "tongue_feature",
+        "pulse_feature",
+        "pattern",
+        "pathomechanism",
+        "treatment_principle",
+        "formula",
+        "herb",
+        "citation",
+        "case"
+      ]
+    },
+    "title": {
+      "type": "string",
+      "description": "Human-readable display title.",
+      "minLength": 1,
+      "maxLength": 300
+    },
+    "canonical_name": {
+      "type": "string",
+      "description": "Canonical normalized name used for matching and relations.",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "aliases": {
+      "type": "array",
+      "description": "Known aliases or surface forms.",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 200
+      },
+      "default": [],
+      "uniqueItems": true
+    },
+    "domain": {
+      "type": ["string", "null"],
+      "description": "Top-level domain, e.g. 內科症狀, 診法, 辨證.",
+      "maxLength": 100
+    },
+    "subdomain": {
+      "type": ["string", "null"],
+      "description": "Second-level domain.",
+      "maxLength": 100
+    },
+    "category": {
+      "type": ["string", "null"],
+      "description": "Category such as 汗證, 舌象, 脈象, 證型.",
+      "maxLength": 100
+    },
+    "subcategory": {
+      "type": ["string", "null"],
+      "description": "Finer-grained category.",
+      "maxLength": 100
+    },
+    "body_markdown": {
+      "type": "string",
+      "description": "Primary content in Markdown with context injection header.",
+      "minLength": 1
+    },
+    "summary_text": {
+      "type": ["string", "null"],
+      "description": "Short summary for UI, reranking, or answer assembly.",
+      "maxLength": 2000
+    },
+    "embedding_text": {
+      "type": "string",
+      "description": "Normalized text used for embedding generation. Should include metadata header + key terms.",
+      "minLength": 1
+    },
+    "quality_score": {
+      "type": "number",
+      "description": "Human or pipeline-evaluated quality score 0~100.",
+      "minimum": 0,
+      "maximum": 100,
+      "default": 0
+    },
+    "completeness_score": {
+      "type": "number",
+      "description": "How complete the atom is for downstream retrieval 0~100.",
+      "minimum": 0,
+      "maximum": 100,
+      "default": 0
+    },
+    "authority_level": {
+      "type": "integer",
+      "description": "Source authority weight 0~100. L0 primary: 90-100, L1 structured: 80-90, L2 classic: 85-95, L3 case: 60-80.",
+      "minimum": 0,
+      "maximum": 100,
+      "default": 50
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true
+    },
+    "metadata": {
+      "$ref": "#/$defs/metadata"
+    }
+  },
+  "$defs": {
+    "metadata": {
+      "type": "object",
+      "description": "Structured metadata for retrieval, ranking, and diagnostics.",
+      "additionalProperties": true,
+      "properties": {
+        "symptom_family": {
+          "type": "string",
+          "description": "Symptom category, e.g. 汗證, 發熱, 疼痛.",
+          "maxLength": 100
+        },
+        "pattern_family": {
+          "type": "string",
+          "description": "Pattern family, e.g. 陰虛, 氣虛, 血虛, 陽虛, 實熱.",
+          "maxLength": 100
+        },
+        "time_bias": {
+          "type": "array",
+          "description": "Associated time context, e.g. 午後, 夜間, 晨起.",
+          "items": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "default": []
+        },
+        "organ_bias": {
+          "type": "array",
+          "description": "Associated organ systems, e.g. 肝, 腎, 心, 肺, 脾.",
+          "items": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "default": []
+        },
+        "related_patterns": {
+          "type": "array",
+          "description": "Canonical names of closely related patterns.",
+          "items": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "default": []
+        },
+        "feature_signature": {
+          "type": "array",
+          "description": "Defining feature set for this pathomechanism or pattern.",
+          "items": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "default": []
+        },
+        "diagnostic_weight": {
+          "type": "number",
+          "description": "Relative importance weight for reranking (0.0~1.0). Used for tongue and pulse features.",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "treatment_hint": {
+          "type": "array",
+          "description": "Associated treatment principles, e.g. 養陰清熱, 益氣固表.",
+          "items": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "default": []
+        },
+        "formula_family": {
+          "type": "string",
+          "description": "Associated formula family or representative formula, e.g. 六味地黃丸, 玉屏風散.",
+          "maxLength": 100
+        },
+        "formula_hint": {
+          "type": "array",
+          "description": "List of candidate formula names for reference.",
+          "items": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "default": []
+        },
+        "source_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "source_ref": {
+          "type": "string",
+          "description": "Chapter or section reference within the source document.",
+          "maxLength": 300
+        },
+        "tags": {
+          "type": "array",
+          "description": "Free-form tags for filtering and grouping.",
+          "items": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "default": []
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "atom_type": { "const": "symptom" } },
+        "required": ["atom_type"]
+      },
+      "then": {
+        "properties": {
+          "metadata": {
+            "type": "object",
+            "required": ["symptom_family"]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "atom_type": { "const": "tongue_feature" } },
+        "required": ["atom_type"]
+      },
+      "then": {
+        "properties": {
+          "metadata": {
+            "type": "object",
+            "required": ["diagnostic_weight"]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "atom_type": { "const": "pulse_feature" } },
+        "required": ["atom_type"]
+      },
+      "then": {
+        "properties": {
+          "metadata": {
+            "type": "object",
+            "required": ["diagnostic_weight"]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "atom_type": { "const": "pattern" } },
+        "required": ["atom_type"]
+      },
+      "then": {
+        "properties": {
+          "metadata": {
+            "type": "object",
+            "required": ["pattern_family"]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "atom_type": { "const": "pathomechanism" } },
+        "required": ["atom_type"]
+      },
+      "then": {
+        "properties": {
+          "metadata": {
+            "type": "object",
+            "required": ["feature_signature"]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "atom_type": { "const": "formula" } },
+        "required": ["atom_type"]
+      },
+      "then": {
+        "properties": {
+          "metadata": {
+            "type": "object",
+            "required": ["formula_family"]
+          }
+        }
+      }
+    }
+  ]
+}

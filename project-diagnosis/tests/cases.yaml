@@ -1,0 +1,36 @@
+# Evaluation cases for the TCM diagnostic RAG MVP.
+# Each case declares assertions against the answer_query.py output.
+# Keep in sync with docs/examples/sample-queries.md.
+
+cases:
+  - id: case_1_yin_heat
+    description: 陰虛內熱典型
+    query: 最近下午容易潮熱，晚上睡覺會盜汗，口乾，心煩，舌紅少苔。
+    expect:
+      extracted_symptoms_any_of: [潮熱, 盜汗, 心煩]
+      extracted_tongue_includes: [舌紅少苔]
+      missing_includes: [pulse_feature]
+      top_pattern: 陰虛內熱
+      top3_includes_any_of: [肝腎陰虛, 心腎不交]
+      rule_codes_triggered_any_of: [TCM-RULE-001, TCM-RULE-004]
+
+  - id: case_2_wei_qi
+    description: 衛氣不固典型
+    query: 容易自汗，吹風怕冷，精神疲倦，講話比較沒力，舌淡。
+    expect:
+      extracted_symptoms_any_of: [自汗, 畏風]
+      extracted_tongue_includes: [舌淡]
+      missing_includes: [pulse_feature]
+      top_pattern: 衛氣不固
+      top3_includes_any_of: [肺氣虛]
+      rule_codes_triggered_any_of: [TCM-RULE-002, TCM-RULE-004]
+      yin_heat_rank_min: 3   # 陰虛內熱 must not be top-1 or top-2
+
+  - id: case_3_ambiguous
+    description: 氣陰兩虛疑似（矛盾訊號）
+    query: 白天也出汗，晚上也出汗，口乾，精神不太好。
+    expect:
+      extracted_symptoms_any_of: [自汗, 盜汗]
+      rule_codes_triggered_any_of: [TCM-RULE-003]
+      has_ambiguity_flag: true
+      has_suggested_question: true
