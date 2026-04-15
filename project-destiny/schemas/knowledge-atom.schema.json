@@ -1,0 +1,171 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "knowledge-atom.schema.json",
+  "title": "KnowledgeAtom",
+  "description": "八字 RAG 知識原子的 JSON Schema 定義",
+  "type": "object",
+  "required": [
+    "atom_code",
+    "source_book",
+    "source_priority",
+    "original_text",
+    "normalized_tags",
+    "logic_type",
+    "embedding_text",
+    "status"
+  ],
+  "properties": {
+    "atom_code": {
+      "type": "string",
+      "description": "全域唯一識別碼，格式建議：{書名縮寫}-{主題}-{序號}",
+      "pattern": "^[a-z0-9\\-]+$",
+      "examples": ["ziping-jia-001", "ditianshui-guange-003"]
+    },
+    "source_book": {
+      "type": "string",
+      "description": "來源著作名稱",
+      "enum": ["子平真詮", "滴天髓", "三命通會", "千里命稿", "其他"]
+    },
+    "source_priority": {
+      "type": "integer",
+      "description": "文獻權威層級，1=最高",
+      "minimum": 1,
+      "maximum": 9
+    },
+    "chapter": {
+      "type": ["string", "null"],
+      "description": "章節名稱"
+    },
+    "section": {
+      "type": ["string", "null"],
+      "description": "節名稱"
+    },
+    "title": {
+      "type": ["string", "null"],
+      "description": "本 atom 的標題摘要"
+    },
+    "original_text": {
+      "type": "string",
+      "description": "保留原始古文，不可省略或替換為白話",
+      "minLength": 1
+    },
+    "modern_interpretation": {
+      "type": ["string", "null"],
+      "description": "現代語意轉述，不得偏離原義"
+    },
+    "embedding_text": {
+      "type": "string",
+      "description": "為向量化優化的拼接文本，含術語 + 語義描述",
+      "minLength": 1
+    },
+    "normalized_tags": {
+      "type": "array",
+      "description": "標準化術語標籤，來自受控詞彙表",
+      "items": { "type": "string" },
+      "minItems": 1
+    },
+    "logic_type": {
+      "type": "array",
+      "description": "此 atom 的邏輯用途分類",
+      "items": {
+        "type": "string",
+        "enum": [
+          "day_master_nature",
+          "pattern_definition",
+          "strength_assessment",
+          "seasonal_adjustment",
+          "ten_god_relation",
+          "conflict_relation",
+          "case_example",
+          "general_principle"
+        ]
+      },
+      "minItems": 1
+    },
+    "conditions": {
+      "type": "array",
+      "description": "結構化條件列表，欄位對應 Bazi Engine 輸出",
+      "items": {
+        "type": "object",
+        "required": ["field", "operator", "value"],
+        "properties": {
+          "field": {
+            "type": "string",
+            "description": "命盤欄位名，對應 chart_payload 欄位"
+          },
+          "operator": {
+            "type": "string",
+            "enum": ["eq", "ne", "in", "not_in", "contains", "gt", "lt"]
+          },
+          "value": {
+            "description": "比對值，可為字串、陣列或數字"
+          }
+        }
+      }
+    },
+    "day_master_tags": {
+      "type": "array",
+      "description": "相關日主標籤，用於高頻過濾",
+      "items": {
+        "type": "string",
+        "enum": ["甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸"]
+      }
+    },
+    "month_branch_tags": {
+      "type": "array",
+      "description": "相關月支標籤，用於高頻過濾",
+      "items": {
+        "type": "string",
+        "enum": ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"]
+      }
+    },
+    "ten_god_tags": {
+      "type": "array",
+      "description": "相關十神標籤",
+      "items": {
+        "type": "string",
+        "enum": ["比肩", "劫財", "食神", "傷官", "偏財", "正財", "七殺", "正官", "偏印", "正印"]
+      }
+    },
+    "pattern_tags": {
+      "type": "array",
+      "description": "相關格局標籤",
+      "items": { "type": "string" }
+    },
+    "seasonal_tags": {
+      "type": "array",
+      "description": "相關季節標籤",
+      "items": {
+        "type": "string",
+        "enum": ["spring", "summer", "autumn", "winter", "late_spring", "late_summer", "late_autumn", "late_winter"]
+      }
+    },
+    "citation_path": {
+      "type": "object",
+      "description": "原文出處定位",
+      "properties": {
+        "book": { "type": "string" },
+        "chapter": { "type": "string" },
+        "line_range": { "type": "string" }
+      }
+    },
+    "notes": {
+      "type": ["string", "null"],
+      "description": "編輯備注，不進入生成流程"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["active", "draft", "deprecated", "archived"],
+      "default": "active"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "additionalProperties": false
+}

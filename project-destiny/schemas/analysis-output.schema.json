@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "analysis-output.schema.json",
+  "title": "AnalysisOutput",
+  "description": "生成編排器輸出的 JSON Schema 定義",
+  "type": "object",
+  "required": [
+    "命盤結構摘要",
+    "核心判斷",
+    "依據文獻",
+    "規則說明",
+    "綜合解釋",
+    "不確定處"
+  ],
+  "properties": {
+    "命盤結構摘要": {
+      "type": "string",
+      "description": "四柱、日主、月令、季節的結構摘要",
+      "minLength": 1
+    },
+    "核心判斷": {
+      "type": "string",
+      "description": "格局、強弱、調候方向的主要判斷",
+      "minLength": 1
+    },
+    "依據文獻": {
+      "type": "array",
+      "description": "引用的知識原子清單",
+      "items": {
+        "type": "object",
+        "required": ["atom_code", "source_book", "original_text", "relevance"],
+        "properties": {
+          "atom_code": { "type": "string" },
+          "source_book": { "type": "string" },
+          "original_text": { "type": "string" },
+          "relevance": {
+            "type": "string",
+            "description": "此文獻如何支撐本次判斷"
+          }
+        }
+      },
+      "minItems": 1
+    },
+    "規則說明": {
+      "type": "string",
+      "description": "規則引擎判定結果的說明",
+      "minLength": 1
+    },
+    "綜合解釋": {
+      "type": "string",
+      "description": "整合規則與文獻的完整解釋",
+      "minLength": 1
+    },
+    "不確定處": {
+      "type": "string",
+      "description": "明示判斷信心較低或證據不足之處。此欄不可為空。",
+      "minLength": 1
+    }
+  }
+}

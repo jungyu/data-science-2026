@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: destiny-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: destiny
+    ports:
+      - "5432:5432"
+    volumes:
+      - destiny-pgdata:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d destiny"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  destiny-pgdata:

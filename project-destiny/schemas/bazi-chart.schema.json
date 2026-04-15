@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "bazi-chart.schema.json",
+  "title": "BaziChart",
+  "description": "八字排盤輸出的 JSON Schema 定義",
+  "type": "object",
+  "required": [
+    "chart_id",
+    "four_pillars",
+    "day_master",
+    "hidden_stems",
+    "month_commander",
+    "season",
+    "true_solar_time_applied",
+    "calculation_meta"
+  ],
+  "properties": {
+    "chart_id": {
+      "type": "string",
+      "description": "命盤唯一識別碼"
+    },
+    "four_pillars": {
+      "type": "object",
+      "description": "四柱：年月日時",
+      "required": ["year", "month", "day", "hour"],
+      "properties": {
+        "year":  { "$ref": "#/$defs/pillar" },
+        "month": { "$ref": "#/$defs/pillar" },
+        "day":   { "$ref": "#/$defs/pillar" },
+        "hour":  { "$ref": "#/$defs/pillar" }
+      }
+    },
+    "day_master": {
+      "type": "string",
+      "description": "日主天干",
+      "enum": ["甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸"]
+    },
+    "hidden_stems": {
+      "type": "object",
+      "description": "各地支藏干，key 為地支，value 為藏干陣列",
+      "additionalProperties": {
+        "type": "array",
+        "items": { "type": "string" }
+      }
+    },
+    "ten_gods": {
+      "type": "object",
+      "description": "各干支對應十神，key 為干支，value 為十神名稱",
+      "additionalProperties": { "type": "string" }
+    },
+    "month_commander": {
+      "type": "string",
+      "description": "月令（月支）",
+      "enum": ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"]
+    },
+    "season": {
+      "type": "string",
+      "description": "季節",
+      "enum": ["spring", "summer", "autumn", "winter", "late_spring", "late_summer", "late_autumn", "late_winter"]
+    },
+    "true_solar_time_applied": {
+      "type": "boolean",
+      "description": "是否套用真太陽時"
+    },
+    "calculation_meta": {
+      "type": "object",
+      "description": "計算基準資訊",
+      "required": ["timezone"],
+      "properties": {
+        "timezone": { "type": "string" },
+        "solar_term_boundary_used": { "type": "boolean" },
+        "adjusted_datetime": { "type": "string", "format": "date-time" }
+      }
+    }
+  },
+  "$defs": {
+    "pillar": {
+      "type": "object",
+      "required": ["stem", "branch"],
+      "properties": {
+        "stem": {
+          "type": "string",
+          "enum": ["甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸"]
+        },
+        "branch": {
+          "type": "string",
+          "enum": ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"]
+        }
+      }
+    }
+  }
+}

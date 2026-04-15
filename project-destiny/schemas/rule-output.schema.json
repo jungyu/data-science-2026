@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "rule-output.schema.json",
+  "title": "RuleEngineOutput",
+  "description": "規則引擎輸出的 JSON Schema 定義",
+  "type": "object",
+  "required": [
+    "chart_id",
+    "strength_assessment",
+    "candidate_patterns",
+    "retrieval_query_seeds"
+  ],
+  "properties": {
+    "chart_id": { "type": "string" },
+    "strength_assessment": {
+      "type": "object",
+      "required": ["day_master_strength"],
+      "properties": {
+        "day_master_strength": {
+          "type": "string",
+          "enum": ["very_strong", "strong", "moderately_strong", "neutral", "moderately_weak", "weak", "very_weak"]
+        },
+        "supporting_elements": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "draining_elements": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "controlling_elements": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "confidence": {
+          "type": "string",
+          "enum": ["high", "medium", "low"]
+        }
+      }
+    },
+    "candidate_patterns": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["pattern", "confidence"],
+        "properties": {
+          "pattern": { "type": "string" },
+          "confidence": {
+            "type": "string",
+            "enum": ["high", "medium", "low"]
+          },
+          "basis": { "type": "string" }
+        }
+      }
+    },
+    "seasonal_adjustment_needed": {
+      "type": "array",
+      "description": "調候需要的五行元素",
+      "items": { "type": "string" }
+    },
+    "special_relations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["type", "from", "to"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["沖", "合", "刑", "害", "破"]
+          },
+          "from": { "type": "string" },
+          "to": { "type": "string" },
+          "impact": {
+            "type": "string",
+            "enum": ["high", "moderate", "low"]
+          }
+        }
+      }
+    },
+    "risk_flags": {
+      "type": "array",
+      "description": "需要特別注意的命盤風險旗標",
+      "items": { "type": "string" }
+    },
+    "retrieval_query_seeds": {
+      "type": "array",
+      "description": "供 Retrieval Orchestrator 使用的查詢種子",
+      "items": { "type": "string" },
+      "minItems": 1
+    }
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "retrieval-result.schema.json",
+  "title": "RetrievalResult",
+  "description": "Retrieval Orchestrator 輸出的 JSON Schema 定義",
+  "type": "object",
+  "required": ["retrieval_id", "chart_id", "results"],
+  "properties": {
+    "retrieval_id": { "type": "string" },
+    "chart_id": { "type": "string" },
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["atom_id", "atom_code", "source_book", "original_text", "final_score"],
+        "properties": {
+          "atom_id": { "type": "integer" },
+          "atom_code": { "type": "string" },
+          "source_book": { "type": "string" },
+          "title": { "type": ["string", "null"] },
+          "original_text": { "type": "string" },
+          "modern_interpretation": { "type": ["string", "null"] },
+          "final_score": { "type": "number", "minimum": 0, "maximum": 1 },
+          "vector_score": { "type": "number", "minimum": 0, "maximum": 1 },
+          "source_priority_score": { "type": "number", "minimum": 0, "maximum": 1 },
+          "symbolic_match_score": { "type": "number", "minimum": 0, "maximum": 1 },
+          "metadata_overlap_score": { "type": "number", "minimum": 0, "maximum": 1 },
+          "route_hits": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["symbolic", "metadata", "vector", "graph"]
+            }
+          },
+          "reason_codes": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}
