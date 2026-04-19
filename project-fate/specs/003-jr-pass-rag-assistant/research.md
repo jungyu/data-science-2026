@@ -1,61 +1,71 @@
-# Research Notes: JR Pass Official Rules & Compliance RAG
+# 研究筆記：JR Pass 官方規則與合規性 RAG
 
-## Decision 1: Use official JR Pass documents as the only first-release corpus
+## 決策一：第一版語料只使用官方 JR Pass 文件
 
-**Decision**: Restrict the first-release knowledge base to official JR Pass and supported regional pass documents, including coverage, validity, qualification, and restrictions.
+**決策**：第一版知識庫只收錄官方 JR Pass 與支援區域票券的官方文件，包含適用範圍、有效期間、資格條件與使用限制。
 
-**Rationale**:
-- Maximizes trustworthiness for compliance-oriented answers.
-- Reduces hallucination risk from secondary or outdated blog content.
-- Aligns with the feature goal of official-rule consultation.
+**理由**：
 
-**Alternatives considered**:
-- Mix official docs with blogs or travel forums: rejected because authority and revision control are weaker.
-- Open-web crawling for broader coverage: rejected because source reliability is too unstable for compliance use.
+- 能最大化合規型回答的可信度
+- 可降低次級來源與過時文章帶來的 hallucination 風險
+- 與本功能「官方規則諮詢」的產品定位一致
 
-## Decision 2: Separate rule retrieval from compliance judgment
+**考慮過的替代方案**：
 
-**Decision**: Build a dedicated `ComplianceAssessment` layer after retrieval instead of letting the generation model infer eligibility directly from retrieved text alone.
+- 混合官方文件與部落格、論壇資料：放棄，因為權威性與版本控制較弱
+- 直接開放全網爬取：放棄，因為對合規型應用而言來源可靠性過低
 
-**Rationale**:
-- Keeps official evidence distinct from system interpretation.
-- Improves explainability and testability.
-- Makes edge-case handling and rule conflicts easier to reason about.
+## 決策二：將規則檢索與合規判定分開
 
-**Alternatives considered**:
-- Pure generation-only reasoning after retrieval: rejected because it weakens traceability and can blur evidence versus inference.
+**決策**：在 retrieval 之後加入獨立的 `ComplianceAssessment` layer，而不是直接讓生成模型從 retrieved text 推論資格判定。
 
-## Decision 3: Track source revision metadata on every ingested chunk
+**理由**：
 
-**Decision**: Every pass rule chunk must include source URL, pass product, revision date, and rule category metadata.
+- 可將官方證據與系統推論分開
+- 提升可解釋性與可測試性
+- 更容易處理邊界案例與規則衝突
 
-**Rationale**:
-- Enables conflict detection between revisions.
-- Supports answer traceability and debugging.
-- Makes future content refresh workflows easier to verify.
+**考慮過的替代方案**：
 
-**Alternatives considered**:
-- Store plain text chunks without revision info: rejected because it undermines compliance trust and version awareness.
+- 檢索後直接交由生成模型推理：放棄，因為會削弱 traceability，也容易混淆 evidence 與 inference
 
-## Decision 4: First release is `zh-TW` only
+## 決策三：每個 chunk 都要保留版本 metadata
 
-**Decision**: Limit the first release to Traditional Chinese output.
+**決策**：每個票券規則 chunk 都必須保留 source URL、pass product、revision date 與 rule category metadata。
 
-**Rationale**:
-- Reduces terminology drift during evaluation.
-- Simplifies prompt design, answer evaluation, and consistency checks.
-- Matches the primary user context for the current project.
+**理由**：
 
-**Alternatives considered**:
-- Immediate multilingual output: rejected because it increases ambiguity, terminology alignment cost, and evaluation scope.
+- 可支援不同版本之間的衝突偵測
+- 有利於答案追溯與除錯
+- 讓未來內容更新流程更容易驗證
 
-## Decision 5: Treat cost comparison as supporting output, not authoritative evidence
+**考慮過的替代方案**：
 
-**Decision**: Use cost comparison only as a supplementary explanation beside official rule-based consultation.
+- 只儲存純文字 chunk：放棄，因為會破壞合規諮詢最需要的版本感知能力
 
-**Rationale**:
-- The system's core role is compliance and rule consultation.
-- Cost estimation may be approximate and should not be mistaken for official fare guarantees.
+## 決策四：第一版只支援繁體中文
 
-**Alternatives considered**:
-- Make cost estimation the primary answer driver: rejected because it would shift the product toward a fare optimizer instead of a rules-based RAG system.
+**決策**：第一版僅支援繁體中文輸出。
+
+**理由**：
+
+- 可降低術語漂移
+- 可簡化 prompt 設計、回答評估與一致性檢查
+- 符合目前專案的主要使用者情境
+
+**考慮過的替代方案**：
+
+- 一開始就支援多語：放棄，因為會提高歧義、術語對齊成本與評估範圍
+
+## 決策五：成本比較只是輔助輸出
+
+**決策**：成本比較只作為官方規則諮詢之外的補充資訊，不作為主要權威依據。
+
+**理由**：
+
+- 系統核心角色是規則與合規諮詢
+- 成本估算可能帶有近似性，不應被誤認為官方票價保證
+
+**考慮過的替代方案**：
+
+- 讓成本估算成為主要回答驅動：放棄，因為這會把產品導向票價最佳化工具，而不是規則型 RAG 系統

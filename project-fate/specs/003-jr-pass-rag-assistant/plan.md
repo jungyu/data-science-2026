@@ -11,64 +11,74 @@ phases:
 constitution_check: pass
 ---
 
-# Implementation Plan: JR Pass Official Rules & Compliance RAG Consultation System
+# 實作計畫：JR Pass 官方規則與合規性 RAG 諮詢系統
 
-**Branch**: `003-jr-pass-rag-assistant` | **Date**: 2026-04-15 | **Spec**: [spec.md](/c:/Users/12ok4/project/data-science-2026/project-fate/specs/003-jr-pass-rag-assistant/spec.md)
-**Input**: Feature specification from `/specs/003-jr-pass-rag-assistant/spec.md`
+**分支**：`003-jr-pass-rag-assistant`  
+**日期**：2026-04-15  
+**規格文件**：[spec.md](C:\Users\12ok4\project\data-science-2026\project-fate\specs\003-jr-pass-rag-assistant\spec.md)
 
-## Summary
-Build a retrieval-first RAG consultation system for JR Pass official rules and compliance. The system ingests official JR Pass and regional pass rule documents, chunks and embeds them with provenance metadata, retrieves rule evidence for a user itinerary and question, validates grounding, performs eligibility assessment, and returns a Traditional Chinese consultation answer with citations and bounded cost/suitability guidance.
+## 摘要
 
-## Technical Context
-**Language/Version**: Python 3.11  
-**Primary Dependencies**: OpenAI SDK, pytest, behave, vector database client, HTML/document loaders, markdown/text normalization utilities  
-**Storage**: Existing vector database abstraction + pass document metadata registry + optional cached itinerary evaluation store  
-**Testing**: pytest unit tests, integration tests, retrieval evaluation tests, behave feature scenarios  
-**Target Platform**: Linux-compatible Python service / CLI-backed ingestion jobs  
-**Project Type**: single  
-**Performance Goals**: normal consultation query `p95 < 2500ms`, retrieved chunks <= 10, citations <= 5  
-**Constraints**: retrieval-first only, official documents only, `zh-TW` output only in first release, anonymous access, refresh official content every 24 hours  
-**Scale/Scope**: first release covers national JR Pass plus a bounded set of supported regional passes and their official rule revisions
+建立一套 retrieval-first 的 JR Pass 合規諮詢 RAG 系統。  
+系統會 ingest 官方 JR Pass 與區域周遊券規則文件，對內容進行 chunking 與 embedding，保留來源與修訂版本 metadata，接著依據使用者行程與問題檢索規則證據、驗證 grounding、進行資格判定，最後輸出繁體中文且附引用的諮詢結果。
 
-## Constitution Check
-*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+## 技術脈絡
 
-**Reference**: See `.agent/memory/constitution.md`
+- **語言 / 版本**：Python 3.11
+- **主要依賴**：OpenAI SDK、pytest、behave、向量資料庫 client、HTML / 文件載入工具、markdown / text normalization utilities
+- **儲存層**：既有向量資料庫抽象層 + 票券文件 metadata registry + 可選 itinerary evaluation cache
+- **測試方式**：pytest 單元測試、整合測試、retrieval evaluation tests、behave feature scenarios
+- **目標平台**：Linux 相容的 Python 服務與 CLI ingestion job
+- **專案型態**：單一 Python 專案
+- **效能目標**：一般查詢 `p95 < 2500ms`、retrieved chunks <= 10、citations <= 5
+- **關鍵限制**：只能 retrieval-first、只能 ingest 官方文件、第一版只支援 `zh-TW`、支援匿名使用、官方資料每 24 小時更新一次
+- **範圍**：第一版支援全國 JR Pass 與有限集合的區域周遊券
 
-### Principle I: Testable Changes
-- [x] Contract tests identified for all API endpoints
-- [x] Integration tests identified for all user workflows
-- [x] Unit tests identified for retrieval, rule parsing, compliance assessment, and grounding logic
-- [x] TDD workflow preserved in task planning approach
+## 憲章檢查
 
-### Principle II: Type Safety First
-- [x] Input schemas planned for itinerary and query inputs
-- [x] Strongly typed domain entities planned for pass rules, products, and assessments
-- [x] Retrieval metadata and compliance outputs normalized before answer generation
+**參考文件**：[constitution.md](C:\Users\12ok4\project\data-science-2026\project-fate\.agent\memory\constitution.md)
 
-### Principle III: Security by Default
-- [x] Input validation planned for all user inputs
-- [x] No sensitive user identifiers required beyond itinerary payload
-- [x] Logging scope bounded to request IDs, grounding state, and source metadata
+### 原則一：可驗證變更
 
-### Principle IV: Code Quality & Maintainability
-- [x] Documentation artifacts planned for research, data model, contracts, and quickstart
-- [x] Test coverage targets defined for unit and integration layers
-- [x] Feature branch and file layout remain incremental and localized
+- [x] 已為 API 端點規劃 contract tests
+- [x] 已為主要使用者流程規劃 integration tests
+- [x] 已為 retrieval、規則解析、合規判定與 grounding 邏輯規劃 unit tests
+- [x] 任務拆解保留 TDD 流程
 
-### Principle V: Small, Reversible Steps
-- [x] Query path reuses existing ingestion/retrieval foundation where possible
-- [x] Compliance assessment added as a bounded domain layer instead of broad trip-planning logic
-- [x] Source coverage limited to supported official pass documents in first release
+### 原則二：型別安全優先
 
-### Principle VI: Human Authority
-- [x] Official-source curation remains explicit
-- [x] System provides consultation, not legally binding or commercial guarantee
-- [x] Rule conflicts and insufficient evidence produce conservative output
+- [x] 已規劃 itinerary 與 query 的輸入 schema
+- [x] 已規劃 pass rules、products、assessments 的強型別實體
+- [x] 已規劃在答案生成前正規化 retrieval metadata 與 compliance output
 
-## Project Structure
+### 原則三：預設安全
 
-### Documentation (this feature)
+- [x] 已規劃使用者輸入驗證
+- [x] 除 itinerary payload 外不要求額外敏感使用者識別資訊
+- [x] logging 僅限 request id、grounding state 與 source metadata
+
+### 原則四：可維護性
+
+- [x] 已規劃 research、data model、contracts、quickstart 等文件產物
+- [x] 已定義 unit 與 integration 測試覆蓋目標
+- [x] feature branch 與檔案結構維持增量式調整
+
+### 原則五：小步可回復
+
+- [x] 盡可能重用現有 ingestion / retrieval 基礎設施
+- [x] 合規判定設計為受限的 domain layer，而非大型旅遊規劃引擎
+- [x] 第一版來源限制為官方票券文件
+
+### 原則六：人類最終權威
+
+- [x] 官方來源範圍明確可審核
+- [x] 系統提供的是諮詢，不是法律或商業保證
+- [x] 遇到規則衝突或證據不足時輸出保守結果
+
+## 專案結構
+
+### 文件產物
+
 ```text
 specs/003-jr-pass-rag-assistant/
 |-- plan.md
@@ -80,109 +90,112 @@ specs/003-jr-pass-rag-assistant/
 `-- tasks.md
 ```
 
-### Source Code (repository root)
+### 原始碼結構
+
 ```text
 src/
 |-- models/
 |   |-- knowledge.py
-|   `-- pass_rules.py                # new
+|   `-- pass_rules.py
 |-- ingestion/
 |   |-- ingestor.py
 |   |-- chunker.py
 |   |-- embedder.py
-|   `-- pass_rule_ingestor.py        # new
+|   `-- pass_rule_ingestor.py
 |-- retrieval/
 |   |-- retrieval_gate.py
-|   `-- pass_rule_retriever.py       # new
+|   `-- pass_rule_retriever.py
 |-- query/
 |   |-- query_pipeline.py
-|   `-- compliance_consultation.py   # new
+|   `-- compliance_consultation.py
 |-- governance/
-|   `-- source_policy.py             # new
+|   `-- source_policy.py
 |-- config/
-|   `-- pass_catalog_config.py       # new
+|   `-- pass_catalog_config.py
 `-- rag/
     `-- core.py
 
 tests/
 |-- contract/
-|   `-- test_jr_pass_compliance_contract.py   # new
+|   `-- test_jr_pass_compliance_contract.py
 |-- integration/
-|   `-- test_jr_pass_consultation_flow.py     # new
+|   `-- test_jr_pass_consultation_flow.py
 `-- unit/
-    |-- test_pass_rule_ingestor.py            # new
-    |-- test_pass_rule_retriever.py           # new
-    `-- test_compliance_assessment.py         # new
+    |-- test_pass_rule_ingestor.py
+    |-- test_pass_rule_retriever.py
+    `-- test_compliance_assessment.py
 ```
 
-**Structure Decision**: Single Python project. Extend the existing ingestion/retrieval/query architecture with a narrowly scoped pass-rule ingestion and compliance assessment layer instead of introducing a separate microservice.
+**結構決策**：維持單一 Python 專案，延伸既有 ingestion / retrieval / query 架構，新增受限範圍的 pass-rule ingestion 與 compliance assessment layer，而不是拆成新的微服務。
 
-## Phase 0: Outline & Research
+## Phase 0：研究
 
-Research output is captured in [research.md](/c:/Users/12ok4/project/data-science-2026/project-fate/specs/003-jr-pass-rag-assistant/research.md).
+研究結果整理在 [research.md](C:\Users\12ok4\project\data-science-2026\project-fate\specs\003-jr-pass-rag-assistant\research.md)。
 
-Resolved research topics:
-- use official JR Pass documents only as first-release corpus
-- split rule retrieval from cost/suitability estimation
-- model revision-aware pass documents with source provenance
-- keep multilingual expansion out of first release
+已確認的研究主題：
 
-**Output**: `research.md` complete
+- 第一版只使用官方 JR Pass 文件
+- 將規則檢索與合規判定拆開
+- 為每個 chunk 保留 revision-aware metadata
+- 第一版不做多語輸出擴張
 
-## Phase 1: Design & Contracts
+## Phase 1：設計與契約
 
-Design output is captured in:
-- [data-model.md](/c:/Users/12ok4/project/data-science-2026/project-fate/specs/003-jr-pass-rag-assistant/data-model.md)
-- [quickstart.md](/c:/Users/12ok4/project/data-science-2026/project-fate/specs/003-jr-pass-rag-assistant/quickstart.md)
-- [jr-pass-compliance.openapi.yaml](/c:/Users/12ok4/project/data-science-2026/project-fate/specs/003-jr-pass-rag-assistant/contracts/jr-pass-compliance.openapi.yaml)
+設計產物如下：
 
-Phase 1 design decisions:
-1. Add a pass-rule ingestion layer for official JR pass documents with revision metadata.
-2. Separate `PassDocument` retrieval from `ComplianceAssessment` logic so grounded evidence and derived judgment remain distinguishable.
-3. Keep `grounding gate` as a mandatory checkpoint before answer generation.
-4. Limit first release to `zh-TW` output and anonymous consultation to reduce scope and ambiguity.
-5. Use bounded cost comparison only as a supporting output, not as the primary authoritative source.
+- [data-model.md](C:\Users\12ok4\project\data-science-2026\project-fate\specs\003-jr-pass-rag-assistant\data-model.md)
+- [quickstart.md](C:\Users\12ok4\project\data-science-2026\project-fate\specs\003-jr-pass-rag-assistant\quickstart.md)
+- [jr-pass-compliance.openapi.yaml](C:\Users\12ok4\project\data-science-2026\project-fate\specs\003-jr-pass-rag-assistant\contracts\jr-pass-compliance.openapi.yaml)
 
-**Output**: data model, quickstart, and contracts completed
+Phase 1 的關鍵設計決策：
 
-## Phase 2: Task Planning Approach
+1. 新增官方票券規則 ingestion layer，保留 revision metadata。
+2. 將 `PassDocument` 檢索與 `ComplianceAssessment` 邏輯分離。
+3. 將 grounding gate 設為回答生成前的必要檢查點。
+4. 第一版限制為 `zh-TW` 與匿名使用，以控制範圍。
+5. 成本比較僅作為輔助資訊，而非主要權威依據。
 
-**Task Generation Strategy**:
-- Generate contract tests for the consultation endpoint first.
-- Generate unit tests for rule ingestion, retrieval metadata filtering, compliance assessment, and grounding behavior.
-- Generate integration tests for the full ingest -> retrieve -> assess -> answer workflow.
-- Implement domain models and config before retriever and consultation orchestration.
-- Implement answer-generation wiring only after retrieval and compliance outputs are testable.
+## Phase 2：任務拆解策略
 
-**Ordering Strategy**:
-- TDD order: contracts -> unit tests -> integration tests -> implementation
-- Dependency order: models/config -> ingestion -> retriever -> compliance logic -> API/query wiring
-- Parallelizable tasks: unit tests for ingestion, retrieval, and compliance logic can proceed independently
+### 任務生成策略
 
-**Estimated Output**: 18-24 ordered tasks in `tasks.md`
+- 先產生 consultation endpoint 的 contract tests
+- 再產生 rule ingestion、metadata filtering、compliance assessment 與 grounding 行為的 unit tests
+- 接著產生完整 ingest -> retrieve -> assess -> answer 流程的 integration tests
+- 在實作 retriever 與 consultation orchestration 前，先完成 domain models 與 config
+- 只有在 retrieval 與 compliance output 可測試後，才接上 answer generation wiring
 
-## Complexity Tracking
+### 排序策略
 
-| Violation | Why Needed | Simpler Alternative Rejected Because |
-|-----------|------------|-------------------------------------|
-| Add explicit compliance assessment layer | The system must distinguish official rule retrieval from eligibility judgment | Pure freeform generation would blur evidence and judgment boundaries |
-| Add revision-aware rule metadata | Official documents may conflict across revisions | Flat documents without revision tracking would weaken trust and explainability |
+- TDD 順序：contracts -> unit tests -> integration tests -> implementation
+- 依賴順序：models / config -> ingestion -> retriever -> compliance logic -> API / query wiring
+- 可平行化任務：ingestion、retrieval、compliance 相關 unit tests 可獨立進行
 
-## Progress Tracking
+### 預估輸出
 
-**Phase Status**:
-- [x] Phase 0: Research complete (/plan command)
-- [x] Phase 1: Design complete (/plan command)
-- [x] Phase 2: Task planning complete (/plan command - describe approach only)
-- [ ] Phase 3: Tasks generated (/tasks command)
-- [ ] Phase 4: Implementation complete
-- [ ] Phase 5: Validation passed
+- 在 [tasks.md](C:\Users\12ok4\project\data-science-2026\project-fate\specs\003-jr-pass-rag-assistant\tasks.md) 中產生 18-24 個有序任務
 
-**Gate Status**:
-- [x] Initial Constitution Check: PASS
-- [x] Post-Design Constitution Check: PASS
-- [x] All NEEDS CLARIFICATION resolved
-- [x] Complexity deviations documented
+## 複雜度追蹤
 
----
-*Based on Constitution: `.agent/memory/constitution.md`*
+| 額外設計 | 必要原因 | 為何不採用更簡單方案 |
+|-----------|----------|----------------------|
+| 明確加入 compliance assessment layer | 系統必須區分官方規則檢索與資格判定 | 若只做自由生成，會混淆證據與判斷 |
+| 加入 revision-aware metadata | 官方文件會隨版本更新而衝突 | 若不追蹤版本，會削弱可信度與可解釋性 |
+
+## 進度追蹤
+
+### Phase 狀態
+
+- [x] Phase 0：研究完成
+- [x] Phase 1：設計完成
+- [x] Phase 2：任務規劃完成
+- [ ] Phase 3：任務產生完成
+- [ ] Phase 4：實作完成
+- [ ] Phase 5：驗證完成
+
+### Gate 狀態
+
+- [x] 初始 Constitution Check：PASS
+- [x] 設計後 Constitution Check：PASS
+- [x] 所有 NEEDS CLARIFICATION 已解完
+- [x] 複雜度偏離已記錄

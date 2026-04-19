@@ -1,46 +1,50 @@
-# ADR-003: Restrict First Release Corpus to Official JR Pass Documents
+# ADR-003：第一版語料庫僅採用官方 JR Pass 文件
 
-## Context
+## 背景
 
-The project is a `JR Pass Official Rules & Compliance RAG Consultation System`. Its primary goal is to answer eligibility, restriction, and rule-compliance questions with traceable evidence.
+本專案是「JR Pass 官方規則與合規性 RAG 諮詢系統」，核心目標是以可追溯的證據回答票券資格、使用限制與合規性問題。
 
-If the first release ingests unofficial blogs, travel forums, or derivative summaries, the system may retrieve outdated interpretations, simplified explanations, or contradictory claims. That creates a high risk of incorrect citations and weakens the trustworthiness of compliance answers.
+若第一版就納入非官方部落格、旅遊論壇或整理型文章，系統可能檢索到過時、簡化或彼此矛盾的說法，進而導致引用錯誤，降低整體可信度。
 
-Because this system is meant to justify answers with evidence, corpus quality matters more than corpus size in the first release.
+由於本系統必須能以引用證據為答案背書，因此在第一版中，語料品質比語料數量更重要。
 
-## Decision
+## 決策
 
-The first release will restrict the RAG corpus to official JR Pass and regional-pass materials only.
+第一版 RAG 語料庫僅收錄官方 JR Pass 與官方區域周遊券相關文件。
 
-Allowed source types:
+允許的來源類型包括：
 
-- official JR pass rule pages
-- official regional pass descriptions
-- official FAQ pages
-- official notices for validity, eligibility, or fare changes
+- 官方 JR Pass 規則頁面
+- 官方區域周遊券說明頁面
+- 官方 FAQ
+- 官方票價、資格與適用條件更新公告
 
-Unofficial travel blogs, community summaries, and forum discussions are excluded from the retrieval corpus.
+不納入：
 
-## Status
+- 非官方旅遊部落格
+- 社群整理文章
+- 討論區與論壇內容
+
+## 狀態
 
 Accepted
 
-## Consequences
+## 後果
 
-### Positive
+### 正面影響
 
-- improves citation trustworthiness
-- reduces hallucination caused by conflicting secondary sources
-- keeps compliance answers grounded in authoritative material
-- makes evaluation easier because retrieved evidence has a clear authority level
+- 提升 citation 的可信度
+- 降低次級來源互相衝突造成的 hallucination
+- 讓合規性回答更貼近權威規則來源
+- 讓後續評估更容易定義語料權威性
 
-### Negative
+### 負面影響
 
-- reduces corpus breadth in the short term
-- may leave some user questions unanswered if official documentation is sparse
-- requires more careful source collection and curation
+- 第一版語料廣度較小
+- 若官方文件不足，部分問題可能無法回答
+- 需要更嚴格地管理資料來源與蒐集流程
 
-### Follow-up implications
+### 後續影響
 
-- future expansion to secondary sources would need a separate authority label and retrieval policy
-- the ingestion pipeline must validate source provenance before indexing
+- 若未來要擴充次級來源，需額外設計 authority label 與 retrieval policy
+- ingestion pipeline 必須在索引前驗證來源是否屬於官方語料

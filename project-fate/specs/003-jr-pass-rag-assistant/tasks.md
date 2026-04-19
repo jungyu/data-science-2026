@@ -47,7 +47,7 @@ phases:
 
 ## Phase 3.5: Polish
 - [ ] T019 Add retrieval-quality evaluation coverage for JR pass rule relevance in `tests/evaluation/test_retrieval_quality.py`
-- [ ] T020 Update repository-facing documentation with feature usage notes in `docs/AI/20260408_bazi_rag_spec.md` and related docs if needed
+- [ ] T020 Update repository-facing documentation with feature usage notes in `docs/AI/20260415_jr_pass_rag_architecture.md`, `docs/AI/20260415_jr_pass_rag_whitepaper.md`, and related docs if needed
 
 ## Dependencies
 - T004-T008 must be written before T009-T018
@@ -73,4 +73,3 @@ Run in parallel:
 - [ ] Tests are scheduled before implementation
 - [ ] Parallel tasks do not edit the same file
 - [ ] Each task specifies exact file paths
-

@@ -1,49 +1,49 @@
-# ADR-004: Separate Compliance Assessment from Generative Answering
+# ADR-004：將合規判定與回答生成分離
 
-## Context
+## 背景
 
-JR Pass consultation requires more than retrieving text. The system must decide whether an itinerary appears eligible under official rules, whether restrictions apply, and whether the answer should be conservative when evidence is incomplete.
+JR Pass 諮詢不只是一般文字問答。系統必須根據官方規則判定行程是否符合資格、是否受限，以及在證據不足時是否應保守回答。
 
-If a single generative step directly consumes itinerary data and retrieved chunks, it may blur together three different tasks:
+如果讓單一生成步驟直接吃入 itinerary 與 retrieved chunks，很容易把三件不同的事混在一起：
 
-- retrieving official rules
-- assessing compliance against those rules
-- generating a user-facing explanation
+- 檢索官方規則
+- 根據規則進行合規判定
+- 生成面向使用者的自然語言說明
 
-That makes the system harder to test, harder to audit, and more likely to mix evidence with unsupported inference.
+這會讓系統更難測試、更難審計，也更容易把沒有證據支持的推論包裝成正式結論。
 
-## Decision
+## 決策
 
-The system will use three logical layers:
+系統採用三層邏輯結構：
 
 1. `Rule Retrieval Layer`
-   Retrieves official JR rule evidence.
+   負責檢索官方規則證據。
 2. `Compliance Assessment Layer`
-   Interprets the itinerary against retrieved rules and produces a structured judgment.
+   負責將行程對照規則並產生結構化判定。
 3. `Answer Generation Layer`
-   Produces the final explanation using retrieved evidence and the compliance outcome.
+   負責根據檢索證據與判定結果生成最終說明文字。
 
-The answer generation layer must not invent compliance status that is not supported by the assessment layer.
+生成層不得自行編造未經判定層支持的合規結論。
 
-## Status
+## 狀態
 
 Accepted
 
-## Consequences
+## 後果
 
-### Positive
+### 正面影響
 
-- improves testability of rule reasoning
-- separates evidence retrieval from judgment logic
-- makes it easier to explain which part of the system produced each conclusion
-- reduces the chance of unsupported compliance claims
+- 提升規則判定流程的可測試性
+- 將證據檢索與邏輯判定分離
+- 更容易解釋每個結論是由哪個系統層產生
+- 降低 unsupported compliance claim 的風險
 
-### Negative
+### 負面影響
 
-- adds architectural complexity compared with a simple vector-RAG pipeline
-- requires explicit interfaces between retrieval, assessment, and generation
+- 架構比單純的 vector-RAG 更複雜
+- 需要明確定義 retrieval、assessment、generation 之間的介面
 
-### Follow-up implications
+### 後續影響
 
-- evaluation can score retrieval quality and compliance quality separately
-- future rule engines or deterministic validators can replace or augment the assessment layer without rewriting generation
+- 評估時可分開量測檢索品質與判定品質
+- 未來若要導入 rule engine 或 deterministic validator，可替換 assessment layer 而不必重寫 generation layer

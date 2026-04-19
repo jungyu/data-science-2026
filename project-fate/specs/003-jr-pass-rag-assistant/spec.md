@@ -14,170 +14,133 @@ sections:
   clarifications: complete
 ---
 
-# Feature Specification: JR Pass Official Rules & Compliance RAG Consultation System
+# 功能規格書：JR Pass 官方規則與合規性 RAG 諮詢系統
 
-**Feature Branch**: `003-jr-pass-rag-assistant`
-**Created**: 2026-04-15
-**Status**: Draft
-**Input**: User description: "JR Pass 官方規則與合規性 RAG 諮詢系統"
+**功能分支**：`003-jr-pass-rag-assistant`  
+**建立日期**：2026-04-15  
+**狀態**：草稿
 
-## Execution Flow (main)
-```
-1. Parse user description from Input
-   -> User wants a RAG-based consultation system for JR Pass official rules and compliance
-2. Extract key concepts from description
-   -> Actors: travelers planning Japan rail itineraries
-   -> Actions: provide itinerary and question, retrieve official pass rules, assess eligibility, receive grounded answer
-   -> Data: itinerary structure, official pass documents, restrictions, eligibility rules, citations
-   -> Constraints: answers must be grounded, explainable, and bounded by supported JR pass rule knowledge
-3. For each unclear aspect:
-   -> Mark with [NEEDS CLARIFICATION: specific question]
-4. Fill User Scenarios & Testing section
-5. Generate Functional Requirements
-6. Identify Key Entities
-7. Run Review Checklist
-8. Return: SUCCESS (spec ready for clarification/planning)
-```
+## 功能定位
 
----
+本系統是一套以 JR Pass 官方規則為核心知識來源的 RAG 諮詢系統。  
+使用者輸入日本旅遊行程與問題後，系統需先檢索官方票券規則，再進行合規判定與回答生成，最終輸出具引用依據的中文說明。
 
-## Quick Guidelines
-- Focus on what travelers need when checking whether a JR Pass is valid, suitable, or compliant for their route
-- Treat this as a knowledge-grounded consultation system, not a freeform travel chatbot
-- Keep requirements testable, explainable, and traceable to itinerary and official-source knowledge
+本系統不是自由聊天的旅遊機器人，而是「以官方規則為依據」的票券合規諮詢工具。
 
-### Section Requirements
-- Mandatory sections are completed below
-- Remaining open decisions are marked explicitly for clarification
+## 使用者情境與驗收測試
 
-### For AI Generation
-- Mark ambiguities instead of guessing
-- Phrase requirements in testable, observable language
-- Prefer bounded compliance consultation behavior over vague assistant language
+### 主要使用者故事
 
----
+旅客輸入日本旅遊行程，並詢問某張 JR Pass 或區域周遊券是否適用。系統會依據官方票券規則、使用限制、適用範圍與資格條件，回傳具引用來源的合規性說明。
 
-## User Scenarios & Testing *(mandatory)*
+### 驗收情境
 
-### Primary User Story
-A traveler provides a Japan itinerary and asks whether a JR Pass or regional rail pass is applicable under official rules, then receives a grounded answer that cites relevant eligibility rules, restrictions, and coverage conditions from the knowledge base.
+1. **給定** 使用者提供完整行程並詢問某張 JR Pass 是否可用，**當** 系統完成檢索與判定，**則** 系統需回傳帶有官方引用的合規性回答。
+2. **給定** 行程不符合某張票券的適用條件，**當** 系統完成判定，**則** 系統需清楚說明不符合原因，並指出是否存在較適合的替代票券。
+3. **給定** 多張票券都可能適用，**當** 系統比較不同票券，**則** 系統需回傳主要建議、備選方案，以及區分原因。
+4. **給定** 行程資訊不足或知識庫無法檢索到足夠證據，**當** 系統無法完成 grounding，**則** 系統需保守回答或拒答，並顯示明確警告。
 
-### Acceptance Scenarios
-1. **Given** a traveler provides a complete itinerary and asks whether a specific JR Pass can be used, **When** the system performs retrieval and evaluation, **Then** it returns a compliance-oriented answer with citations to the supporting official rules.
-2. **Given** the itinerary does not satisfy the conditions for a supported pass, **When** the system evaluates the route, **Then** it clearly explains why the itinerary is not compliant and whether another pass is more suitable.
-3. **Given** multiple pass products could fit the route, **When** the system evaluates the itinerary, **Then** it returns one primary consultation result plus alternatives and the reasons for the distinction.
-4. **Given** the itinerary or question falls outside the supported knowledge boundary, **When** the system cannot retrieve enough grounded context, **Then** it returns a conservative answer or refusal with an explicit warning.
+### 邊界情境
 
-### Edge Cases
-- What happens when the user only visits one city and makes no intercity rail movement?
-- How does the system behave when destination stay days exceed the trip duration?
-- What happens when part of the route depends on transport not covered by the supported rail passes?
-- How does the system respond when official pass documents are retrieved but their rules conflict, differ by revision, or appear outdated?
+- 使用者只停留單一城市、沒有跨城市鐵路移動時怎麼處理？
+- 停留天數與整體旅遊天數不一致時怎麼處理？
+- 行程中包含票券未覆蓋的交通方式時怎麼處理？
+- 官方文件彼此有版本差異、規則衝突或內容過期時怎麼處理？
 
-## Requirements *(mandatory)*
+## 功能需求
 
 ### Functional Requirements
-- **FR-001**: The system MUST accept a structured Japan itinerary including dates, trip duration, arrival city, departure city, destination sequence, and transportation preferences.
-- **FR-002**: The system MUST accept a natural-language user question about JR Pass or regional rail pass eligibility, restrictions, or suitability.
-- **FR-003**: The system MUST retrieve relevant official pass rules, coverage details, eligibility constraints, and restrictions from the JR pass knowledge base before producing the final answer.
-- **FR-004**: The system MUST return an answer that includes both a user-readable consultation result and explicit citations to the official knowledge fragments used.
-- **FR-005**: The system MUST assess whether the itinerary is compliant with the conditions of at least one supported pass when enough route information is available.
-- **FR-006**: The system MUST clearly state when the itinerary is not eligible for a supported pass and explain the rule-based reason.
-- **FR-007**: The system MUST disclose important restrictions such as area coverage, validity period, train eligibility, reservation requirements, and traveler qualification rules when relevant.
-- **FR-008**: The system MUST validate itinerary consistency before producing a consultation result.
-- **FR-009**: The system MUST refuse or constrain the answer when retrieval results do not meet grounding requirements.
-- **FR-010**: The system MUST support both national JR Pass and supported regional pass products in the retrieval and consultation process.
-- **FR-011**: The system MUST return request-level metadata and grounding status for traceability and debugging.
-- **FR-012**: The system MUST distinguish between official rule-based evidence and system-generated estimation or suitability advice.
-- **FR-013**: The system MUST refresh pass catalog and official rule content at least once every 24 hours.
-- **FR-014**: The system MUST support anonymous consultation in the first release.
-- **FR-015**: The system MUST generate answers in Traditional Chinese (`zh-TW`) in the first release.
 
-### Key Entities *(include if feature involves data)*
-- **TripPlan**: The structured user itinerary, including dates, cities, route sequence, and travel preferences.
-- **DestinationStop**: One destination in the itinerary, including order and stay duration.
-- **PassDocument**: A knowledge document describing one JR Pass or regional rail pass, including official coverage, validity, restrictions, and qualification rules.
-- **PassProduct**: A normalized pass entity derived from pass documents, including pass type, valid days, area coverage, pricing metadata, and eligibility metadata.
-- **RetrievedChunk**: A chunk of official pass knowledge retrieved for the user query, including source metadata and relevance score.
-- **ComplianceAssessment**: The rule-based eligibility judgment for whether the itinerary fits a supported pass.
-- **ConsultationResult**: The user-visible answer containing consultation text, alternatives, compliance outcome, cost comparison, citations, and warnings.
-- **GroundingResult**: The retrieval validation outcome that determines whether the answer may proceed, fallback, or be blocked.
+- **FR-001**：系統必須接受結構化的日本旅遊行程，至少包含日期、旅遊天數、入境城市、離境城市、目的地順序與交通偏好。
+- **FR-002**：系統必須接受自然語言問題，內容可涉及 JR Pass 或區域周遊券的資格、限制、適用性與合規性。
+- **FR-003**：系統在產生最終回答前，必須先從官方票券知識庫檢索相關規則、適用範圍、資格條件與限制資訊。
+- **FR-004**：系統必須回傳可讀性的諮詢結果，且需附上實際使用到的官方引用片段。
+- **FR-005**：當行程資訊足夠時，系統必須判定該行程是否符合至少一張支援票券的使用條件。
+- **FR-006**：當行程不符合支援票券條件時，系統必須清楚說明規則性原因。
+- **FR-007**：當情境相關時，系統必須揭露重要限制，例如區域覆蓋、有效期間、可搭列車種類、是否需預約、旅客資格條件。
+- **FR-008**：系統在產生諮詢結果前，必須先驗證行程資料的一致性。
+- **FR-009**：當檢索結果未通過 grounding 要求時，系統必須拒答或限制回答範圍。
+- **FR-010**：系統必須支援全國 JR Pass 以及指定區域周遊券的檢索與諮詢流程。
+- **FR-011**：系統必須回傳 request-level metadata 與 grounding 狀態，供追蹤與除錯使用。
+- **FR-012**：系統必須明確區分「官方規則依據」與「系統生成的估算或建議」。
+- **FR-013**：系統必須每 24 小時至少更新一次票券目錄與官方規則資料。
+- **FR-014**：第一版系統必須支援匿名使用。
+- **FR-015**：第一版系統必須以繁體中文（`zh-TW`）輸出。
 
----
+## 核心資料實體
 
-## Constraints
+- **TripPlan**：使用者的結構化旅遊行程，包含日期、城市、路線順序與交通偏好。
+- **DestinationStop**：行程中的單一停留點，包含順序與停留天數。
+- **PassDocument**：描述某張 JR Pass 或區域票券的官方文件，包含適用範圍、有效期間、限制與資格條件。
+- **PassProduct**：由文件正規化後的票券實體，包含票券類型、有效天數、適用區域、價格與資格資訊。
+- **RetrievedChunk**：對應使用者問題所檢索出的官方知識片段，含來源中繼資料與相關分數。
+- **ComplianceAssessment**：依據官方規則判定行程是否符合票券條件的結果。
+- **ConsultationResult**：提供給使用者的最終回答，包含合規說明、替代方案、引用來源、警告與摘要。
+- **GroundingResult**：檢索驗證結果，用來決定是否可正常回答、保守回答或拒答。
+
+## 約束條件
 
 ### Technical Constraints
-- The system MUST use a retrieval-first RAG flow and MUST NOT answer compliance questions from model prior knowledge alone.
-- The knowledge base MUST be built from official JR Pass and regional pass documents, with each chunk carrying source URL, pass product, revision date, and rule category metadata.
-- The system MUST apply a recursive, semantics-preserving chunking strategy for official rule text, using paragraph boundaries first and splitting long sections by sentence or phrase rather than arbitrary fixed-length truncation.
-- Target chunk size is approximately 600 tokens with an overlap of 100 tokens, to preserve context across related rules while keeping retrieval latency low.
-- Retrieval results MUST pass a grounding gate before answer generation; blocked results must return a conservative response instead of a fabricated answer.
-- The first release MUST cap retrieved chunks at 10 and citations at 5 to keep latency and answer sprawl bounded.
+
+- 系統必須採用 retrieval-first 的 RAG 流程，不可只依賴模型既有知識回答票券規則問題。
+- 知識庫只能使用官方 JR Pass 與區域票券文件，每個 chunk 必須帶有來源網址、票券名稱、修訂日期與規則類別等中繼資料。
+- 系統必須使用保留語意的 chunking 策略，優先依段落切分，再視需要依句子或片語細分，不可使用粗暴固定長度截斷。
+- 目標 chunk 大小約為 600 tokens，overlap 約 100 tokens，以兼顧規則完整性與檢索延遲。
+- 所有檢索結果必須通過 grounding gate；若未通過，必須改為保守回答或拒答。
+- 第一版系統最多檢索 10 個 chunks，最終引用不得超過 5 筆。
 
 ### Evaluation Plan
-- The system MUST include an evaluation workflow using RAGAS or equivalent retrieval-grounding metrics to measure faithfulness, relevance, and hallucination risk.
-- Use RAGAS-style metrics to validate:
-  - retrieval Top-K accuracy for official rule fragments,
-  - grounding precision for cited evidence,
-  - answer faithfulness against the official JR Pass corpus.
-- Use TruLens or a similar attribution/audit framework to inspect generated answers for evidence usage, attribution correctness, and hallucination signal.
-- Define acceptance criteria such as:
-  - p95 end-to-end query latency < 2500ms,
-  - Top-K retrieval accuracy ≥ 80% for rule-relevant queries,
-  - no fabricated citations when grounding gate status is `block`.
-- Evaluation coverage MUST include both national JR Pass and supported regional pass products, as well as negative cases where the itinerary is non-compliant or out-of-scope.
+
+- 系統必須規劃使用 `RAGAS` 或同等框架評估忠實度、相關性與 hallucination 風險。
+- 應至少評估以下指標：
+  - 官方規則片段的 Top-K 檢索命中率
+  - 引用證據的 grounding precision
+  - 回答相對於官方語料的 faithfulness
+- 系統應使用 `TruLens` 或類似框架檢查回答中的證據使用、歸因正確性與 hallucination 訊號。
+- 驗收門檻至少包含：
+  - 端到端查詢延遲 `p95 < 2500ms`
+  - 規則型查詢的 Top-K retrieval accuracy `>= 80%`
+  - grounding gate 狀態為 `block` 時不得產生虛構引用
+- 評估案例必須涵蓋全國 JR Pass、區域周遊券，以及不符合資格或超出系統支援範圍的負面案例。
 
 ### Business Constraints
-- The first release provides consultation for JR Pass and supported regional rail passes only; it does not cover flights, hotels, buses, rental cars, or full itinerary planning.
-- The system MUST separate official rule interpretation from system-generated cost estimation or suitability advice.
-- The system MUST explain non-eligibility or non-compliance explicitly when a user itinerary does not satisfy pass conditions.
-- The first release allows anonymous usage, but no personalized account history or saved itineraries are required.
+
+- 第一版只處理 JR Pass 與支援的區域鐵道周遊券，不處理航班、住宿、巴士、租車或完整旅遊規劃。
+- 系統必須將「官方規則詮釋」與「系統生成的成本估算或適合度建議」分開。
+- 當使用者行程不符合票券條件時，系統必須明確說明不符合原因。
+- 第一版允許匿名使用，不要求帳號歷史紀錄與行程儲存功能。
 
 ### Operational Constraints
-- Official rule and pass catalog content MUST be refreshed at least every 24 hours.
-- The first release outputs `zh-TW` only to reduce terminology drift and evaluation complexity.
-- The system MUST log request IDs, grounding status, and source revision metadata, but MUST NOT log personally sensitive user identifiers beyond the submitted itinerary payload needed for debugging.
-- Query latency target for normal requests is `p95 < 2500ms`.
 
----
+- 官方規則與票券目錄資料至少每 24 小時刷新一次。
+- 第一版只輸出 `zh-TW`，以降低術語漂移與評估複雜度。
+- 系統必須紀錄 request ID、grounding 狀態與來源修訂版本，但不得額外記錄與除錯無關的個資。
+- 一般請求的查詢延遲目標為 `p95 < 2500ms`。
 
-## Clarifications
+## 已確認事項
 
 ### Session 2026-04-15
-- Q: What is the acceptable refresh interval for pass catalog and rule content? -> A: Refresh every 24 hours
-- Q: Should the first release require authentication? -> A: Anonymous access allowed
-- Q: What output language should the first release support? -> A: zh-TW only
 
----
+- Q：票券目錄與官方規則的更新頻率為何？  
+  A：每 24 小時更新一次
+- Q：第一版是否要求登入？  
+  A：允許匿名使用
+- Q：第一版輸出語言為何？  
+  A：僅支援繁體中文 `zh-TW`
 
-## Review & Acceptance Checklist
-*GATE: Automated checks run during main() execution*
+## 審查清單
 
 ### Content Quality
-- [x] No implementation details (languages, frameworks, APIs)
-- [x] Focused on user value and business needs
-- [x] Written for non-technical stakeholders
-- [x] All mandatory sections completed
+
+- [x] 未寫入特定實作框架與程式語言細節
+- [x] 以使用者價值與業務需求為主
+- [x] 可供非技術利害關係人閱讀
+- [x] 所有必要章節均已完成
 
 ### Requirement Completeness
-- [x] No [NEEDS CLARIFICATION] markers remain
-- [x] Requirements are testable and unambiguous
-- [x] Success criteria are measurable
-- [x] Scope is clearly bounded
-- [x] Dependencies and assumptions identified
 
----
-
-## Execution Status
-*Updated by main() during processing*
-
-- [x] User description parsed
-- [x] Key concepts extracted
-- [x] Ambiguities marked
-- [x] User scenarios defined
-- [x] Requirements generated
-- [x] Entities identified
-- [x] Review checklist passed
-
----
+- [x] 不再含有 `[NEEDS CLARIFICATION]`
+- [x] 所有需求可測試且具體
+- [x] 成功標準可量化
+- [x] 範圍界線明確
+- [x] 依賴與前提假設已標出

@@ -1,20 +1,20 @@
-# ADR-005: Use Revision-Aware Metadata for Rule Retrieval
+# ADR-005：規則檢索必須採用 Revision-Aware Metadata
 
-## Context
+## 背景
 
-JR Pass rules can change over time. Eligibility, pricing references, train coverage, reservation requirements, and FAQ wording may all be revised after publication.
+JR Pass 規則會隨時間變動。購買資格、票價參考、可搭列車範圍、預約要求與 FAQ 說明都可能在官方更新後產生差異。
 
-If chunks are indexed without revision-aware metadata, retrieval may return text from different document versions without signaling which rule is current. That creates three risks:
+若 chunk 在索引時沒有帶 revision-aware metadata，系統可能會檢索到來自不同版本的規則片段，卻無法判斷哪一個才是目前有效版本。這會造成三種風險：
 
-- outdated rule text may be cited as current
-- conflicting chunks may appear equally valid during retrieval
-- answer generation may not detect rule-version ambiguity
+- 過期規則被當作現行規則引用
+- 互相衝突的 chunks 在檢索時被視為同等有效
+- 生成層無法辨識版本歧義
 
-Because this system is designed for official-rule consultation, document recency and version traceability are essential.
+由於本系統是官方規則導向的諮詢系統，因此資料新鮮度與版本可追溯性是必要條件。
 
-## Decision
+## 決策
 
-Every indexed chunk will carry revision-aware metadata, including:
+每個被索引的 chunk 都必須攜帶 revision-aware metadata，至少包含：
 
 - `source_url`
 - `pass_name`
@@ -22,27 +22,28 @@ Every indexed chunk will carry revision-aware metadata, including:
 - `revision_date`
 - `document_status`
 
-Retrieval and reranking should prefer the most recent active rule content when multiple relevant chunks exist. If conflicting revisions are detected, the response should surface a warning instead of silently choosing one.
+當多個相關 chunks 同時存在時，retrieval 與 reranking 應優先考慮最新且有效的規則內容。  
+若偵測到不同版本間存在衝突，系統必須顯示 warning，而不是靜默選擇其一。
 
-## Status
+## 狀態
 
 Accepted
 
-## Consequences
+## 後果
 
-### Positive
+### 正面影響
 
-- reduces the risk of citing obsolete rules
-- improves citation traceability
-- supports revision conflict detection
-- strengthens trust in compliance-oriented answers
+- 降低引用過期規則的風險
+- 提升 citation 的可追溯性
+- 支援 revision conflict detection
+- 強化合規性回答的可信度
 
-### Negative
+### 負面影響
 
-- increases ingestion and metadata-management complexity
-- requires reliable extraction of revision dates and document status
+- 增加 ingestion 與 metadata 管理複雜度
+- 需要可靠地抽取 revision date 與 document status
 
-### Follow-up implications
+### 後續影響
 
-- the vector schema and ETL pipeline must preserve revision fields
-- evaluation should include cases where multiple revisions exist for the same rule
+- 向量資料 schema 與 ETL pipeline 都必須保留 revision 欄位
+- 評估流程必須納入「同一規則存在多個版本」的測試案例
