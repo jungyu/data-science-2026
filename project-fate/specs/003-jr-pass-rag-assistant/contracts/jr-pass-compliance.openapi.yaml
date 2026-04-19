@@ -1,0 +1,179 @@
+openapi: 3.1.0
+info:
+  title: JR Pass Compliance RAG API
+  version: 1.0.0
+  description: Retrieval-grounded consultation endpoint for JR Pass official rules and compliance questions.
+servers:
+  - url: https://api.example.com
+paths:
+  /api/jr-pass-compliance-rag/query:
+    post:
+      summary: Query JR Pass official rules and compliance guidance
+      operationId: queryJrPassCompliance
+      tags: [JRPassComplianceRAG]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JrPassComplianceQueryRequest"
+      responses:
+        "200":
+          description: Grounded consultation result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JrPassComplianceQueryResponse"
+        "400":
+          description: Invalid request payload
+        "422":
+          description: Invalid itinerary or unsupported query
+        "429":
+          description: Rate limited
+        "503":
+          description: Knowledge unavailable or insufficient grounded context
+components:
+  schemas:
+    JrPassComplianceQueryRequest:
+      type: object
+      required: [question, trip_plan]
+      properties:
+        question:
+          type: string
+        locale:
+          type: string
+          default: zh-TW
+        trip_plan:
+          $ref: "#/components/schemas/TripPlan"
+    TripPlan:
+      type: object
+      required:
+        - start_date
+        - duration_days
+        - arrival_city
+        - departure_city
+        - destinations
+      properties:
+        start_date:
+          type: string
+          format: date
+        duration_days:
+          type: integer
+          minimum: 1
+        arrival_city:
+          type: string
+        departure_city:
+          type: string
+        transport_preferences:
+          type: array
+          items:
+            type: string
+        pass_scope_preference:
+          type: string
+          enum: [national, regional, no_preference]
+        destinations:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/DestinationStop"
+    DestinationStop:
+      type: object
+      required: [city, stay_days]
+      properties:
+        city:
+          type: string
+        stay_days:
+          type: integer
+          minimum: 1
+    JrPassComplianceQueryResponse:
+      type: object
+      required:
+        - request_id
+        - answer
+        - summary
+        - grounding
+        - compliance_assessment
+      properties:
+        request_id:
+          type: string
+        answer:
+          type: string
+        summary:
+          type: string
+        recommended_passes:
+          type: array
+          items:
+            $ref: "#/components/schemas/RecommendedPass"
+        compliance_assessment:
+          $ref: "#/components/schemas/ComplianceAssessment"
+        comparison:
+          $ref: "#/components/schemas/Comparison"
+        citations:
+          type: array
+          items:
+            $ref: "#/components/schemas/Citation"
+        grounding:
+          $ref: "#/components/schemas/Grounding"
+    RecommendedPass:
+      type: object
+      required: [pass_name, pass_type, coverage_area, valid_days, reason]
+      properties:
+        pass_name:
+          type: string
+        pass_type:
+          type: string
+          enum: [national, regional]
+        coverage_area:
+          type: string
+        valid_days:
+          type: integer
+        reason:
+          type: string
+        limitations:
+          type: array
+          items:
+            type: string
+    ComplianceAssessment:
+      type: object
+      required: [eligible, rule_summary]
+      properties:
+        eligible:
+          type: boolean
+        rule_summary:
+          type: string
+        violated_rules:
+          type: array
+          items:
+            type: string
+    Comparison:
+      type: object
+      properties:
+        with_pass:
+          type: number
+        without_pass:
+          type: number
+        savings:
+          type: number
+    Citation:
+      type: object
+      required: [doc_id, title, excerpt, relevance_score]
+      properties:
+        doc_id:
+          type: string
+        title:
+          type: string
+        excerpt:
+          type: string
+        relevance_score:
+          type: number
+    Grounding:
+      type: object
+      required: [gate_status]
+      properties:
+        gate_status:
+          type: string
+          enum: [pass, fallback, block]
+        warnings:
+          type: array
+          items:
+            type: string
