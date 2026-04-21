@@ -373,7 +373,7 @@ Claude：  [自動載入技能，按照最佳實踐執行]
    遵循你的主題結構
 4. 讓 Claude 分析 Sentry 錯誤並
    自動修 GitHub PR
-5. 讓 Claude 產出 Yiguandao 相關
+5. 讓 Claude 產出智慧農業相關
    Podcast 逐字稿時使用特定風格
 ```
 
@@ -460,13 +460,13 @@ Claude：  [自動載入技能，按照最佳實踐執行]
 下面這個技能資料夾結構有什麼問題？（至少找出 3 個）
 
 ```
-Yiguandao Podcast Generator/
+Smart Farming Podcast Generator/
 ├── README.md
 ├── skill.md
 ├── scripts/
 │   └── generate.py
 ├── config.yaml
-└── yiguandao-podcast-generator/
+└── smart-farming-podcast-generator/
     └── SKILL.md
 ```
 
@@ -475,16 +475,16 @@ Yiguandao Podcast Generator/
 
 問題一大堆：
 
-1. ❌ 資料夾名稱 `Yiguandao Podcast Generator` 有空白
+1. ❌ 資料夾名稱 `Smart Farming Podcast Generator` 有空白
 2. ❌ 主要檔案應該是 `SKILL.md` 不是 `skill.md`（大小寫錯誤）
 3. ❌ 不該有 `README.md` 在技能資料夾內
-4. ❌ 多餘的巢狀資料夾 `yiguandao-podcast-generator/`
+4. ❌ 多餘的巢狀資料夾 `smart-farming-podcast-generator/`
 5. ⚠️ `config.yaml` 這個位置不對，應該視用途放在 `scripts/` 或 `references/`
 
 正確結構：
 
 ```
-yiguandao-podcast-generator/
+smart-farming-podcast-generator/
 ├── SKILL.md
 ├── scripts/
 │   └── generate.py
