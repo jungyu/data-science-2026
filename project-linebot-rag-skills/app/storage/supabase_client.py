@@ -1,0 +1,77 @@
+from __future__ import annotations
+
+from typing import Any, Mapping
+
+import httpx
+
+from app.config import Settings
+
+
+class SupabaseRestClient:
+    def __init__(self, settings: Settings) -> None:
+        self._settings = settings
+
+    def _headers(self) -> dict[str, str]:
+        api_key = self._settings.supabase_service_role_key
+        return {
+            "apikey": api_key,
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "Accept-Profile": self._settings.supabase_schema,
+            "Content-Profile": self._settings.supabase_schema,
+        }
+
+    def _url(self, path: str) -> str:
+        base = self._settings.supabase_url.rstrip("/")
+        return f"{base}/rest/v1/{path.lstrip('/')}"
+
+    async def rpc(self, function_name: str, payload: Mapping[str, Any]) -> list[dict[str, Any]]:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                self._url(f"rpc/{function_name}"),
+                headers=self._headers(),
+                json=dict(payload),
+            )
+            response.raise_for_status()
+            return response.json()
+
+    async def insert(self, table: str, row: Mapping[str, Any]) -> None:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                self._url(table),
+                headers={**self._headers(), "Prefer": "return=minimal"},
+                json=dict(row),
+            )
+            response.raise_for_status()
+
+    async def upsert(
+        self,
+        table: str,
+        rows: list[Mapping[str, Any]],
+        *,
+        on_conflict: str | None = None,
+    ) -> None:
+        params: dict[str, str] = {}
+        if on_conflict:
+            params["on_conflict"] = on_conflict
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                self._url(table),
+                headers={
+                    **self._headers(),
+                    "Prefer": "resolution=merge-duplicates,return=minimal",
+                },
+                params=params,
+                json=[dict(row) for row in rows],
+            )
+            response.raise_for_status()
+
+    async def select(self, table: str, params: Mapping[str, str] | None = None) -> list[dict[str, Any]]:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(
+                self._url(table),
+                headers=self._headers(),
+                params=dict(params or {}),
+            )
+            response.raise_for_status()
+            return response.json()
