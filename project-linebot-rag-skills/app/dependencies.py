@@ -3,12 +3,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from functools import lru_cache
 
+from app.ai.factory import build_embedder, build_llm, has_llm_configured
 from app.config import Settings, get_settings
-from app.generator.responder import OpenAIGeneratorLLM, ResponseGenerator
+from app.generator.responder import ResponseGenerator
 from app.line.client import LineMessagingClient
-from app.rag.embedder import OpenAICompatibleEmbedder
 from app.rag.retriever import RAGRetriever
-from app.router.intent_router import IntentRouter, OpenAIRouterLLM
+from app.router.intent_router import IntentRouter
 from app.skills.registry import SkillRegistry
 from app.storage.knowledge_repo import KnowledgeRepository
 from app.storage.logs_repo import LogsRepository
@@ -60,7 +60,7 @@ def get_logs_repo() -> LogsRepository:
 @lru_cache(maxsize=1)
 def get_router() -> IntentRouter:
     settings = get_settings()
-    llm = OpenAIRouterLLM(settings) if settings.openai_api_key else None
+    llm = build_llm(settings, "router") if has_llm_configured(settings) else None
     return IntentRouter(llm=llm, confidence_threshold=settings.router_confidence_threshold)
 
 
@@ -68,7 +68,7 @@ def get_router() -> IntentRouter:
 def get_retriever() -> RAGRetriever:
     settings = get_settings()
     return RAGRetriever(
-        embedder=OpenAICompatibleEmbedder(settings),
+        embedder=build_embedder(settings),
         knowledge_repo=get_knowledge_repo(),
         logs_repo=get_logs_repo(),
         final_context_k=settings.final_context_k,
@@ -78,7 +78,7 @@ def get_retriever() -> RAGRetriever:
 @lru_cache(maxsize=1)
 def get_responder() -> ResponseGenerator:
     settings = get_settings()
-    llm = OpenAIGeneratorLLM(settings) if settings.openai_api_key else None
+    llm = build_llm(settings, "generator") if has_llm_configured(settings) else None
     return ResponseGenerator(llm=llm, line_max_message_chars=settings.line_max_message_chars)
 
 

@@ -4,7 +4,6 @@ import json
 from dataclasses import dataclass
 from typing import Protocol
 
-from app.config import Settings
 from app.router.emotion_detector import detect_emotion
 from app.router.prompts import render_router_prompt
 from app.router.schemas import EmotionState, ResponseMode, RouterResult, SkillId
@@ -20,24 +19,6 @@ KNOWLEDGE_KEYWORDS = ("筆記", "adr", "spec", "規格", "知識庫", "project",
 class RouterLLM(Protocol):
     async def complete(self, prompt: str) -> str:
         ...
-
-
-class OpenAIRouterLLM:
-    def __init__(self, settings: Settings) -> None:
-        from openai import AsyncOpenAI
-
-        self._settings = settings
-        self._client = AsyncOpenAI(
-            api_key=settings.openai_api_key or None,
-            base_url=settings.openai_base_url,
-        )
-
-    async def complete(self, prompt: str) -> str:
-        response = await self._client.responses.create(
-            model=self._settings.router_model,
-            input=prompt,
-        )
-        return response.output_text
 
 
 @dataclass

@@ -21,11 +21,30 @@ class Settings(BaseSettings):
     line_channel_access_token: str = ""
     line_api_base: str = "https://api.line.me"
 
+    # --- AI provider selection ---
+    # ai_provider: which backend drives the router + generator LLMs
+    #   options: openai | claude | gemini | github_copilot
+    ai_provider: str = "openai"
+    # embedding_provider: which backend drives RAG embeddings
+    #   options: openai | gemini
+    embedding_provider: str = "openai"
+
+    # OpenAI
     openai_api_key: str = ""
     openai_base_url: str = "https://api.openai.com/v1"
     router_model: str = "gpt-4.1-mini"
     generator_model: str = "gpt-4.1"
     embedding_model: str = "text-embedding-3-small"
+
+    # Anthropic / Claude
+    anthropic_api_key: str = ""
+
+    # Google Gemini
+    gemini_api_key: str = ""
+
+    # GitHub Copilot (OpenAI-compatible chat completions)
+    github_copilot_token: str = ""
+    github_copilot_base_url: str = "https://api.githubcopilot.com"
 
     supabase_url: str = ""
     supabase_service_role_key: str = ""

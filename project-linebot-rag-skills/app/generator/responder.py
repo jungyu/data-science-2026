@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol
 
-from app.config import Settings
 from app.generator.formatter import split_for_line
 from app.generator.prompts import render_synthesis_prompt
 from app.rag.schemas import KnowledgeChunk
@@ -14,24 +13,6 @@ from app.skills.loader import SkillDefinition
 class GeneratorLLM(Protocol):
     async def complete(self, prompt: str) -> str:
         ...
-
-
-class OpenAIGeneratorLLM:
-    def __init__(self, settings: Settings) -> None:
-        from openai import AsyncOpenAI
-
-        self._settings = settings
-        self._client = AsyncOpenAI(
-            api_key=settings.openai_api_key or None,
-            base_url=settings.openai_base_url,
-        )
-
-    async def complete(self, prompt: str) -> str:
-        response = await self._client.responses.create(
-            model=self._settings.generator_model,
-            input=prompt,
-        )
-        return response.output_text
 
 
 @dataclass
