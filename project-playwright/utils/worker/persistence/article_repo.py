@@ -61,6 +61,8 @@ class SupabaseArticleRepo:
             "content_hash": new_hash,
             "is_published": True,
             "is_available": True,
+            "source_type": "web",
+            "category": (draft.categories or [None])[0],
         }
         if input.source_page_id:
             data["source_page_id"] = input.source_page_id

@@ -41,10 +41,18 @@ element = page.query_selector("button.submit")
 
 ## 注意事項
 
-本章範例使用真實網站（`playwright.dev`）作為練習對象。網站改版後，元素數量、導覽結構和文字內容可能改變。學習重點應放在 **selector 的語意與策略**，而非固定的匹配數量。
+本章範例使用真實網站（`playwright.dev`）作為練習對象（**需要網路連線**）。網站改版後，元素數量、導覽結構和文字內容可能改變。學習重點應放在 **selector 的語意與策略**，而非固定的匹配數量。
 
 ## 練習
 
 1. 用 `get_by_role()` 找到頁面上所有的連結
 2. 嘗試用不同選擇器定位同一個元素，比較哪種最穩定
 3. 使用 `locator().filter()` 從清單中篩選特定項目
+
+## 自我檢核
+
+完成本章後，你應該能回答：
+
+1. `page.locator("button")` 和 `page.get_by_role("button")` 有什麼不同？哪種更不容易因為改版而失效？
+2. 什麼情況下應該優先用 `get_by_text()` 而不是 CSS selector？
+3. `locator().filter(has_text="...")` 和直接在 CSS 裡加 `:has-text()` 有什麼差異？

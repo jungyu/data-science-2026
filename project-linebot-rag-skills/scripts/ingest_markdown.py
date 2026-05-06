@@ -1,8 +1,13 @@
+"""Markdown ingester — thin wrapper（向後相容）。
+
+新版統一 CLI：`python scripts/ingest.py markdown --paths <...> --category <...>`
+本檔保留原命令行介面，內部走 task-25 的 IngestionPipeline + MarkdownIngester。
+"""
+
 from __future__ import annotations
 
 import argparse
 import asyncio
-import hashlib
 import sys
 from pathlib import Path
 
@@ -11,35 +16,10 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from app.config import get_settings
-from app.rag.chunker import chunk_markdown
-from app.rag.embedder import OpenAICompatibleEmbedder
-from app.storage.supabase_client import SupabaseRestClient
-
-
-async def ingest_path(path: Path, *, category: str) -> int:
-    settings = get_settings()
-    client = SupabaseRestClient(settings)
-    embedder = OpenAICompatibleEmbedder(settings)
-    text = path.read_text(encoding="utf-8")
-    rows = []
-    for index, chunk in enumerate(chunk_markdown(text), start=1):
-        embedding = await embedder.embed_query(chunk)
-        content_hash = hashlib.sha256(chunk.encode("utf-8")).hexdigest()
-        rows.append(
-            {
-                "source_id": str(path),
-                "source_type": "markdown",
-                "title": f"{path.stem} #{index}",
-                "content": chunk,
-                "content_hash": content_hash,
-                "category": category,
-                "tags": [path.stem],
-                "metadata": {"path": str(path), "chunk_index": index},
-                "embedding": embedding,
-            }
-        )
-    await client.upsert("private_knowledge", rows, on_conflict="content_hash")
-    return len(rows)
+from app.ingest.ingesters import MarkdownIngester
+from app.ingest.pipeline import IngestionPipeline
+from app.ai.factory import build_embedder
+from app.storage.stores import build_store
 
 
 async def main() -> None:
@@ -48,10 +28,15 @@ async def main() -> None:
     parser.add_argument("--category", default="notes")
     args = parser.parse_args()
 
-    total = 0
-    for raw_path in args.paths:
-        total += await ingest_path(Path(raw_path), category=args.category)
-    print(f"Ingested {total} chunks.")
+    settings = get_settings()
+    store = build_store(settings)
+    embedder = build_embedder(settings)
+    pipeline = IngestionPipeline(embedder=embedder, store=store)
+
+    paths = [Path(p) for p in args.paths]
+    ingester = MarkdownIngester(paths, category=args.category)
+    stats = await pipeline.run(ingester)
+    print(f"Ingested {stats.chunks} chunks across {stats.docs} files.")
 
 
 if __name__ == "__main__":

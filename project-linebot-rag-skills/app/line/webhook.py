@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Request
 
 from app.dependencies import RuntimeServices, get_runtime_services
+from app.observability.tracer import reset_current_tracer, set_current_tracer
 
 logger = logging.getLogger(__name__)
-from app.line.schemas import LineEvent, LineWebhookPayload
 
 
 router = APIRouter(prefix="/api/line", tags=["line"])
@@ -19,80 +19,103 @@ async def line_webhook(
     background_tasks: BackgroundTasks,
     services: RuntimeServices = Depends(get_runtime_services),
 ) -> dict[str, bool]:
-    body = await request.body()
-    signature = request.headers.get("x-line-signature")
-    if not services.line_client.validate_signature(body, signature):
-        raise HTTPException(status_code=400, detail="Invalid LINE signature")
-
-    payload = LineWebhookPayload.model_validate_json(body)
-    for event in payload.events:
-        if event.is_text_message and event.source.user_id:
-            background_tasks.add_task(process_text_event, event, services)
+    """LINE webhook entry — 解析委派給 LineChannel。"""
+    line_channel = services.channels["line"]
+    _, inputs = await line_channel.parse_request(request)
+    for inp in inputs:
+        background_tasks.add_task(process_channel_input, inp, services)
     return {"ok": True}
 
 
-async def process_text_event(event: LineEvent, services: RuntimeServices) -> None:
-    user_id = event.source.user_id
-    message = event.message
-    if user_id is None or message is None or message.text is None:
-        return
+async def process_channel_input(inp, services: RuntimeServices) -> None:
+    """Channel-agnostic 入口：給定 ChannelInput 跑完整 graph。
 
+    本檔在 task-23 前是 LINE-specific；現在 LINE 與 HTTP / 其他 channel 都走這條。
+    """
+    channel = services.channels.get(inp.channel)
+    if channel is None:
+        logger.error("process_channel_input: unknown channel %r — dropping message", inp.channel)
+        return
+    user_id = inp.external_user_id
+
+    # —— inbound 落庫（DB column 仍叫 line_user_id，跨 channel 用同欄位）
     try:
         await services.messages_repo.save_message(
             line_user_id=user_id,
             direction="inbound",
-            message_text=message.text,
+            message_text=inp.raw_text,
         )
     except Exception:
-        pass
+        logger.warning("save_message inbound failed for user=%s", user_id, exc_info=True)
 
-    recent_history = "No recent conversation."
-    try:
-        recent_history = await services.messages_repo.build_recent_history(user_id)
-    except Exception:
-        pass
+    recent_history = await channel.load_recent_history(external_user_id=user_id)
 
-    router_result = await services.router.route_message(message.text, recent_history)
-    skill = services.skill_registry.get(router_result.target_skill) or services.skill_registry.require(
-        "general_chat"
-    )
+    initial_state = {
+        "user_input": inp.raw_text,
+        "channel": inp.channel,
+        "external_user_id": user_id,
+        "external_message_id": inp.external_message_id,
+        "recent_history": recent_history,
+        "dry_run": user_id.startswith(("U_demo", "U_eval")),
+    }
 
-    rag_chunks = []
-    rag_context = "No retrieved context."
-    if router_result.is_rag_required:
-        rag_chunks = await services.retriever.retrieve(
-            router_result.rag_query or message.text,
-            categories=router_result.rag_categories,
-            top_k=services.settings.knowledge_top_k,
-            line_user_id=user_id,
-            skill_id=router_result.target_skill,
+    tracer = None
+    token = None
+    if services.tracer_registry is not None:
+        tracer = services.tracer_registry.start(
+            thread_id=channel.build_thread_id(inp),
+            variant=services.settings.graph_variant,
         )
-        rag_context = services.retriever.build_context(rag_chunks)
+        token = set_current_tracer(tracer)
 
+    final_state = None
     try:
-        responses = await services.responder.generate_response(
-            user_input=message.text,
-            router_result=router_result,
-            skill=skill,
-            rag_chunks=rag_chunks,
-            rag_context=rag_context,
-            recent_history=recent_history,
-        )
+        final_state = await services.rag_graph.ainvoke(initial_state)
     except Exception:
-        logger.exception("generate_response failed")
-        responses = ["系統暫時無法完成此請求，請稍後再試。"]
-
-    try:
-        await services.line_client.push_text(user_id, responses)
+        logger.exception("rag_graph invocation failed")
     finally:
-        try:
-            await services.messages_repo.save_message(
-                line_user_id=user_id,
-                direction="outbound",
-                message_text="\n\n".join(responses),
-                skill_id=router_result.target_skill,
-                router_result=router_result.model_dump(),
-                rag_used=bool(rag_chunks),
-            )
-        except Exception:
-            pass
+        if token is not None:
+            reset_current_tracer(token)
+        if tracer is not None and services.tracer_registry is not None:
+            try:
+                await services.tracer_registry.async_write_trace(tracer)
+            except Exception:
+                logger.exception("write_trace failed")
+
+    if final_state is None:
+        return
+
+    # —— outbound 落庫（讀 final_state）
+    router_result = final_state.get("router_result")
+    responses = final_state.get("responses", [])
+    rag_chunks = final_state.get("rag_chunks", [])
+
+    try:
+        await services.messages_repo.save_message(
+            line_user_id=user_id,
+            direction="outbound",
+            message_text="\n\n".join(responses),
+            skill_id=router_result.target_skill if router_result else None,
+            router_result=router_result.model_dump() if router_result else None,
+            rag_used=bool(rag_chunks),
+        )
+    except Exception:
+        logger.warning("save_message outbound failed for user=%s", user_id, exc_info=True)
+
+
+# 向後相容：既有 test_line_webhook.py 直接測 process_text_event
+async def process_text_event(event, services: RuntimeServices) -> None:
+    """Backward-compat shim：把 LineEvent 包成 ChannelInput 後走 process_channel_input。"""
+    from app.channels.base import ChannelInput
+
+    user_id = event.source.user_id
+    message = event.message
+    if user_id is None or message is None or message.text is None:
+        return
+    inp = ChannelInput(
+        channel="line",
+        external_user_id=user_id,
+        external_message_id=message.id or "",
+        raw_text=message.text,
+    )
+    await process_channel_input(inp, services)

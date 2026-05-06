@@ -1,0 +1,8 @@
+# Next.js docs 範例 URL list — task-18 walkthrough 用
+# 註解行（# 開頭）會被 crawler 跳過
+
+https://nextjs.org/docs/app/building-your-application/rendering
+https://nextjs.org/docs/app/building-your-application/rendering/server-components
+https://nextjs.org/docs/app/building-your-application/rendering/client-components
+https://nextjs.org/docs/app/building-your-application/data-fetching
+https://nextjs.org/docs/app/building-your-application/caching

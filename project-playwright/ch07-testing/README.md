@@ -74,3 +74,27 @@ playwright show-trace trace.zip
 |------|------|
 | `test_basic.py` | 基礎測試：導航、標題、元素 |
 | `test_e2e_search.py` | E2E 流程：搜尋引擎操作 |
+
+## 自我檢核
+
+完成本章後，你應該能回答：
+
+1. pytest-playwright 的 `page` fixture 是怎麼來的？你在測試函式裡宣告參數名稱，pytest 怎麼知道要注入什麼？
+2. 為什麼 `test_e2e_search.py` 預設不執行？如果你把它加入 CI 自動跑，可能會有什麼問題？
+3. 用 `playwright show-trace trace.zip` 可以看到什麼？它和一般的 pytest 錯誤訊息相比，多了哪些資訊？
+
+---
+
+## 與 Ch08 的關係
+
+Ch07 示範的是 **pytest-playwright**：把瀏覽器自動化當作「測試框架」，透過 fixture 驅動，適合 E2E 驗收。
+
+Ch08 則把 Playwright 用在「**生產爬蟲 pipeline**」：長時間跑的 worker、Job Queue、資料庫寫入。這類場景不適合 pytest-playwright fixture（每個 job 生命週期不同、需要自行管理 browser 實例），所以 Ch08 的 `BrowserManager` 直接呼叫 `async_playwright()` 而非依賴 fixture。
+
+簡單記法：
+
+| | pytest-playwright | Playwright SDK（直接） |
+|---|---|---|
+| 使用場景 | E2E 測試、CI 驗收 | 爬蟲 worker、批次任務 |
+| 觸發方式 | `pytest` 指令 | 直接執行 Python 腳本 |
+| 本課章節 | Ch07 | Ch08 |

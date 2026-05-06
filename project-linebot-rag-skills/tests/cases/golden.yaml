@@ -1,0 +1,63 @@
+# Golden case set — 學生轉題目時把這份完全替換為自己領域的案例。
+#
+# 對應 spec-20。10 個 case 分四類：
+#   - faq-***   FAQ 充分覆蓋（三變體應都通過）
+#   - multi-*** 複合條件（multi-seed 才開始受益）
+#   - gap-***   知識庫沒涵蓋（測試 sufficiency / clarify）
+#   - ground-** 易誘發 hallucination（測試 grounding / forbidden）
+#
+# 注意：expected_chunks 的 chunk_id 對應實際 ingest 進來的資料。
+# 若你直接跑 `python scripts/eval.py` 但知識庫尚未建好，recall 會是 0。
+# 這時 chunk_recall 會被視為「沒得評」（None）而非「失敗」。
+
+cases:
+  # FAQ 充分覆蓋
+  - id: faq-001
+    query: "什麼是 RAG？"
+    expected_chunks: ["kb-rag-overview-001"]
+    notes: "FAQ 級基本問題；basic / selfrag / reflection 都該答對"
+
+  - id: faq-002
+    query: "RAG 的三個主要步驟是什麼？"
+    expected_chunks: ["kb-rag-pipeline-002"]
+
+  - id: faq-003
+    query: "向量檢索與全文檢索的差異？"
+    expected_chunks: ["kb-vector-vs-fulltext-001"]
+
+  # 複合條件
+  - id: multi-001
+    query: "Next.js 14 App Router 的 SSR 怎麼做？"
+    expected_chunks: ["kb-nextjs-app-router-ssr-001", "kb-nextjs-rsc-002"]
+    notes: "selfrag 的 multi-seed 應比 basic 命中更多"
+
+  - id: multi-002
+    query: "pgvector 與 Pinecone 在維度上限的差異？"
+    expected_chunks: ["kb-pgvector-limits-001", "kb-pinecone-limits-001"]
+
+  - id: multi-003
+    query: "用 Claude 做 RAG 需要哪些 SDK 與 API key？"
+    expected_chunks: ["kb-claude-sdk-001"]
+
+  # 知識庫沒涵蓋
+  - id: gap-001
+    query: "怎麼用 LangGraph 接 Kubernetes Operator？"
+    expected_chunks: []
+    expect_clarification: true
+    notes: "basic 會強行生成；selfrag/reflection 應走 clarify"
+
+  - id: gap-002
+    query: "MCP server 與 OpenAI plugin 的差別？"
+    expected_chunks: []
+    expect_clarification: true
+
+  # 易誘發 hallucination
+  - id: ground-001
+    query: "請列出 RAG 系統的所有評估指標"
+    forbidden_phrases: ["所有", "完全", "無一例外"]
+    notes: "知識庫只有部分；不可宣稱完整"
+
+  - id: ground-002
+    query: "Anthropic 是哪一年提供原生 embedding API 的？"
+    forbidden_phrases: ["2023 年", "2024 年", "已提供"]
+    notes: "Anthropic 並無原生 embedding API"

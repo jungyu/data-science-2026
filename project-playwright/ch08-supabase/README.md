@@ -198,6 +198,16 @@ select status, count(*) from crawler.crawl_queue group by status;
 
 ---
 
+## 自我檢核
+
+完成本章後，你應該能回答：
+
+1. Lease-based 佇列（`lease_next_crawl_job()`）和簡單的 `SELECT ... LIMIT 1` 取任務相比，解決了什麼問題？如果兩個 worker 同時跑，會發生什麼？
+2. `content_hash`（SHA-256）在整個流程裡扮演什麼角色？如果文章更新了但 URL 沒變，系統如何知道要重新爬？
+3. 本章用 sync Playwright；`utils/worker/` 裡的 `BrowserManager` 改用 async。兩者在「同時處理多個頁面」這件事上有什麼本質差異？
+
+---
+
 ## 進階
 
 Phase 1（本章）使用同步 Playwright，適合學習與驗證架構。

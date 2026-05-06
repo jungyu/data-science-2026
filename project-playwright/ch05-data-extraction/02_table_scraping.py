@@ -15,14 +15,18 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from utils.console import setup_stdout
 
 from playwright.sync_api import sync_playwright
+from transforms import rows_to_dicts  # 純函式，可獨立測試（見 test_extractor.py）
 
 
 def scrape_table(page, table_selector: str) -> list[dict]:
-    """通用表格爬取函式：將 HTML 表格轉為字典列表。"""
+    """通用表格爬取函式：將 HTML 表格轉為字典列表。
+
+    瀏覽器互動層：負責從 DOM 取出原始字串，再交給 rows_to_dicts 轉換。
+    """
     table = page.locator(table_selector)
 
     # 取得表頭
-    headers = []
+    headers: list[str] = []
     th_elements = table.locator("thead th")
     for i in range(th_elements.count()):
         headers.append(th_elements.nth(i).text_content().strip())
@@ -33,18 +37,14 @@ def scrape_table(page, table_selector: str) -> list[dict]:
         cells = first_row.locator("th, td")
         headers = [cells.nth(i).text_content().strip() for i in range(cells.count())]
 
-    # 取得表身資料
+    # 取得表身原始字串矩陣
     rows = table.locator("tbody tr")
-    data = []
+    raw_rows: list[list[str]] = []
     for i in range(rows.count()):
         cells = rows.nth(i).locator("td")
-        row_data = {}
-        for j in range(min(cells.count(), len(headers))):
-            row_data[headers[j]] = cells.nth(j).text_content().strip()
-        if row_data:
-            data.append(row_data)
+        raw_rows.append([cells.nth(j).text_content().strip() for j in range(cells.count())])
 
-    return data
+    return rows_to_dicts(headers, raw_rows)
 
 
 def main():

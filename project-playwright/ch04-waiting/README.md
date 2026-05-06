@@ -24,8 +24,17 @@ page.wait_for_url("**/dashboard")       # 等待 URL 變更
 
 ## 範例檔案
 
-| 檔案 | 說明 |
-|------|------|
-| `01_auto_waiting.py` | Playwright 自動等待機制 |
-| `02_explicit_wait.py` | 顯式等待：selector、URL、load state |
-| `03_network_events.py` | 攔截與監聽網路請求 |
+| 檔案 | 需要網路 | 說明 |
+|------|---------|------|
+| `01_auto_waiting.py` | ❌（自建 HTML） | Playwright 自動等待機制 |
+| `02_explicit_wait.py` | ✅（playwright.dev） | 顯式等待：selector、URL、load state |
+| `03_network_events.py` | ✅（playwright.dev） | 攔截與監聽網路請求 |
+| `04_error_and_retry.py` | ✅（example.com） | TimeoutError 捕捉與重試策略 |
+
+## 自我檢核
+
+完成本章後，你應該能回答：
+
+1. 什麼情況下 Playwright 的自動等待「不夠」，必須用 `wait_for_selector()` 或 `wait_for_load_state("networkidle")`？
+2. `PlaywrightTimeoutError` 應該在哪一層捕捉？捕捉後應該做什麼（重試、跳過、記錄）？
+3. 指數退避（exponential backoff）的原理是什麼？為什麼不用固定間隔重試？

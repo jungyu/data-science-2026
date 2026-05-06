@@ -4,18 +4,23 @@ from __future__ import annotations
 class AnthropicLLM:
     """Anthropic Claude — uses the Messages API."""
 
-    def __init__(self, api_key: str, model: str) -> None:
+    def __init__(self, api_key: str, model: str, temperature: float | None = None) -> None:
         import anthropic
 
         self._client = anthropic.AsyncAnthropic(api_key=api_key)
         self._model = model
+        self._temperature = temperature
 
     async def complete(self, prompt: str) -> str:
-        response = await self._client.messages.create(
-            model=self._model,
-            max_tokens=4096,
-            messages=[{"role": "user", "content": prompt}],
-        )
+        kwargs: dict = {
+            "model": self._model,
+            "max_tokens": 4096,
+            "messages": [{"role": "user", "content": prompt}],
+        }
+        temperature = getattr(self, "_temperature", None)
+        if temperature is not None:
+            kwargs["temperature"] = temperature
+        response = await self._client.messages.create(**kwargs)
         # Extract the first text block; content may include tool_use or other block types.
         for block in response.content:
             if block.type == "text":

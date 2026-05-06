@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Literal, Protocol, runtime_checkable
 if TYPE_CHECKING:
     from app.config import Settings
 
-LLMRole = Literal["router", "generator"]
+LLMRole = Literal["router", "generator", "judge"]
 
 
 @runtime_checkable
@@ -31,21 +31,31 @@ def has_llm_configured(settings: Settings) -> bool:
 
 
 def build_llm(settings: Settings, role: LLMRole) -> LLMBackend:
-    """Return an LLM instance matching the active ai_provider and role model."""
-    model = settings.router_model if role == "router" else settings.generator_model
+    """Return an LLM instance matching the active ai_provider and role model.
+
+    "judge" role uses settings.judge_model when set; falls back to router_model.
+    Router and judge roles use temperature=0.0 for deterministic outputs.
+    """
+    if role == "router":
+        model = settings.router_model
+    elif role == "judge":
+        model = settings.judge_model or settings.router_model
+    else:
+        model = settings.generator_model
     provider = settings.ai_provider
+    temperature = 0.0 if role in ("router", "judge") else None
 
     if provider == "openai":
         from app.ai.providers.openai_provider import OpenAILLM
-        return OpenAILLM(settings, model)
+        return OpenAILLM(settings, model, temperature=temperature)
 
     if provider == "claude":
         from app.ai.providers.anthropic_provider import AnthropicLLM
-        return AnthropicLLM(settings.anthropic_api_key, model)
+        return AnthropicLLM(settings.anthropic_api_key, model, temperature=temperature)
 
     if provider == "gemini":
         from app.ai.providers.gemini_provider import GeminiLLM
-        return GeminiLLM(settings.gemini_api_key, model)
+        return GeminiLLM(settings.gemini_api_key, model, temperature=temperature)
 
     if provider == "github_copilot":
         from app.ai.providers.openai_provider import OpenAIChatLLM
@@ -53,6 +63,7 @@ def build_llm(settings: Settings, role: LLMRole) -> LLMBackend:
             settings.github_copilot_token,
             settings.github_copilot_base_url,
             model,
+            temperature=temperature,
         )
 
     raise ValueError(

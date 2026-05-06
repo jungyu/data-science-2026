@@ -16,31 +16,38 @@ class BrokenEmbedder:
         raise RuntimeError("boom")
 
 
-class FakeKnowledgeRepository:
-    async def match_private_knowledge(
+class FakeStore:
+    """模擬 KnowledgeStore Protocol。"""
+
+    name = "fake"
+
+    async def search(
         self,
         *,
-        query_embedding: list[float],
-        query_text: str,
-        categories: list[str] | None = None,
+        query_embedding,
+        query_text=None,
+        filters=None,
         top_k: int = 8,
     ) -> list[KnowledgeChunk]:
         return [
             KnowledgeChunk(
-                id="a",
-                title="Spec A",
-                content="Chunk A",
-                category="engineering",
-                combined_score=0.4,
+                id="a", title="Spec A", content="Chunk A",
+                category="engineering", combined_score=0.4,
             ),
             KnowledgeChunk(
-                id="b",
-                title="Spec B",
-                content="Chunk B",
-                category="engineering",
-                combined_score=0.9,
+                id="b", title="Spec B", content="Chunk B",
+                category="engineering", combined_score=0.9,
             ),
         ]
+
+    async def upsert(self, chunks):
+        return len(chunks)
+
+    async def delete_by_source(self, source_id: str) -> int:
+        return 0
+
+    async def health_check(self) -> bool:
+        return True
 
 
 class FakeLogsRepository:
@@ -55,7 +62,7 @@ def test_retriever_returns_ranked_chunks_and_logs() -> None:
     logs_repo = FakeLogsRepository()
     retriever = RAGRetriever(
         embedder=FakeEmbedder(),
-        knowledge_repo=FakeKnowledgeRepository(),
+        store=FakeStore(),
         logs_repo=logs_repo,
         final_context_k=1,
     )
@@ -64,7 +71,7 @@ def test_retriever_returns_ranked_chunks_and_logs() -> None:
         retriever.retrieve(
             "webhook architecture",
             categories=["engineering"],
-            line_user_id="U123",
+            external_user_id="U123",
             skill_id="tech_architect",
         )
     )
@@ -77,7 +84,7 @@ def test_retriever_returns_ranked_chunks_and_logs() -> None:
 def test_retriever_returns_empty_list_on_failure() -> None:
     retriever = RAGRetriever(
         embedder=BrokenEmbedder(),
-        knowledge_repo=FakeKnowledgeRepository(),
+        store=FakeStore(),
         logs_repo=FakeLogsRepository(),
     )
 

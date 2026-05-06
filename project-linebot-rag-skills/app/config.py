@@ -56,6 +56,43 @@ class Settings(BaseSettings):
     router_confidence_threshold: float = Field(default=0.55, ge=0.0, le=1.0)
     skills_dir: str = "skills"
 
+    # P2 multi-seed retrieval（spec-14 / task-14）
+    fusion_strategy: str = "max"   # max | mean | rrf
+    max_seeds: int = 5
+
+    # P3 sufficiency（spec-15 / task-15）
+    sufficiency_min_chunks: int = 2
+    sufficiency_min_top_score: float = 0.4
+    sufficiency_min_feature_overlap: int = 1
+
+    # P4 judge + reflection（spec-17 / task-17）
+    judge_enabled: bool = True
+    judge_model: str = ""              # 空字串 → 沿用 router_model
+    judge_min_axis: int = 6            # 各軸最低分
+    judge_min_mean: float = 7.0        # 平均最低分
+    max_reflection_retries: int = 1    # 硬上限 2
+
+    # 三變體並陳（spec-19 / task-19）
+    graph_variant: str = "reflection"  # basic | selfrag | reflection
+
+    # Observability（spec-22 / task-22）
+    observability_enabled: bool = True
+    observability_persist: bool = False    # 寫 Supabase graph_traces
+    trace_dir: str = ".traces"
+
+    # Knowledge Store backend（spec-24 / task-24）
+    knowledge_store_backend: str = "supabase"  # supabase | sqlite_vec | pinecone
+    sqlite_vec_path: str = ".kb/local.db"
+    sqlite_vec_dim: int = 1536                  # OpenAI text-embedding-3-small
+    pinecone_api_key: str = ""
+    pinecone_index: str = "rag-lessons"
+
+    # HITL + Persistence（spec-21 / task-21）
+    hitl_enabled: bool = False
+    hitl_always_review_skills: list[str] = []
+    checkpoint_backend: str = "memory"   # memory | sqlite | none
+    checkpoint_sqlite_path: str = ".checkpoints/rag.db"
+
     @property
     def project_root(self) -> Path:
         return Path(__file__).resolve().parent.parent

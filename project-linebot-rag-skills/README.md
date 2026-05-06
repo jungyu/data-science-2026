@@ -10,16 +10,25 @@ LINE 用戶訊息
     ↓
 LINE Webhook（FastAPI）
     ↓
-Router — 意圖分類 + emotion 偵測
-    ↓
-Retriever — 向量 + 全文混合檢索（pgvector + pg_trgm）
-    ↓
-Generator — 依 skill system prompt 生成回覆
-    ↓
-LINE Push API → 回覆用戶
+LangGraph StateGraph
+  ├─ route       — 意圖分類 + skill 解析 + emotion 偵測
+  ├─ retrieve    — 向量 + 全文混合檢索（pgvector + pg_trgm）
+  ├─ generate    — 依 skill system prompt 生成回覆
+  └─ push        — 透過 LINE Push API 回覆用戶
 ```
 
 每個環節獨立成模組，routing、retrieval、generation 分離，所有決策可透過 schema 與 log 追蹤。
+
+### 為什麼用 LangGraph
+
+P1（[spec-12](./docs/ai-agent/specs/spec-12-graph-refactor.md)）把線性 pipeline 重構為 LangGraph StateGraph，**行為等價但結構升級**。原因：
+
+- **可分支**：後續 phase（[spec-15](./docs/ai-agent/specs/spec-15-sufficiency-clarify.md) sufficiency 判定 / [spec-17](./docs/ai-agent/specs/spec-17-judge-reflection.md) judge）需要條件 edge，線性函式串接做不到
+- **可迴圈**：reflection 需要「judge fail → 重生成」迴圈
+- **可並行**：multi-seed 檢索（[spec-14](./docs/ai-agent/specs/spec-14-multi-seed-retrieval.md)）需要 fan-out / fan-in
+- **可審查**：state 一覽即知，每個 node 的 input / output 明確
+
+完整教學藍圖見 [docs/ai-agent/plan/roadmap.md](./docs/ai-agent/plan/roadmap.md)；LangGraph 概念補充見 [docs/RAG/LangGraph](./docs/RAG/LangGraph/)。
 
 ## 專案結構
 

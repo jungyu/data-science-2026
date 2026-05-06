@@ -31,8 +31,25 @@ with sync_playwright() as p:
 | `03_pdf_export.py` | 將網頁匯出為 PDF（僅 Chromium） |
 | `04_browser_context.py` | 使用 BrowserContext 隔離瀏覽狀態 |
 
+## 網路依賴
+
+| 檔案 | 需要網路 |
+|------|---------|
+| `01_open_browser.py` | ✅（連 playwright.dev） |
+| `02_navigate_and_screenshot.py` | ✅（連 playwright.dev / python.org） |
+| `03_pdf_export.py` | ✅（連 example.com） |
+| `04_browser_context.py` | ✅（連 example.com） |
+
 ## 練習
 
 1. 執行 `01_open_browser.py`（預設 headed 模式），觀察瀏覽器開啟過程；再加上 `--headless` 旗標比較兩者差異
 2. 在 `02_navigate_and_screenshot.py` 中加入你常用的網站
 3. 嘗試用 `firefox` 取代 `chromium` 看看有什麼差異
+
+## 自我檢核
+
+完成本章後，你應該能回答：
+
+1. `Playwright → Browser → BrowserContext → Page` 這四層各自負責什麼？可以省略 BrowserContext 直接建立 Page 嗎？
+2. `headless=True` 和 `headless=False` 的差異是什麼？生產爬蟲通常用哪個？
+3. `browser.close()` 如果沒呼叫會怎樣？用 `with` 語法能解決這個問題嗎？
