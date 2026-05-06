@@ -7,6 +7,7 @@ section 切 chunks、embed、批量 upsert。
 from __future__ import annotations
 
 import hashlib
+import logging
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -14,6 +15,8 @@ from app.ingest.base import Ingester
 from app.ingest.chunkers import Chunker, chunker_for
 from app.ingest.document import Document, DocumentSection
 from app.storage.knowledge_store import KnowledgeChunkInsert, KnowledgeStore
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -32,11 +35,13 @@ class IngestionPipeline:
         embedder: Any,
         store: KnowledgeStore,
         chunker: Chunker | None = None,
+        poison_screen: bool = True,
     ) -> None:
         """`chunker` 為 None 時依 Document.source_type 自動挑（DEFAULT_CHUNKERS）。"""
         self._embedder = embedder
         self._store = store
         self._chunker_override = chunker
+        self._poison_screen = poison_screen
 
     def _chunker_for(self, doc: Document) -> Chunker:
         if self._chunker_override is not None:
@@ -89,12 +94,21 @@ class IngestionPipeline:
             inserts: list[KnowledgeChunkInsert] = []
             chunk_idx = 0
             for section in doc.sections:
-                for chunk in chunker.chunk(section.text):
+                for chunk_text in chunker.chunk(section.text):
+                    if self._poison_screen:
+                        from app.security.guards import detect_rag_poison
+                        if detect_rag_poison(chunk_text):
+                            logger.warning(
+                                "security: poison detected in chunk from %s, skipping",
+                                doc.source_id,
+                            )
+                            stats.skipped += 1
+                            continue
                     chunk_idx += 1
-                    embedding = await self._embedder.embed_query(chunk)
+                    embedding = await self._embedder.embed_query(chunk_text)
                     inserts.append(
                         self._build_chunk_insert(
-                            doc, section, chunk, chunk_idx, embedding
+                            doc, section, chunk_text, chunk_idx, embedding
                         )
                     )
             if inserts:

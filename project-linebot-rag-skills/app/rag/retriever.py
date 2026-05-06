@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 from app.rag.embedder import EmbeddingProvider
 from app.rag.reranker import select_top_chunks
@@ -15,6 +16,7 @@ class RAGRetriever:
     store: KnowledgeStore
     logs_repo: LogsRepository
     final_context_k: int = 4
+    settings: Any = None   # Settings | None — used for hybrid weights (spec-27)
 
     async def retrieve_for_seed(
         self,
@@ -30,10 +32,22 @@ class RAGRetriever:
         """
         try:
             embedding = await self.embedder.embed_query(seed)
+            # spec-27: thread hybrid weights from settings into SearchFilters
+            s = self.settings
+            if s is not None and getattr(s, "hybrid_enabled", False):
+                vector_weight = s.hybrid_vector_weight
+                keyword_weight = s.hybrid_keyword_weight
+            else:
+                vector_weight = 1.0
+                keyword_weight = 0.0
             return await self.store.search(
                 query_embedding=embedding,
                 query_text=seed,
-                filters=SearchFilters(categories=categories),
+                filters=SearchFilters(
+                    categories=categories,
+                    vector_weight=vector_weight,
+                    keyword_weight=keyword_weight,
+                ),
                 top_k=top_k,
             )
         except Exception:

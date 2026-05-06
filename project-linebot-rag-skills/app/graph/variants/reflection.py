@@ -28,12 +28,16 @@ from app.graph.nodes import (
     fuse_scores_node,
     human_review_node,
     increment_retry_node,
+    input_guard_node,
     judge_node,
     make_route_after_judge,
     mark_warning_node,
     push_node,
+    query_transform_node,
+    rerank_node,
     render_narrative_node,
     retrieve_one_node,
+    route_after_input_guard,
     route_by_sufficiency,
     route_node,
 )
@@ -41,19 +45,16 @@ from app.graph.state import RAGState
 
 
 def build_reflection_graph(services: Any):
-    """Build reflection variant。task-21 引入 HITL：
-
-    - settings.hitl_enabled=False（預設）→ retry 用盡走 mark_warning → push
-    - settings.hitl_enabled=True → retry 用盡走 human_review，graph 在進入
-      human_review 前 interrupt（需 services.checkpointer，無 checkpointer 時 raise）
-    """
     g = StateGraph(RAGState)
 
+    g.add_node("input_guard", partial(input_guard_node, services=services))
     g.add_node("route", partial(route_node, services=services))
+    g.add_node("query_transform", partial(query_transform_node, services=services))
     g.add_node("extract_features", partial(extract_features_node, services=services))
     g.add_node("expand_seeds", partial(expand_seeds_node, services=services))
     g.add_node("retrieve_one", partial(retrieve_one_node, services=services))
     g.add_node("fuse_scores", partial(fuse_scores_node, services=services))
+    g.add_node("rerank", partial(rerank_node, services=services))
     g.add_node("check_sufficiency", partial(check_sufficiency_node, services=services))
     g.add_node("clarify", partial(clarify_node, services=services))
     g.add_node("build_answer_contract", partial(build_answer_contract_node, services=services))
@@ -64,8 +65,10 @@ def build_reflection_graph(services: Any):
     g.add_node("human_review", partial(human_review_node, services=services))
     g.add_node("push", partial(push_node, services=services))
 
-    g.add_edge(START, "route")
-    g.add_edge("route", "extract_features")
+    g.add_edge(START, "input_guard")
+    g.add_conditional_edges("input_guard", route_after_input_guard, ["route", "push"])
+    g.add_edge("route", "query_transform")
+    g.add_edge("query_transform", "extract_features")
     g.add_edge("extract_features", "expand_seeds")
     g.add_conditional_edges(
         "expand_seeds",
@@ -73,7 +76,8 @@ def build_reflection_graph(services: Any):
         ["retrieve_one", "fuse_scores"],
     )
     g.add_edge("retrieve_one", "fuse_scores")
-    g.add_edge("fuse_scores", "check_sufficiency")
+    g.add_edge("fuse_scores", "rerank")
+    g.add_edge("rerank", "check_sufficiency")
     g.add_conditional_edges(
         "check_sufficiency",
         route_by_sufficiency,
@@ -100,8 +104,6 @@ def build_reflection_graph(services: Any):
     g.add_edge("clarify", "push")
     g.add_edge("push", END)
 
-    # HITL：interrupt 在 human_review **之前**——只有走到該路徑才會中斷，
-    # judge=pass 路徑不受影響。
     compile_kwargs: dict[str, Any] = {}
     checkpointer = getattr(services, "checkpointer", None)
     if checkpointer is not None:

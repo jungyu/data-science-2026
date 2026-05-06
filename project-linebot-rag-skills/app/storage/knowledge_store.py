@@ -20,6 +20,9 @@ class SearchFilters(BaseModel):
     after: datetime | None = None
     metadata_match: dict | None = None
     tenant_id: str | None = None
+    # spec-27 hybrid retrieval weights（透傳給 store.search → RPC）
+    vector_weight: float = 1.0
+    keyword_weight: float = 0.0
 
 
 class KnowledgeChunkInsert(BaseModel):

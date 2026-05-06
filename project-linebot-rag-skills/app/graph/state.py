@@ -58,3 +58,13 @@ class RAGState(TypedDict, total=False):
 
     # 非 prod 路徑（demo / eval）：push_node 不真的送出訊息
     dry_run: bool
+
+    # —— spec-26 query transform
+    transformed_queries: list[str]    # transform 後展開的查詢列表（含原始 user_input）
+    hyde_doc: str | None              # HyDE 假設性解答
+    transform_strategy: str | None   # 本次使用的策略
+
+    # —— spec-30 security
+    blocked: bool                     # input_guard 攔截時設 True
+    blocked_reason: str | None
+    output_had_leakage: bool          # output_guard 偵測到 PII 洩漏

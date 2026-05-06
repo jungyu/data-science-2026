@@ -68,6 +68,16 @@ async def process_channel_input(inp, services: RuntimeServices) -> None:
         )
         token = set_current_tracer(tracer)
 
+    settings = services.settings
+    if getattr(settings, "streaming_enabled", False):
+        placeholder = getattr(settings, "streaming_placeholder", "⏳ 思考中，請稍候...")
+        try:
+            await services.line_client.push_message(
+                user_id, [{"type": "text", "text": placeholder}]
+            )
+        except Exception:
+            logger.warning("Failed to send streaming placeholder")
+
     final_state = None
     try:
         final_state = await services.rag_graph.ainvoke(initial_state)

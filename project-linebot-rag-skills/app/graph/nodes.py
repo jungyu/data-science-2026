@@ -6,6 +6,7 @@ from typing import Any
 from langgraph.types import Send
 
 from app.graph.clarifier import format_clarification
+from app.graph.query_transform import query_transform_node  # noqa: F401 — re-export for variant builders
 from app.graph.state import RAGState
 from app.observability.tracer import traced
 from app.rag.fusion import get_fuser
@@ -80,7 +81,7 @@ async def generate_basic_node(state: RAGState, services: Any) -> dict[str, Any]:
 
 @traced("expand_seeds")
 async def expand_seeds_node(state: RAGState, services: Any) -> dict[str, Any]:
-    """把 features 展開為 seeds。若不需 RAG 直接回空 list 短路後續 fan-out。"""
+    """Expand features into seeds. Also merges transformed_queries from spec-26."""
     router_result = state["router_result"]
     if not router_result.is_rag_required:
         return {"seeds": [], "hits_per_seed": []}
@@ -89,9 +90,17 @@ async def expand_seeds_node(state: RAGState, services: Any) -> dict[str, Any]:
         state["features"],
         max_seeds=services.settings.max_seeds,
     )
-    # 若 expander 一條 seed 都產不出（極端 fallback），保底用 router_result.rag_query
     if not seeds:
         seeds = [router_result.rag_query or state["user_input"]]
+
+    # spec-26: merge transformed_queries as additional seeds
+    extra = state.get("transformed_queries") or []
+    for q in extra:
+        if q and q not in seeds:
+            seeds.append(q)
+
+    max_s = services.settings.max_seeds
+    seeds = seeds[:max_s]
     return {"seeds": seeds, "hits_per_seed": []}
 
 
@@ -339,6 +348,69 @@ async def mark_warning_node(state: RAGState, services: Any) -> dict[str, Any]:
     return {"responses": responses, "judge_warning_prefix": True}
 
 
+@traced("rerank")
+async def rerank_node(state: RAGState, services: Any) -> dict[str, Any]:
+    """spec-28: cross-encoder reranking after fusion.
+
+    If reranker is None (disabled), falls back to score-sort.
+    """
+    from app.rag.reranker import select_top_chunks
+
+    chunks = state.get("rag_chunks") or []
+    query = state["user_input"]
+    top_n = getattr(services.settings, "reranker_top_n", 5)
+    reranker = getattr(services, "reranker", None)
+
+    if reranker is None:
+        ranked = select_top_chunks(chunks, top_n)
+        strategy = "score-sort"
+    else:
+        ranked = await reranker.rerank(query, chunks, top_n)
+        strategy = "cross-encoder"
+
+    logger.info(
+        "rerank: %d → %d chunks (strategy=%s)", len(chunks), len(ranked), strategy
+    )
+    context = services.retriever.build_context(ranked)
+    return {"rag_chunks": ranked, "rag_context": context}
+
+
+@traced("input_guard")
+async def input_guard_node(state: RAGState, services: Any) -> dict[str, Any]:
+    """spec-30: Detect prompt injection and enforce input length limit.
+
+    Sets state['blocked']=True when injection detected; push_node will short-circuit.
+    """
+    from app.security.guards import detect_prompt_injection
+
+    settings = services.settings
+    if not getattr(settings, "security_input_guard", True):
+        return {"blocked": False}
+
+    user_input: str = state.get("user_input", "")
+    max_chars = getattr(settings, "security_max_input_chars", 1000)
+    if len(user_input) > max_chars:
+        logger.warning("security: input truncated %d → %d chars", len(user_input), max_chars)
+        user_input = user_input[:max_chars]
+
+    if detect_prompt_injection(user_input):
+        logger.warning("security: prompt injection detected")
+        blocked_reply = getattr(settings, "security_blocked_reply", "抱歉，這個問題我無法回覆。")
+        return {
+            "user_input": user_input,
+            "blocked": True,
+            "blocked_reason": "prompt_injection",
+            "responses": [blocked_reply],
+        }
+
+    return {"user_input": user_input, "blocked": False}
+
+
+def route_after_input_guard(state: RAGState) -> str:
+    """Edge: input_guard → route (normal) or push (blocked)."""
+    return "push" if state.get("blocked") else "route"
+
+
 @traced("push")
 async def push_node(state: RAGState, services: Any) -> dict[str, Any]:
     user_id = state.get("external_user_id", "")
@@ -363,5 +435,13 @@ async def push_node(state: RAGState, services: Any) -> dict[str, Any]:
         text = state["reviewer_revised_text"]
     else:
         text = "\n\n".join(state.get("responses") or [])
+
+    # spec-30: redact PII from outgoing text
+    if getattr(services.settings, "security_output_guard", True):
+        from app.security.guards import detect_sensitive_leakage, redact_sensitive
+        if detect_sensitive_leakage(text):
+            logger.warning("security: PII detected in outgoing message, redacting")
+            text = redact_sensitive(text)
+
     await channel.push(recipient_id=user_id, messages=channel.format(text))
     return {}

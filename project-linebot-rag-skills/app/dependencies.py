@@ -49,6 +49,7 @@ class RuntimeServices:
     tracer_registry: TracerRegistry | None = None
     channels: dict[str, OutputChannel] = field(default_factory=dict)
     checkpointer: Any = None
+    reranker: Any = None
     rag_graph: Any = None
 
 
@@ -95,6 +96,17 @@ def get_knowledge_store() -> KnowledgeStore:
 
 
 @lru_cache(maxsize=1)
+def get_reranker():
+    from app.rag.reranker import make_reranker
+    try:
+        return make_reranker(get_settings())
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).warning("reranker init failed: %s", exc)
+        return None
+
+
+@lru_cache(maxsize=1)
 def get_retriever() -> RAGRetriever:
     settings = get_settings()
     return RAGRetriever(
@@ -102,6 +114,7 @@ def get_retriever() -> RAGRetriever:
         store=get_knowledge_store(),
         logs_repo=get_logs_repo(),
         final_context_k=settings.final_context_k,
+        settings=settings,
     )
 
 
@@ -212,6 +225,7 @@ def get_runtime_services() -> RuntimeServices:
         tracer_registry=get_tracer_registry(),
         channels=get_channels(),
         checkpointer=get_checkpointer(),
+        reranker=get_reranker(),
     )
     services.rag_graph = build_rag_graph(services)
     return services

@@ -34,6 +34,8 @@ class SupabaseStore:
             query_text=query_text or "",
             categories=filters.categories if filters else None,
             top_k=top_k,
+            vector_weight=filters.vector_weight if filters else 1.0,
+            keyword_weight=filters.keyword_weight if filters else 0.0,
         )
 
     async def upsert(self, chunks: list[KnowledgeChunkInsert]) -> int:

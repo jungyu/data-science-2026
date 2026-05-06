@@ -15,6 +15,8 @@ class KnowledgeRepository:
         query_text: str,
         categories: list[str] | None = None,
         top_k: int = 8,
+        vector_weight: float = 1.0,
+        keyword_weight: float = 0.0,
     ) -> list[KnowledgeChunk]:
         rows = await self._client.rpc(
             "match_private_knowledge",
@@ -23,6 +25,8 @@ class KnowledgeRepository:
                 "query_text": query_text,
                 "match_count": top_k,
                 "category_filter": categories or None,
+                "vector_weight": vector_weight,
+                "keyword_weight": keyword_weight,
             },
         )
         return [KnowledgeChunk.model_validate(row) for row in rows]

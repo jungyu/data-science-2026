@@ -27,13 +27,16 @@ class MockRepo:
         self.search_calls: list[dict] = []
 
     async def match_private_knowledge(
-        self, *, query_embedding, query_text, categories=None, top_k=8
+        self, *, query_embedding, query_text, categories=None, top_k=8,
+        vector_weight=1.0, keyword_weight=0.0
     ):
         self.search_calls.append({
             "query_embedding": query_embedding,
             "query_text": query_text,
             "categories": categories,
             "top_k": top_k,
+            "vector_weight": vector_weight,
+            "keyword_weight": keyword_weight,
         })
         return [
             KnowledgeChunk(id="a", content="x", category="general", combined_score=0.8),

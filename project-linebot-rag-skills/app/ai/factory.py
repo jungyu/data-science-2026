@@ -84,7 +84,11 @@ def build_embedder(settings: Settings) -> EmbedBackend:
         from app.ai.providers.gemini_provider import GeminiEmbedder
         return GeminiEmbedder(settings.gemini_api_key, settings.embedding_model)
 
+    if provider == "huggingface":
+        from app.ai.providers.huggingface_provider import HuggingFaceEmbedder
+        return HuggingFaceEmbedder(settings)
+
     raise ValueError(
         f"Unknown embedding provider: {provider!r}. "
-        "Valid values: openai | gemini"
+        "Valid values: openai | gemini | huggingface"
     )

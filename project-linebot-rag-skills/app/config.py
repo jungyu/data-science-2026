@@ -3,7 +3,7 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -93,6 +93,40 @@ class Settings(BaseSettings):
     checkpoint_backend: str = "memory"   # memory | sqlite | none
     checkpoint_sqlite_path: str = ".checkpoints/rag.db"
 
+    # spec-26 query transform
+    query_transform_strategy: str = "none"   # none | hyde | step_back | decompose
+    hyde_model: str = ""                      # empty → falls back to router_model
+    hyde_max_tokens: int = 150
+    step_back_model: str = ""                 # empty → falls back to router_model
+    decompose_max_subqueries: int = 3
+
+    # spec-27 hybrid retrieval（Supabase SQL already implements BM25; this exposes the weights）
+    hybrid_enabled: bool = False
+    hybrid_vector_weight: float = 0.7
+    hybrid_keyword_weight: float = 0.3
+
+    # spec-28 reranker
+    reranker_enabled: bool = False
+    reranker_provider: str = "cohere"          # cohere | bge
+    reranker_model: str = "rerank-multilingual-v3.0"
+    reranker_top_n: int = 5
+    cohere_api_key: str = ""
+    bge_reranker_model: str = "BAAI/bge-reranker-base"
+
+    # spec-29 embedding dimensions（text-embedding-3-* supports dimension reduction）
+    embedding_dimensions: int | None = None
+
+    # spec-30 security guards
+    security_input_guard: bool = True
+    security_output_guard: bool = True
+    security_poison_screen: bool = True
+    security_max_input_chars: int = 1000
+    security_blocked_reply: str = "抱歉，這個問題我無法回覆。"
+
+    # spec-31 streaming
+    streaming_enabled: bool = False
+    streaming_placeholder: str = "⏳ 思考中，請稍候..."
+
     @property
     def project_root(self) -> Path:
         return Path(__file__).resolve().parent.parent
@@ -101,6 +135,17 @@ class Settings(BaseSettings):
     def skills_path(self) -> Path:
         path = Path(self.skills_dir)
         return path if path.is_absolute() else self.project_root / path
+
+    @model_validator(mode="after")
+    def _validate_hybrid_weights(self) -> "Settings":
+        if self.hybrid_enabled:
+            total = self.hybrid_vector_weight + self.hybrid_keyword_weight
+            if not (0.99 < total < 1.01):
+                raise ValueError(
+                    f"hybrid_vector_weight + hybrid_keyword_weight must equal 1.0 "
+                    f"(got {total:.3f})"
+                )
+        return self
 
 
 @lru_cache(maxsize=1)

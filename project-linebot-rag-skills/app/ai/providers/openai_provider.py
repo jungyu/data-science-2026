@@ -74,6 +74,21 @@ class OpenAIChatLLM:
             )
         return response.choices[0].message.content or ""
 
+    async def stream_complete(self, prompt: str):
+        """Yield string chunks as the model generates them."""
+        kwargs: dict = {
+            "model": self._model,
+            "messages": [{"role": "user", "content": prompt}],
+            "stream": True,
+        }
+        temperature = getattr(self, "_temperature", None)
+        if temperature is not None:
+            kwargs["temperature"] = temperature
+        stream = await self._client.chat.completions.create(**kwargs)
+        async for chunk in stream:
+            if chunk.choices and chunk.choices[0].delta.content:
+                yield chunk.choices[0].delta.content
+
 
 class OpenAIEmbedder:
     def __init__(self, settings: Settings) -> None:
@@ -84,13 +99,14 @@ class OpenAIEmbedder:
             base_url=settings.openai_base_url,
         )
         self._model = settings.embedding_model
+        self._dimensions = getattr(settings, "embedding_dimensions", None)
 
     async def embed_query(self, text: str) -> list[float]:
         t0 = time.time()
-        response = await self._client.embeddings.create(
-            model=self._model,
-            input=text.strip(),
-        )
+        kwargs: dict = {"model": self._model, "input": text.strip()}
+        if getattr(self, "_dimensions", None):
+            kwargs["dimensions"] = self._dimensions
+        response = await self._client.embeddings.create(**kwargs)
         usage = getattr(response, "usage", None)
         if usage is not None:
             record_llm_call_if_traced(
