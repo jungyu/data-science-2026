@@ -77,6 +77,12 @@
 | [`project-first/`](project-first/) | Project-First 教學法 | Unit 0 | 多章 |
 | [`homework/`](homework/) | 作業範本與規格 | 全課程 | 依需要 |
 
+### 工作流程指南
+
+| 指南 | 說明 |
+|------|------|
+| [Fork 子專案 + 跟上上游更新](fork-subproject-sync.md) | 如何 fork 本 repo、客製化子專案，並持續同步課程更新 |
+
 ---
 
 ## 期末專題路徑（Unit 12 核心）
