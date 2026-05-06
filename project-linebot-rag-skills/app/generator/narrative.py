@@ -41,6 +41,12 @@ class NarrativeLLM(Protocol):
     async def complete(self, prompt: str) -> str: ...
 
 
+class StreamingNarrativeLLM(Protocol):
+    """spec-31：可選串流介面。providers 不一定全實作。"""
+
+    def stream_complete(self, prompt: str): ...
+
+
 def _fallback_render(contract: AnswerContract) -> str:
     """LLM 失敗或未配置時的模板降級輸出。
 
@@ -103,6 +109,23 @@ class NarrativeRenderer:
         if self.llm is None:
             return _fallback_render(contract)
 
+        prompt = self._build_prompt(
+            contract=contract, skill=skill, response_mode=response_mode, feedback=feedback
+        )
+        try:
+            return await self.llm.complete(prompt)
+        except Exception:
+            logger.exception("narrative render failed, falling back to template")
+            return _fallback_render(contract)
+
+    def _build_prompt(
+        self,
+        *,
+        contract: AnswerContract,
+        skill: SkillDefinition,
+        response_mode: str,
+        feedback: list[str] | None,
+    ) -> str:
         feedback_section = ""
         if feedback:
             feedback_section = (
@@ -110,16 +133,51 @@ class NarrativeRenderer:
                 + "\n".join(f"- {f}" for f in feedback)
                 + "\n\n"
             )
-
-        prompt = _PROMPT.format(
+        return _PROMPT.format(
             skill_name=skill.name,
             skill_system_prompt=skill.system_prompt,
             response_mode=response_mode,
             contract_json=contract.model_dump_json(indent=2),
             feedback_section=feedback_section,
         )
+
+    async def stream_render(
+        self,
+        *,
+        contract: AnswerContract,
+        skill: SkillDefinition,
+        response_mode: str,
+        feedback: list[str] | None = None,
+    ):
+        """spec-31：以 async generator 形式 yield 文字 chunk。
+
+        前提：self.llm 必須有 `stream_complete(prompt)` 方法（OpenAILLM /
+        OpenAIChatLLM 已實作）。沒有時降級回單次 complete + 一次 yield。
+        失敗時 yield 模板 fallback。
+        """
+        if self.llm is None:
+            yield _fallback_render(contract)
+            return
+
+        prompt = self._build_prompt(
+            contract=contract, skill=skill, response_mode=response_mode, feedback=feedback
+        )
+
+        stream_method = getattr(self.llm, "stream_complete", None)
+        if stream_method is None:
+            # Provider 未實作串流：退化成一次性回覆
+            try:
+                text = await self.llm.complete(prompt)
+            except Exception:
+                logger.exception("narrative render failed, falling back to template")
+                text = _fallback_render(contract)
+            yield text
+            return
+
         try:
-            return await self.llm.complete(prompt)
+            async for delta in stream_method(prompt):
+                if delta:
+                    yield delta
         except Exception:
-            logger.exception("narrative render failed, falling back to template")
-            return _fallback_render(contract)
+            logger.exception("stream_render failed, yielding template fallback")
+            yield _fallback_render(contract)

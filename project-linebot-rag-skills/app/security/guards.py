@@ -12,10 +12,13 @@ _INJECTION_PATTERNS = [
     r"disregard\s+(your|all)\s+(instructions?|guidelines?|rules?)",
     r"system\s*prompt",
     r"<\s*(INST|SYS|SYSTEM)\s*>",
-    r"忽略(之前|前面|所有)(的)?(指令|設定|限制|規則)",
+    # 中文：忽略 ... (指令/設定/限制/規則) — 中間允許 0–12 字以容納「之前的所有」等變體
+    r"忽略.{0,12}?(指令|設定|限制|規則|提示)",
     r"假裝你是",
     r"現在你是(?!.*助理)",
     r"輸出.*?(system\s*prompt|系統提示)",
+    # 中文：扮演 / 切換成 ... 角色（常見越獄前綴）
+    r"切換成.{0,8}?(角色|模式|身份)",
 ]
 
 _INJECTION_RE = re.compile(

@@ -235,8 +235,47 @@ async def build_answer_contract_node(state: RAGState, services: Any) -> dict[str
 
 @traced("render_narrative")
 async def render_narrative_node(state: RAGState, services: Any) -> dict[str, Any]:
-    """Stage 2：受限 LLM 把 contract 寫成 markdown，依 LINE 上限切段。"""
+    """Stage 2：受限 LLM 把 contract 寫成 markdown，依 LINE 上限切段。
+
+    spec-31：當 settings.streaming_enabled 為真且 channel="http" 時，改走
+    stream_render 並透過 LangGraph custom stream writer 推送每個 token；
+    成品 responses 仍寫回 state（供 judge / push 使用）。
+    """
     response_mode = getattr(state["router_result"], "response_mode", "default")
+    settings = services.settings
+    use_stream = (
+        getattr(settings, "streaming_enabled", False)
+        and state.get("channel") == "http"
+    )
+
+    if use_stream:
+        try:
+            from langgraph.config import get_stream_writer
+            writer = get_stream_writer()
+        except Exception:
+            writer = None
+
+        try:
+            from app.generator.formatter import split_for_line
+            full = ""
+            async for token in services.narrative_renderer.stream_render(
+                contract=state["answer_contract"],
+                skill=state["skill"],
+                response_mode=response_mode,
+                feedback=state.get("judge_feedback"),
+            ):
+                full += token
+                if writer is not None:
+                    writer({"token": token})
+            responses = split_for_line(
+                full, max_chars=services.narrative_renderer.line_max_message_chars
+            )
+        except Exception:
+            logger.exception("stream render_narrative failed")
+            responses = ["系統暫時無法完成此請求，請稍後再試。"]
+        return {"responses": responses}
+
+    # 非串流路徑（既有行為）
     try:
         responses = await services.narrative_renderer.render(
             contract=state["answer_contract"],

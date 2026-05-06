@@ -55,6 +55,11 @@ crawler = [
   "readability-lxml>=0.8",
   "lxml>=5.0",
 ]
+# spec-28 reranker — 依 RERANKER_PROVIDER 擇一安裝
+reranker-cohere = ["cohere>=5.0"]
+reranker-bge = ["sentence-transformers>=2.7"]
+# spec-29 本地 HuggingFace embedding（EMBEDDING_PROVIDER=huggingface 時需要）
+hf-embed = ["sentence-transformers>=2.7"]
 
 [build-system]
 requires = ["hatchling"]

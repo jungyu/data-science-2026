@@ -38,6 +38,24 @@ class OpenAILLM:
             )
         return response.output_text
 
+    async def stream_complete(self, prompt: str):
+        """Yield text deltas via Responses API streaming (spec-31).
+
+        SDK 1.40+ 提供 `stream=True` 並 yield `ResponseTextDeltaEvent` 等事件；
+        我們只挑 `response.output_text.delta` 來組裝。其他事件型別忽略。
+        """
+        kwargs: dict = {"model": self._model, "input": prompt, "stream": True}
+        temperature = getattr(self, "_temperature", None)
+        if temperature is not None:
+            kwargs["temperature"] = temperature
+        stream = await self._client.responses.create(**kwargs)
+        async for event in stream:
+            event_type = getattr(event, "type", "")
+            if event_type == "response.output_text.delta":
+                delta = getattr(event, "delta", "")
+                if delta:
+                    yield delta
+
 
 class OpenAIChatLLM:
     """OpenAI Chat Completions API — for OpenAI-compatible endpoints (GitHub Copilot, etc.)."""
