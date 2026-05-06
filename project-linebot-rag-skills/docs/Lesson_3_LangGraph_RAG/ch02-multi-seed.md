@@ -427,4 +427,4 @@ A：Single-topic 問題走 multi-seed 只是多跑一次 embedding（約 +50ms�
 ---
 
 上一章 → [Ch 01：Graph 起步](ch01-graph-basics.md)
-下一章 → [Ch 03：誠實追問 + 兩段式生成](ch03-sufficiency-generation.md)
+下一章 → [Ch 02b：進階檢索三技 — HyDE / 混合檢索 / Reranker](ch02b-advanced-retrieval.md)

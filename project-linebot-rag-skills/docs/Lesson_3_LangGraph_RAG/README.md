@@ -58,6 +58,7 @@ Lesson 3 的所有示範都假設知識庫已有資料；空庫會讓 retrieval 
 | [Ch 00](ch00-setup.md) | 環境設定 | 跑通 `.env`、pytest、本地服務 | 前置 |
 | [Ch 01](ch01-graph-basics.md) | Graph 起步 | LangGraph 核心概念、等價重構、知識庫入庫 | W1 |
 | [Ch 02](ch02-multi-seed.md) | Multi-seed 檢索 | Feature Extractor、fan-out/in、RRF fusion | W2 |
+| [Ch 02b](ch02b-advanced-retrieval.md) | 進階檢索三技 | HyDE、BM25 混合檢索、Reranker | W2（選修）|
 | [Ch 03](ch03-sufficiency-generation.md) | 誠實追問 + 兩段式生成 | 條件分支、Answer Contract、grounded constraint | W3 |
 | [Ch 04](ch04-self-correction.md) | 自我審查 | 4 軸 Judge、reflection 迴圈、三變體並陳 | W4 |
 | [Ch 05](ch05-evaluation.md) | 量化 + 觀測 | Golden case set、6 個 metric、cost tracking | W5 |

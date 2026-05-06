@@ -434,5 +434,5 @@ A：LLM 的 confidence 有 calibration 問題（常常過度自信或過度謙�
 
 ---
 
-上一章 → [Ch 02：Multi-seed 檢索](ch02-multi-seed.md)
+上一章 → [Ch 02b：進階檢索三技 — HyDE / 混合檢索 / Reranker](ch02b-advanced-retrieval.md)
 下一章 → [Ch 04：自我審查](ch04-self-correction.md)
