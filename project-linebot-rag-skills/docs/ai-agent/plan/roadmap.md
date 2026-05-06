@@ -320,7 +320,9 @@ P1 / P3 / P4 完成時，graph 形態剛好對應 [docs/RAG/LangGraph/ch06](../.
 
 ## Phase 5（選修）：工程補完
 
-完成 P1–P4 後 graph 主線就齊了。以下議題不在 graph 結構教學主線內，但對「把 bot 做成生產級」有價值，可作為**進階練習題**或學生自選題目：
+完成 P1–P4 後 graph 主線就齊了。Phase 5 分兩梯次：
+
+### 第一梯次（原有）
 
 | 項目 | 規格 | 屬性 |
 |------|------|------|
@@ -335,6 +337,23 @@ P1 / P3 / P4 完成時，graph 形態剛好對應 [docs/RAG/LangGraph/ch06](../.
 | Retrieval Log 分析 | [spec-09](../specs/spec-09-retrieval-analytics.md) | 觀測性 |
 
 > ⚠️ 既有的 [spec-10 Self-RAG](../specs/spec-10-selfrag.md) 與 [spec-11 Reflection](../specs/spec-11-reflection.md) 將被新的 P3 / P4 spec 取代（Self-RAG 的「query 改寫重試」會被 Sufficiency + Multi-seed 的組合取代；Reflection 升級為結構化 4 軸 Judge）。
+
+### 第二梯次：Advanced RAG 強化（spec-26–31）
+
+**計畫總覽**：[advanced-rag-plan.md](./advanced-rag-plan.md)
+
+本梯次補完六個 RAG 核心品質與生產安全性議題，不改變 graph 骨架，透過 env var 切換是否啟用：
+
+| 項目 | 規格 | 任務 | 依賴 | 屬性 |
+|------|------|------|------|------|
+| 查詢轉換（HyDE / Step-Back / Decompose）| [spec-26](../specs/spec-26-query-transform.md) | [task-26](../tasks/task-26-query-transform.md) | P2 | 檢索品質 |
+| 混合檢索曝光（BM25 + vector config）| [spec-27](../specs/spec-27-hybrid-retrieval.md) | [task-27](../tasks/task-27-hybrid-retrieval.md) | P1 | 檢索品質 |
+| Cross-encoder Reranker（Cohere / BGE）| [spec-28](../specs/spec-28-reranker.md) | [task-28](../tasks/task-28-reranker.md) | spec-27 | 精排品質 |
+| Embedding 模型選型 | [spec-29](../specs/spec-29-embedding-selection.md) | [task-29](../tasks/task-29-embedding-selection.md) | spec-20 | 基礎設施 |
+| 安全性防禦（Injection / Poisoning / 洩漏）| [spec-30](../specs/spec-30-security.md) | [task-30](../tasks/task-30-security.md) | P3 | 生產安全 |
+| 串流回應（HTTP SSE / LINE 占位訊息）| [spec-31](../specs/spec-31-streaming.md) | [task-31](../tasks/task-31-streaming.md) | P4 | 使用者體驗 |
+
+建議施做順序：`spec-27 → spec-28 → spec-26 → spec-30 → spec-31 → spec-29`
 
 ---
 
