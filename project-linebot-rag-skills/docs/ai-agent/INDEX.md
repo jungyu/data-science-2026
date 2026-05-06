@@ -106,6 +106,20 @@
 | spec/task 07–09 | Notion ingestion、skill hot-reload、retrieval analytics |
 | spec/task 10–11 | Self-RAG（精簡版）、初版 reflection |
 
+### Advanced RAG 強化梯次（W1–W7 完成後選修）
+
+> 計畫總覽：[advanced-rag-plan.md](plan/advanced-rag-plan.md)。
+> 全部以 env var 切換是否啟用，預設 OFF；行為與 W7 完成後完全一致。
+
+| Spec | Task | 主題 |
+|---|---|---|
+| [spec-26](specs/spec-26-query-transform.md) | [task-26](tasks/task-26-query-transform.md) | 查詢轉換（HyDE / Step-Back / Decompose）|
+| [spec-27](specs/spec-27-hybrid-retrieval.md) | [task-27](tasks/task-27-hybrid-retrieval.md) | 混合檢索曝光（BM25 + vector 權重 config）|
+| [spec-28](specs/spec-28-reranker.md) | [task-28](tasks/task-28-reranker.md) | Cross-encoder Reranker（Cohere / BGE）|
+| [spec-29](specs/spec-29-embedding-selection.md) | [task-29](tasks/task-29-embedding-selection.md) | Embedding 模型選型（含 HuggingFace 本地嵌入）|
+| [spec-30](specs/spec-30-security.md) | [task-30](tasks/task-30-security.md) | 安全防禦（Prompt Injection / RAG Poisoning / PII redact）|
+| [spec-31](specs/spec-31-streaming.md) | [task-31](tasks/task-31-streaming.md) | 串流回應（HTTP SSE 真 token streaming + LINE 占位訊息）|
+
 ---
 
 ## 4. 範例與走查（`examples/`）
@@ -224,13 +238,13 @@
 |---|---|---|
 | 計畫文件 | 4 | `plan/` |
 | 可移植性指南 | 2 | `guides/` |
-| Spec 文件 | 25 | `specs/` |
-| Task 文件 | 25 | `tasks/` |
+| Spec 文件 | 31 | `specs/` |
+| Task 文件 | 31 | `tasks/` |
 | 範例 / 走查 | 14 | `examples/` |
 | ADR | 6 | `../../adr/` |
 | RAG 理論 | 19 | `../../RAG/` |
 | 操作文件 | 5 | `../../` |
-| **合計** | **100** | |
+| **合計** | **112** | |
 
 ---
 

@@ -24,24 +24,32 @@ def test_each_variant_compiles(stub_services):
 
 
 def test_basic_topology_is_minimal(stub_services):
-    """basic variant 不含 multi-seed / sufficiency / judge 的 node。"""
+    """basic variant 不含 multi-seed / sufficiency / judge 的 node。
+
+    spec-30：basic 仍要含 input_guard（任何變體都應有）。
+    spec-26/28：basic 不接 query_transform / rerank（只有 multi-seed 變體用得到）。
+    """
     g = build_basic_graph(stub_services)
     nodes = set(g.get_graph().nodes.keys())
-    # basic 有的：route, retrieve, generate, push（+ start/end auto-added）
-    assert {"route", "retrieve", "generate", "push"}.issubset(nodes)
-    # basic 不該有的：multi-seed 與 P3/P4 的 node
+    # basic 有的：input_guard, route, retrieve, generate, push（+ start/end auto-added）
+    assert {"input_guard", "route", "retrieve", "generate", "push"}.issubset(nodes)
+    # basic 不該有的：multi-seed 與 P3/P4 的 node、以及 advanced 增補的 node
     forbidden = {"extract_features", "expand_seeds", "retrieve_one", "fuse_scores",
                  "check_sufficiency", "clarify", "build_answer_contract",
-                 "render_narrative", "judge", "increment_retry", "mark_warning"}
+                 "render_narrative", "judge", "increment_retry", "mark_warning",
+                 "query_transform", "rerank"}
     assert nodes & forbidden == set(), f"basic should not contain {nodes & forbidden}"
 
 
 def test_selfrag_topology_no_judge(stub_services):
-    """selfrag 含 P2/P3 但不含 P4 judge。"""
+    """selfrag 含 P2/P3 但不含 P4 judge。
+
+    spec-26/28/30：selfrag 也應含 input_guard / query_transform / rerank。
+    """
     g = build_selfrag_graph(stub_services)
     nodes = set(g.get_graph().nodes.keys())
-    assert {"extract_features", "expand_seeds", "fuse_scores",
-            "check_sufficiency", "clarify",
+    assert {"input_guard", "query_transform", "extract_features", "expand_seeds",
+            "fuse_scores", "rerank", "check_sufficiency", "clarify",
             "build_answer_contract", "render_narrative"}.issubset(nodes)
     assert "judge" not in nodes
     assert "increment_retry" not in nodes
@@ -49,13 +57,34 @@ def test_selfrag_topology_no_judge(stub_services):
 
 
 def test_reflection_topology_full(stub_services):
-    """reflection 含全部 phase。"""
+    """reflection 含全部 phase + spec-26/28/30 advanced node。"""
     g = build_reflection_graph(stub_services)
     nodes = set(g.get_graph().nodes.keys())
-    assert {"extract_features", "expand_seeds", "fuse_scores",
-            "check_sufficiency", "clarify",
+    assert {"input_guard", "query_transform", "extract_features", "expand_seeds",
+            "fuse_scores", "rerank", "check_sufficiency", "clarify",
             "build_answer_contract", "render_narrative",
             "judge", "increment_retry", "mark_warning"}.issubset(nodes)
+
+
+def test_advanced_node_edges_correct(stub_services):
+    """spec-26/28：input_guard → route → query_transform → extract_features，
+    fuse_scores → rerank → check_sufficiency。驗證 wiring 正確（避免 node
+    存在但邊接錯）。"""
+    g = build_selfrag_graph(stub_services)
+    edges = g.get_graph().edges
+    edge_pairs = {(e.source, e.target) for e in edges}
+
+    # input_guard 後條件邊：可能去 route 或 push（blocked）；至少能到達一條
+    assert any(src == "input_guard" for src, _ in edge_pairs), \
+        "input_guard should have outgoing edges"
+
+    # query_transform 介於 route 與 extract_features 之間
+    assert ("route", "query_transform") in edge_pairs
+    assert ("query_transform", "extract_features") in edge_pairs
+
+    # rerank 介於 fuse_scores 與 check_sufficiency 之間
+    assert ("fuse_scores", "rerank") in edge_pairs
+    assert ("rerank", "check_sufficiency") in edge_pairs
 
 
 @pytest.mark.asyncio

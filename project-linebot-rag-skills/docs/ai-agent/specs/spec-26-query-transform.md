@@ -159,20 +159,22 @@ async def query_transform_node(state: RAGState, settings: Settings) -> dict:
 
 ### 4. Graph 接線
 
-在所有 graph variant 的 `extract_features` **之前**插入 `query_transform_node`：
+在 **selfrag** 與 **reflection** 變體的 `extract_features` **之前**插入 `query_transform_node`：
 
 ```python
-# app/graph/rag_graph.py（或各 variant builder）
+# app/graph/variants/{selfrag,reflection}.py
 from app.graph.query_transform import query_transform_node
 
-builder.add_node("query_transform", partial(query_transform_node, settings=settings))
+builder.add_node("query_transform", partial(query_transform_node, services=services))
 
 # edge：route → query_transform → extract_features → ...
 builder.add_edge("route", "query_transform")
 builder.add_edge("query_transform", "extract_features")
 ```
 
-`extract_features` / `expand_seeds` node 讀取 `state["transformed_queries"]`（而非直接讀 `state["query"]`）作為展開 seed 的輸入。
+> **basic 變體不接** `query_transform`：basic 是 P1 線性教學版（route → retrieve → generate → push），不含 multi-seed 與 feature extraction，沒有 `expand_seeds` 可以消化 `transformed_queries`，因此 query transform 對它無實際效益。學生若要在 basic 上做 query transform，建議先升級到 selfrag。
+
+`extract_features` / `expand_seeds` node 讀取 `state["transformed_queries"]`（而非直接讀 `state["user_input"]`）作為展開 seed 的輸入。
 
 ### 5. `expand_seeds` 相容改動
 

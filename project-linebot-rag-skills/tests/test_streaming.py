@@ -195,6 +195,59 @@ class TestSseEndpoint:
                 assert "完整回覆" in "".join(tokens)
                 assert '"done": true' in body
 
+    def test_oversized_body_returns_413(self):
+        """spec-31：HTTP 層 body size 限制（32KB），超過拒絕。"""
+        from fastapi.testclient import TestClient
+        from app.main import app
+
+        @dataclass
+        class _S:
+            streaming_enabled: bool = False
+            security_max_input_chars: int = 1000
+
+        mock_services = MagicMock()
+        mock_services.settings = _S()
+
+        with patch("app.api.stream.get_runtime_services", return_value=mock_services):
+            with TestClient(app) as client:
+                # 40KB query → exceed 32KB body cap
+                big_query = "x" * 40000
+                resp = client.post("/api/stream/query", json={"query": big_query})
+                assert resp.status_code == 413
+
+    def test_query_exceeding_max_chars_returns_413(self):
+        """query 超過 security_max_input_chars 直接拒絕（不浪費 graph 資源）。"""
+        from fastapi.testclient import TestClient
+        from app.main import app
+
+        @dataclass
+        class _S:
+            streaming_enabled: bool = False
+            security_max_input_chars: int = 50
+
+        mock_services = MagicMock()
+        mock_services.settings = _S()
+
+        with patch("app.api.stream.get_runtime_services", return_value=mock_services):
+            with TestClient(app) as client:
+                resp = client.post(
+                    "/api/stream/query", json={"query": "x" * 100}
+                )
+                assert resp.status_code == 413
+                assert "exceeds 50 chars" in resp.text
+
+    def test_invalid_json_returns_400(self):
+        from fastapi.testclient import TestClient
+        from app.main import app
+
+        with TestClient(app) as client:
+            resp = client.post(
+                "/api/stream/query",
+                content="not json {",
+                headers={"content-type": "application/json"},
+            )
+            assert resp.status_code == 400
+
     def test_enabled_streaming_uses_custom_stream_mode(self):
         """streaming_enabled=True → astream(stream_mode='custom')，逐 token 推送。"""
         from fastapi.testclient import TestClient
