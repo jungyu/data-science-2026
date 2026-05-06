@@ -302,6 +302,127 @@ git merge --continue --no-edit
 
 ---
 
+## 局部比對與選擇性引入
+
+有時你只想知道「上游的某支程式改了什麼」，或者只想把某一個修復帶進來，
+不想整個 merge。以下從「搞清楚哪裡有變化」到「選擇引入哪些」逐步說明。
+
+---
+
+### 第一步：搞清楚哪裡有變化
+
+```bash
+# 先確保拿到最新的上游資訊
+git fetch upstream
+```
+
+**看哪些 commit 觸碰了你在意的子專案**
+
+```bash
+git log upstream/main --oneline -- project-linebot-rag-skills/
+# 輸出範例：
+# a1b2c3d fix(graph): 修正 reflect 節點的 retry 計數問題
+# 9f8e7d6 feat(eval): 新增 forbidden_phrase_rate metric
+```
+
+**比對整個子專案的程式碼差異（你的分支 vs 上游）**
+
+```bash
+git diff my-domain upstream/main -- project-linebot-rag-skills/app/
+# 太多了看不完？只看有哪些檔案改了：
+git diff my-domain upstream/main --name-only -- project-linebot-rag-skills/app/
+```
+
+**聚焦到單一檔案**
+
+```bash
+git diff my-domain upstream/main -- project-linebot-rag-skills/app/graph/nodes.py
+# + 號開頭 = 上游新增的行
+# - 號開頭 = 上游刪除的行（你目前還有這些行）
+```
+
+---
+
+### 第二步：選擇引入方式
+
+根據情況選一種：
+
+---
+
+#### 方法 A：引入特定檔案的完整上游版本
+
+適合：上游修了你從未動過的檔案（例如 bug fix 在你未碰的 `app/eval/metrics.py`）
+
+```bash
+# 用上游版本直接覆蓋該檔案
+git checkout upstream/main -- project-linebot-rag-skills/app/eval/metrics.py
+
+# 確認改了什麼
+git diff HEAD project-linebot-rag-skills/app/eval/metrics.py
+
+# 沒問題就 commit
+git add project-linebot-rag-skills/app/eval/metrics.py
+git commit -m "chore: 引入上游 metrics.py 最新版（修正 forbidden_phrase_rate 計算）"
+```
+
+> ⚠️ 這會用上游版本**完整覆蓋**你的版本。如果你也改過這個檔案，改動會被清除。
+> 使用前先用 `git diff` 確認你沒有要保留的修改。
+
+---
+
+#### 方法 B：Cherry-pick 特定 commit
+
+適合：某個 commit 只改了一個清楚的功能點，你想完整帶進來
+
+```bash
+# 找到那個 commit 的 hash
+git log upstream/main --oneline -- project-linebot-rag-skills/app/graph/nodes.py
+# a1b2c3d fix(graph): 修正 reflect 節點的 retry 計數問題
+
+# 把那個 commit 套用到你的分支
+git cherry-pick a1b2c3d
+
+# 如果有衝突，照 Step 7 的方式處理，完成後：
+git cherry-pick --continue --no-edit
+```
+
+> ⚠️ Cherry-pick 會套用整個 commit 觸碰的所有檔案（不只是單一子專案）。
+> 套用前先確認：`git show a1b2c3d --name-only` 看那個 commit 改了哪些檔案。
+
+---
+
+#### 方法 C：看著 diff，手動融合（最精準）
+
+適合：上游和你都改了同一支程式，想把上游的某幾行改動加進你的版本，而不是覆蓋
+
+```bash
+# 在終端並排看 diff
+git diff my-domain upstream/main -- project-linebot-rag-skills/app/graph/nodes.py
+
+# 或者把 diff 存成檔案慢慢看
+git diff my-domain upstream/main -- project-linebot-rag-skills/app/graph/nodes.py > /tmp/nodes_diff.txt
+```
+
+看著 diff，在你的編輯器裡手動把需要的改動加進去。
+改完後正常 `git add` + `git commit`。
+
+---
+
+### 三種方法的選擇指引
+
+```
+上游改的檔案，你從未動過？
+  └─ 方法 A（整個檔案換掉，最快）
+
+一個完整的 bug fix commit，想原封不動帶進來？
+  └─ 方法 B（cherry-pick，保留 commit 歷史）
+
+上游和你都改了同一個地方，需要融合？
+  └─ 方法 C（手動融合，最安全）
+```
+
+---
+
 ## 日常工作節奏
 
 ```bash
