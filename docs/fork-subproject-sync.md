@@ -43,7 +43,14 @@ my-domain 分支（你真正工作的地方，放你的客製化）
 ```bash
 # 確認 git 已安裝（版本 2.25 以上）
 git --version
+```
 
+如果出現 `command not found`：
+- **macOS**：`brew install git`（需先裝 [Homebrew](https://brew.sh)）或安裝 [Xcode Command Line Tools](https://developer.apple.com/xcode/resources/)
+- **Windows**：從 [git-scm.com](https://git-scm.com/download/win) 下載安裝包
+- **Linux（Ubuntu/Debian）**：`sudo apt install git`
+
+```bash
 # 確認 uv 已安裝（用來管理 Python 環境）
 uv --version
 ```
@@ -57,6 +64,9 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 # Windows（PowerShell）
 powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
 ```
+
+> ⚠️ **安裝 `uv` 後，需要重新啟動終端機**（關掉再開），`uv` 指令才會生效。
+> 或者執行 `source ~/.bashrc`（bash）/ `source ~/.zshrc`（zsh）讓設定立即生效。
 
 你還需要一個 **GitHub 帳號**，並設定好驗證方式（見下方 Step 2 說明）。
 
@@ -97,7 +107,7 @@ cd data-science-2026
 你需要用 **Personal Access Token（PAT）** 代替密碼。
 
 取得 PAT：GitHub → 右上角頭像 → Settings → Developer settings → Personal access tokens → Tokens (classic) → Generate new token。
-勾選 `repo` 權限，生成後複製（只顯示一次）。
+勾選 `repo` 權限，Expiration 建議選 **90 days**（夠用一學期）。生成後複製（只顯示一次）。
 
 ```bash
 git clone https://github.com/你的帳號/data-science-2026.git
@@ -127,11 +137,8 @@ git remote -v
 
 ## Step 3：開你的工作分支
 
-> ⚠️ 確認你在 **repo 根目錄**（`data-science-2026/`），不是在子專案目錄裡。
-> 如果剛才進去過子目錄，先 `cd ..` 回到根目錄。
-
 ```bash
-# 確認你在 repo 根目錄
+# 確認你在 repo 根目錄（Step 2 結束時應已在這裡）
 pwd
 # 應該顯示：.../data-science-2026
 
@@ -220,18 +227,18 @@ git push origin my-domain
 
 ## Step 6：跟上課程更新
 
-課程有新章節、修了 bug 時，做這四步（回到 repo 根目錄執行）：
+課程有新章節、修了 bug 時，依序執行以下步驟（在 repo 根目錄）：
 
 ```bash
 # 1. 確認先 commit 好你的工作
-git status   # 應該是 clean（nothing to commit）
+git status   # 應該顯示 nothing to commit
 
 # 2. 拉取最新的課程內容
 git fetch upstream
 
 # 3. 切到 main，把課程更新合併進來
 git checkout main
-git merge upstream/main
+git merge upstream/main --no-edit
 # → 如果你的 main 是乾淨的（沒有你自己的 commit），這一步不會有任何衝突
 
 # 4. 把 main 的更新推到你的 fork
@@ -239,9 +246,14 @@ git push origin main
 
 # 5. 切回你的工作分支，把課程更新帶進來
 git checkout my-domain
-git merge main
+git merge main --no-edit
 # → 如果你沒有動過課程檔案，這一步也不會有衝突
 ```
+
+> 💡 **`--no-edit` 的作用**：git merge 預設會開啟文字編輯器（通常是 vim）讓你填寫 commit 訊息。
+> `--no-edit` 直接使用預設訊息跳過這個步驟。對新手來說幾乎永遠都不需要手動改 merge commit 訊息。
+>
+> 如果不小心進了 vim，輸入 `:q!` 按 Enter 可以強制離開（不存檔）。
 
 **推薦用 `merge` 而不是 `rebase`**：merge 保留完整歷史、出錯容易復原，
 對 git 還不熟的學生更安全。熟悉 rebase 之後再考慮切換。
@@ -280,9 +292,9 @@ git checkout --ours   app/graph/nodes.py   # 用你的版本
 # 4. 標記衝突已解決
 git add app/graph/nodes.py
 
-# 5. 完成 merge commit
-git merge --continue
-# 或 git commit -m "merge: 跟上課程更新"
+# 5. 完成 merge commit（--no-edit 跳過 vim，使用預設訊息）
+git merge --continue --no-edit
+# 或 git commit --no-edit
 ```
 
 遇到衝突幾乎都代表「你改了不該改的課程檔案」。
@@ -399,6 +411,6 @@ git reset --hard HEAD~1
 代表遠端有你本地沒有的 commit（通常是你在另一台電腦 push 過）：
 
 ```bash
-git pull origin my-domain   # 先拉下來合併
-git push origin my-domain   # 再推
+git pull origin my-domain --no-edit   # 先拉下來合併（--no-edit 跳過 vim）
+git push origin my-domain             # 再推
 ```
