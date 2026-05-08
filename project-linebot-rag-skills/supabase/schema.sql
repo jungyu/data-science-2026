@@ -80,10 +80,13 @@ create table if not exists prompt_cache (
   created_at timestamptz default now()
 );
 
+-- HNSW：小型知識庫 recall 佳，無需依資料量調 lists/probes。
+-- 需要 pgvector >= 0.5.0；Supabase 預設已支援。
+-- 先 drop 舊 IVFFlat index（若存在），讓既有環境能順利切換到 HNSW。
+drop index if exists private_knowledge_embedding_idx;
 create index if not exists private_knowledge_embedding_idx
 on private_knowledge
-using ivfflat (embedding vector_cosine_ops)
-with (lists = 100);
+using hnsw (embedding vector_cosine_ops);
 
 create index if not exists private_knowledge_search_idx
 on private_knowledge
