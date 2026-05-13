@@ -1,5 +1,7 @@
 # tcm_corpus — 中醫古籍語料庫範例
 
+![tcm_corpus 中醫古籍語料庫](tcm.png)
+
 > *把中醫古籍、藥典、病典灌進你的 RAG 知識庫。*
 
 兩支腳本接入 [醫砭 yibian.hopto.org](https://yibian.hopto.org/) 的兩種路徑：

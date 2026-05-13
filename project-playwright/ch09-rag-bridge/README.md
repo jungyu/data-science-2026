@@ -1,5 +1,7 @@
 # ch09 — RAG Bridge：爬蟲資料對接知識庫
 
+![ch09 RAG Bridge](ch09.png)
+
 ## 定位
 
 本章是 project-playwright **教學的收口章**。  

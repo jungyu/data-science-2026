@@ -20,7 +20,9 @@ output/
 *.pdf
 *.csv
 *.xlsx
-!ch00-setup/*.png
+# 放行各章節 / 範例的封面圖（與 README 同層的展示用 PNG）
+!ch??-*/*.png
+!examples/*/*.png
 
 # Playwright
 playwright-report/

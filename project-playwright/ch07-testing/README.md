@@ -1,5 +1,7 @@
 # Ch07 — pytest-playwright 測試整合
 
+![Ch07 pytest-playwright 測試整合](ch07.png)
+
 ## 學習目標
 
 - 使用 pytest-playwright 撰寫自動化測試

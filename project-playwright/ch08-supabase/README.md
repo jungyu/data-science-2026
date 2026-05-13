@@ -1,5 +1,7 @@
 # Ch08 — Playwright × Supabase 整合
 
+![Ch08 Playwright × Supabase 整合](ch08.png)
+
 ## 定位
 
 本章是 ch01–ch07 的**整合終點**：用 Playwright 爬取 Hacker News，

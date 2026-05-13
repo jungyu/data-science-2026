@@ -1,5 +1,7 @@
 # Ch02 — 元素選擇器
 
+![Ch02 元素選擇器](ch02.png)
+
 ## 學習目標
 
 - 掌握 Playwright 的 Locator API（推薦方式）

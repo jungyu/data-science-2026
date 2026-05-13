@@ -1,5 +1,7 @@
 # drone_data — 把無人機資料灌進你的 RAG 知識庫
 
+![drone_data 無人機資料 RAG 範例](drone.png)
+
 > *四個來源、四種路徑、一條 pipeline、一個 LINE Bot 能回答的問題。*
 
 ```

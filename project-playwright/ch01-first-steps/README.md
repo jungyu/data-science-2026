@@ -1,5 +1,7 @@
 # Ch01 — 初探瀏覽器自動化
 
+![Ch01 初探瀏覽器自動化](ch01.png)
+
 ## 學習目標
 
 - 理解 Playwright 的 sync API 基本用法
