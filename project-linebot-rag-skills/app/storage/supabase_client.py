@@ -64,6 +64,15 @@ class SupabaseRestClient:
                 params=params,
                 json=[dict(row) for row in rows],
             )
+            if response.status_code >= 400:
+                # spec-X 偵錯：上傳失敗時把 PostgREST 的具體訊息帶上來，
+                # 而不只是給一個沒線索的 HTTPStatusError
+                import logging
+                logging.getLogger(__name__).error(
+                    "upsert %s failed: status=%s body=%s keys=%s",
+                    table, response.status_code, response.text[:500],
+                    sorted(rows[0].keys()) if rows else [],
+                )
             response.raise_for_status()
 
     async def select(self, table: str, params: Mapping[str, str] | None = None) -> list[dict[str, Any]]:
