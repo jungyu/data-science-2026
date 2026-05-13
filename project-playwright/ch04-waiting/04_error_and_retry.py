@@ -18,16 +18,26 @@ Ch04-04 — 錯誤處理與重試策略。
 import time
 import sys
 from pathlib import Path
+from typing import Callable, TypeVar
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from utils.console import setup_stdout
 
-from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
+from playwright.sync_api import Page, sync_playwright, TimeoutError as PlaywrightTimeoutError
 
 
 # ── 工具函式（純 Python，可獨立單元測試）────────────────────────────────────────
 
-def with_retry(fn, *, max_attempts: int = 3, delay: float = 1.0, label: str = ""):
+T = TypeVar("T")
+
+
+def with_retry(
+    fn: Callable[[], T],
+    *,
+    max_attempts: int = 3,
+    delay: float = 1.0,
+    label: str = "",
+) -> T:
     """對 fn() 最多重試 max_attempts 次；每次失敗後等待 delay 秒（指數退避）。
 
     Args:
@@ -55,7 +65,7 @@ def with_retry(fn, *, max_attempts: int = 3, delay: float = 1.0, label: str = ""
 
 # ── 示範 1：刻意讓 TimeoutError 發生並捕捉 ──────────────────────────────────────
 
-def demo_timeout_error(page):
+def demo_timeout_error(page: Page) -> None:
     print("\n【示範 1】捕捉 TimeoutError")
     page.set_content("<html><body><p>這個頁面沒有 .never-appears</p></body></html>")
 
@@ -69,7 +79,7 @@ def demo_timeout_error(page):
 
 # ── 示範 2：自訂 goto() timeout ────────────────────────────────────────────────
 
-def demo_goto_timeout(page):
+def demo_goto_timeout(page: Page) -> None:
     print("\n【示範 2】自訂 goto() timeout")
     print("  預設 timeout = 30,000ms（30 秒）")
     print("  生產環境通常設 10,000–15,000ms，避免卡在慢速頁面")
@@ -84,7 +94,7 @@ def demo_goto_timeout(page):
 
 # ── 示範 3：重試包裝器 ────────────────────────────────────────────────────────
 
-def demo_retry(page):
+def demo_retry(page: Page) -> None:
     print("\n【示範 3】重試包裝器（模擬不穩定的動態元素）")
 
     # 建立一個「延遲 3 秒才出現」的元素
@@ -118,7 +128,7 @@ def demo_retry(page):
 
 # ── 主程式 ─────────────────────────────────────────────────────────────────────
 
-def main():
+def main() -> None:
     setup_stdout()
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)

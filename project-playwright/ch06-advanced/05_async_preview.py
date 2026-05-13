@@ -19,9 +19,13 @@ ch08 的生產 Pipeline 改用 async API（`async_playwright`）：
 import asyncio
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from utils.console import setup_stdout
+
+if TYPE_CHECKING:
+    from playwright.async_api import Browser as AsyncBrowser
 
 # ── 任務說明 ────────────────────────────────────────────────────────────────────
 # 目標：同時抓取 3 個頁面的標題
@@ -58,7 +62,7 @@ def fetch_titles_sync() -> list[str]:
 # Async 版本（ch08 使用的寫法）
 # ══════════════════════════════════════════════════════════════════════════════
 
-async def fetch_title(browser, url: str) -> str:
+async def fetch_title(browser: "AsyncBrowser", url: str) -> str:
     """抓取單一 URL 的標題（async coroutine）。"""
     page = await browser.new_page()
     try:
@@ -87,7 +91,7 @@ async def fetch_titles_async() -> list[str]:
 # 主程式：比較兩種版本
 # ══════════════════════════════════════════════════════════════════════════════
 
-async def main():
+async def main() -> None:
     import time
     setup_stdout()
 

@@ -16,6 +16,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from utils.console import setup_stdout
 
+from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 from playwright.sync_api import sync_playwright
 
@@ -56,7 +57,8 @@ def main() -> None:
                 print("[略過] 找不到 h1 元素，跳過區塊截圖。")
         except PlaywrightTimeoutError:
             print("[略過] 元素截圖逾時，跳過區塊截圖。")
-        except Exception as e:
+        except PlaywrightError as e:
+            # Playwright 內部錯誤（element detached / page navigated 等），不再吞掉其他類型
             print(f"[略過] 元素截圖失敗（{e}），跳過區塊截圖。")
 
         browser.close()

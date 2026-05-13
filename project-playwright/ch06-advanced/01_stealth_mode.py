@@ -10,7 +10,7 @@ Ch06-01 — Stealth 模式：隱藏自動化特徵。
     python ch06-advanced/01_stealth_mode.py
 """
 
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import Browser, BrowserContext, Playwright, sync_playwright
 
 # Stealth JS：隱藏 Playwright 自動化特徵
 STEALTH_JS = """
@@ -58,7 +58,9 @@ STEALTH_JS = """
 """
 
 
-def create_stealth_context(playwright, **kwargs):
+def create_stealth_context(
+    playwright: Playwright, **kwargs
+) -> tuple[Browser, BrowserContext]:
     """建立帶有 Stealth 模式的 BrowserContext。
 
     將 Stealth JS 注入到 BrowserContext 的 init script 中，
@@ -87,7 +89,7 @@ def create_stealth_context(playwright, **kwargs):
     return browser, context
 
 
-def main():
+def main() -> None:
     with sync_playwright() as p:
         # --- 比較：一般模式 vs Stealth 模式 ---
 

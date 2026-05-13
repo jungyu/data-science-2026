@@ -12,12 +12,12 @@ Playwright 的 storage_state 可以把 Cookie 和 localStorage
 
 import json
 from pathlib import Path
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import BrowserContext, sync_playwright
 
 STORAGE_DIR = Path(__file__).parent.parent / "output" / "sessions"
 
 
-def save_session(context, name: str = "default") -> Path:
+def save_session(context: BrowserContext, name: str = "default") -> Path:
     """儲存瀏覽器狀態（Cookie + localStorage）到 JSON 檔案。"""
     STORAGE_DIR.mkdir(parents=True, exist_ok=True)
     filepath = STORAGE_DIR / f"{name}_session.json"
@@ -34,7 +34,7 @@ def load_session(name: str = "default") -> dict | None:
     return None
 
 
-def main():
+def main() -> None:
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
 

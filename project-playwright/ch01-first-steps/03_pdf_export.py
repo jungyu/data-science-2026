@@ -18,7 +18,7 @@ from playwright.sync_api import sync_playwright
 OUTPUT_DIR = Path(__file__).parent.parent / "output"
 
 
-def main():
+def main() -> None:
     setup_stdout()
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 

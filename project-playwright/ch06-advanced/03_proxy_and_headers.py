@@ -13,6 +13,8 @@ Ch06-03 — Proxy 設定與自訂 HTTP 標頭。
 """
 
 import os
+from playwright.sync_api import Error as PlaywrightError
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 from playwright.sync_api import sync_playwright
 from dotenv import load_dotenv
 
@@ -83,13 +85,16 @@ def demo_proxy():
             page.goto("https://httpbin.org/ip", timeout=10000)
             content = page.locator("pre").text_content()
             print(f"  Proxy IP: {content.strip()}")
-        except Exception as e:
+        except PlaywrightTimeoutError:
+            print("  Proxy 連線逾時（10s）— 檢查 proxy 是否可達或加長 timeout")
+        except PlaywrightError as e:
+            # Playwright 通用錯誤（DNS / TLS / 拒連等），narrow 後不會吞掉非預期錯誤
             print(f"  Proxy 連線失敗: {e}")
         finally:
             browser.close()
 
 
-def main():
+def main() -> None:
     demo_custom_headers()
     demo_proxy()
     print("\n[完成] 標頭與 Proxy 設定示範結束。")

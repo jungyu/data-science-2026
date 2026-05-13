@@ -10,7 +10,8 @@ Ch06-04 — 處理彈窗、Cookie Banner、對話框。
     python ch06-advanced/04_popup_handler.py
 """
 
-from playwright.sync_api import sync_playwright, Page
+from playwright.sync_api import Error as PlaywrightError
+from playwright.sync_api import Page, TimeoutError as PlaywrightTimeoutError, sync_playwright
 
 # 常見彈窗的 CSS 選擇器
 DEFAULT_POPUP_SELECTORS = {
@@ -60,9 +61,12 @@ def handle_popups(page: Page, custom_selectors: dict | None = None, timeout: int
                     element.click(timeout=timeout)
                     closed_count += 1
                     print(f"  [關閉] {category}: {selector}")
-            except Exception:
-                # 找不到或無法點擊，跳過
-                pass
+            except PlaywrightTimeoutError:
+                # selector 在 timeout 內找不到 / 不可見，視為「該彈窗未出現」
+                continue
+            except PlaywrightError:
+                # Playwright 通用錯誤（element detached、navigation 中斷等），跳到下一個 selector
+                continue
 
     return closed_count
 
@@ -76,7 +80,7 @@ def handle_dialog(page: Page):
     page.on("dialog", on_dialog)
 
 
-def main():
+def main() -> None:
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()

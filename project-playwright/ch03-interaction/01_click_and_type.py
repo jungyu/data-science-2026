@@ -19,7 +19,7 @@ from utils.console import setup_stdout
 from playwright.sync_api import sync_playwright
 
 
-def main():
+def main() -> None:
     setup_stdout()
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
