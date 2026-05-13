@@ -14,6 +14,11 @@ Ch07 — 測試設定：把「本地安全」和「需要網路」的測試分�
     pytest ch07-testing/                    # 只跑本地安全測試
     pytest ch07-testing/ --run-network      # 全部跑，包含 E2E
     pytest ch07-testing/ -m network --run-network   # 只跑 E2E
+
+與根目錄 conftest.py 的分工：
+    根 conftest.py 設定 ``browser_context_args``（viewport / locale /
+    timezone 等共用瀏覽器情境），pytest-playwright 會自動套用至此章。
+    本檔只負責「網路測試開關」，不重複定義瀏覽器參數。
 """
 
 import pytest

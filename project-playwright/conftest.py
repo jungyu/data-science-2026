@@ -9,10 +9,16 @@ import pytest
 from pathlib import Path
 from dotenv import load_dotenv
 
-# 載入 .env 環境變數
-load_dotenv()
+ROOT_DIR = Path(__file__).parent
+ENV_FILE = ROOT_DIR / ".env"
+if not ENV_FILE.exists():
+    print(
+        f"[conftest] 提示：找不到 {ENV_FILE.name}。"
+        f" 如需 Supabase / 其他外部服務，請執行 `cp .env.example .env` 後填入。"
+    )
+load_dotenv(ENV_FILE)
 
-OUTPUT_DIR = Path(__file__).parent / "output"
+OUTPUT_DIR = ROOT_DIR / "output"
 
 
 @pytest.fixture(scope="session")

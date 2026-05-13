@@ -58,6 +58,7 @@ copy .env.example .env
 | **ch06** | 進階技巧 | Stealth 模式、Session 管理、Proxy |
 | **ch07** | 測試整合 | pytest-playwright、E2E 測試 |
 | **ch08** | Supabase 整合 | crawl_queue、Lease 機制、content_hash 去重 |
+| **ch09** | RAG Bridge | 對接 project-linebot-rag-skills，爬蟲資料 → 知識庫 → LINE Bot |
 
 ## 專案結構
 
@@ -75,13 +76,14 @@ project-playwright/
 ├── ch06-advanced/          # 進階：隱匿、Session、代理
 ├── ch07-testing/           # pytest-playwright 測試
 ├── ch08-supabase/          # Supabase 整合（Pipeline 終點）
+├── ch09-rag-bridge/        # 對接 RAG 知識庫（跨專案整合）
 ├── utils/                  # 共用工具模組
 └── examples/               # 完整實戰範例
 ```
 
 ## 學習建議
 
-1. **依序學習**：ch00 → ch08，每章建立在前一章基礎上
+1. **依序學習**：ch00 → ch09，每章建立在前一章基礎上
 2. **動手執行**：每個 `.py` 檔都可獨立跑，先跑再讀程式碼
 3. **修改實驗**：改 selector、改目標網址、觀察不同結果
 4. **搭配文件**：善用 [Playwright Python 官方文件](https://playwright.dev/python/)
