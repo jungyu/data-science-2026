@@ -25,6 +25,16 @@ def build_store(settings: Settings) -> KnowledgeStore:
         return SqliteVecStore(path=settings.sqlite_vec_path, dim=settings.sqlite_vec_dim)
 
     if backend == "pinecone":
+        # 提前驗證：PineconeStore 內部建構也會抓不到 api_key 而爆，
+        # 但訊息會混在 pinecone SDK 的 stack trace 裡難 debug；這裡直接擋。
+        if not settings.pinecone_api_key:
+            raise ValueError(
+                "knowledge_store_backend=pinecone requires PINECONE_API_KEY to be set"
+            )
+        if not settings.pinecone_index:
+            raise ValueError(
+                "knowledge_store_backend=pinecone requires PINECONE_INDEX to be set"
+            )
         from app.storage.stores.pinecone_store import PineconeStore
 
         return PineconeStore(

@@ -55,6 +55,7 @@ class IngestionPipeline:
         chunk_text: str,
         chunk_index: int,
         embedding: list[float],
+        knowledge_version: int | None,
     ) -> KnowledgeChunkInsert:
         # id：deterministic 字串便於去重 / 跨 store 對應
         page_part = section.page_number if section.page_number is not None else "x"
@@ -78,10 +79,35 @@ class IngestionPipeline:
             content_hash=content_hash,
             source_id=doc.source_id,
             source_type=doc.source_type,
+            knowledge_version=knowledge_version,
         )
+
+    async def _resolve_knowledge_version(self) -> int | None:
+        """spec-06：pipeline 開頭跟 store 要本次匯入用的 knowledge_version。
+
+        Store 沒實作 `next_knowledge_version` 時回 None（chunk insert 走 schema
+        預設值）；prompt_cache 失效機制在那些 store 上不適用（屬已知 trade-off）。
+        """
+        getter = getattr(self._store, "next_knowledge_version", None)
+        if getter is None:
+            return None
+        try:
+            return await getter()
+        except Exception as exc:
+            logger.warning(
+                "next_knowledge_version failed; chunks will use schema default. exc=%s(%s)",
+                type(exc).__name__, exc,
+            )
+            return None
 
     async def run(self, ingester: Ingester) -> IngestStats:
         stats = IngestStats()
+        # spec-06：整次 pipeline 共用同一個 knowledge_version；首批 ingest（表空）回 1。
+        knowledge_version = await self._resolve_knowledge_version()
+        if knowledge_version is not None:
+            logger.info(
+                "ingest pipeline using knowledge_version=%d", knowledge_version
+            )
         async for doc in ingester.yield_documents():
             # 增量跳過：store 裡已有相同 content_hash 就不重新 embed
             if doc.content_hash:
@@ -108,7 +134,8 @@ class IngestionPipeline:
                     embedding = await self._embedder.embed_query(chunk_text)
                     inserts.append(
                         self._build_chunk_insert(
-                            doc, section, chunk_text, chunk_idx, embedding
+                            doc, section, chunk_text, chunk_idx, embedding,
+                            knowledge_version,
                         )
                     )
             if inserts:

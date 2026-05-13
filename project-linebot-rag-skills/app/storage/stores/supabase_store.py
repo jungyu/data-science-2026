@@ -46,11 +46,33 @@ class SupabaseStore:
         for chunk in chunks:
             row = chunk.model_dump()
             row.pop("id", None)
+            # spec-06：knowledge_version 為 None 時讓 DB 用 default 1（首批 ingest）；
+            # 有值就帶上（同一 pipeline 跑出的 chunk 共用 max+1）
+            if row.get("knowledge_version") is None:
+                row.pop("knowledge_version", None)
             rows.append(row)
         await self._client.upsert(
             "private_knowledge", rows, on_conflict="content_hash"
         )
         return len(rows)
+
+    async def next_knowledge_version(self) -> int:
+        """spec-06：回傳 `max(knowledge_version) + 1`，供 IngestionPipeline 在
+        run() 開始時取得本次匯入要用的版本號。表空時回 1（首批 ingest）。
+        並發 ingest 可能同時拿到同一個 version——可接受，反正都比舊版本大、
+        cache_key 會失效；後續 ingest 仍會繼續往上遞增。
+        """
+        rows = await self._client.select(
+            "private_knowledge",
+            {
+                "select": "knowledge_version",
+                "order": "knowledge_version.desc",
+                "limit": "1",
+            },
+        )
+        if not rows:
+            return 1
+        return int(rows[0].get("knowledge_version") or 0) + 1
 
     async def delete_by_source(self, source_id: str) -> int:
         # 教學版簡化：未實作刪除（學生若需要再加）

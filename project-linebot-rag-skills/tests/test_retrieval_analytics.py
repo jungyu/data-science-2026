@@ -86,6 +86,25 @@ def test_low_score_skips_records_without_scores():
     assert aggregate_low_score(rows, threshold=0.3) == []
 
 
+def test_low_score_excludes_zero_combined_scores():
+    """combined=0 視為沒實際命中，不該被誤算成「分數低於 threshold 的有效低分」。"""
+    rows = [_row("q", ["c1"], {"c1": {"combined": 0.0}})]
+    # 沒有 > 0 的分數 → _max_combined 回 None → 被 aggregate 跳過
+    assert aggregate_low_score(rows, threshold=0.3) == []
+
+
+def test_category_stats_skips_zero_in_avg():
+    """category 平均分計算也排除 0（保持與 _max_combined 一致）。"""
+    rows = [
+        _row("a", ["c1"], {"c1": {"combined": 0.8}}, category_filter=["rag"]),
+        _row("b", ["c1"], {"c1": {"combined": 0.0}}, category_filter=["rag"]),  # 不算進平均
+    ]
+    out = aggregate_category_stats(rows)
+    by_cat = {r["category"]: r for r in out}
+    assert by_cat["rag"]["count"] == 2  # count 還是算
+    assert by_cat["rag"]["avg_max_score"] == 0.8  # avg 只有 0.8
+
+
 # ── category stats ──────────────────────────────────────────────────────────
 
 

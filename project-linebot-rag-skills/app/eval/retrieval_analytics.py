@@ -20,15 +20,21 @@ def cutoff_iso(days: int) -> str:
 
 
 def _max_combined(scores: dict[str, Any]) -> float | None:
+    """從 scores dict 抽 max combined_score；0 視為「沒有實際命中」並排除。
+
+    `scores` 形如 `{chunk_id: {"combined": 0.7, ...}}`（新版）或 `{chunk_id: 0.7}`
+    （舊版 flat 格式）。回 None 代表本筆 row 沒有可用分數——下游 aggregate_low_score
+    會跳過、aggregate_category_stats 不會把 0 拉低平均分。
+    """
     if not scores:
         return None
     out: list[float] = []
     for v in scores.values():
         if isinstance(v, dict):
             c = v.get("combined")
-            if isinstance(c, (int, float)):
+            if isinstance(c, (int, float)) and c > 0:
                 out.append(float(c))
-        elif isinstance(v, (int, float)):
+        elif isinstance(v, (int, float)) and v > 0:
             out.append(float(v))
     return max(out) if out else None
 

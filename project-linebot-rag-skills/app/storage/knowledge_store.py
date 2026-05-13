@@ -44,6 +44,9 @@ class KnowledgeChunkInsert(BaseModel):
     content_hash: str
     source_id: str | None = None
     source_type: str = "markdown"
+    # spec-06：同一個 pipeline.run() 的所有 chunk 共用同一個 knowledge_version；
+    # None 代表 store 用 schema 預設值（教學版單機 sqlite_vec / pinecone 不一定有此欄位）
+    knowledge_version: int | None = None
 
 
 class KnowledgeStore(Protocol):

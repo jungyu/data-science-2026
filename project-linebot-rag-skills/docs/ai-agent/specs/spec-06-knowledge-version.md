@@ -1,5 +1,18 @@
 # Spec-06：Knowledge Version 追蹤
 
+> **✅ 已實作**
+>
+> - `IngestionPipeline.run()` 開頭呼叫 `store.next_knowledge_version()`（若實作）
+>   取得本次匯入用版本號（`max + 1`）；該 run 所有 chunk 共用此版本
+> - `SupabaseStore.next_knowledge_version()` 走 `SELECT max(knowledge_version)`
+> - `KnowledgeChunkInsert.knowledge_version: int | None` 為 optional 欄位；
+>   sqlite_vec / pinecone 等沒有對應欄位的 store 直接忽略（pipeline 拿到 None
+>   也照樣跑，chunk 走 schema 預設值）
+> - 與 [spec-05](./spec-05-prompt-cache.md) prompt cache 連動：版本變動自動讓
+>   舊 cache_key 失配 → 不需手動清表
+> - 驗收測試：`tests/test_ingest/test_pipeline.py::test_pipeline_stamps_knowledge_version_when_store_supports_it`
+>   + 2 個 fallback / 失敗路徑測試
+
 ## 背景
 
 `private_knowledge.knowledge_version` 欄位存在，但 `ingest_markdown.py` 不更新它，`prompt_cache` 也無法依此失效。目前快取失效的唯一方式是手動清空 `prompt_cache` 資料表。

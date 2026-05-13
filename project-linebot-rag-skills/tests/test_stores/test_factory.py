@@ -22,3 +22,20 @@ def test_factory_rejects_unknown():
     s = Settings(knowledge_store_backend="nonsense")
     with pytest.raises(ValueError, match="unknown knowledge_store_backend"):
         build_store(s)
+
+
+def test_factory_rejects_pinecone_without_api_key():
+    """spec-24：缺 PINECONE_API_KEY 時提前 fail，不要等到 PineconeStore 建構才爆。"""
+    s = Settings(knowledge_store_backend="pinecone", pinecone_api_key="")
+    with pytest.raises(ValueError, match="PINECONE_API_KEY"):
+        build_store(s)
+
+
+def test_factory_rejects_pinecone_without_index():
+    s = Settings(
+        knowledge_store_backend="pinecone",
+        pinecone_api_key="dummy",
+        pinecone_index="",
+    )
+    with pytest.raises(ValueError, match="PINECONE_INDEX"):
+        build_store(s)

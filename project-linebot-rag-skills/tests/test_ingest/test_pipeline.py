@@ -154,3 +154,51 @@ async def test_pipeline_first_ingest_when_not_in_store():
     stats = await pipeline.run(_StubIngester([_doc()]))
     assert stats.docs == 1
     assert stats.unchanged == 0
+
+
+# ── spec-06 knowledge_version ────────────────────────────────────────────────
+
+
+class _VersionedStubStore(_StubStore):
+    """支援 next_knowledge_version 的 stub；測 pipeline 是否會把版本印到 chunk 上。"""
+
+    def __init__(self, *, stored_hash: str | None = None, next_version: int = 7) -> None:
+        super().__init__(stored_hash=stored_hash)
+        self._next_version = next_version
+
+    async def next_knowledge_version(self) -> int:
+        return self._next_version
+
+
+@pytest.mark.asyncio
+async def test_pipeline_stamps_knowledge_version_when_store_supports_it():
+    """spec-06：store 有 next_knowledge_version 時，所有 chunk 都用同一版號。"""
+    store = _VersionedStubStore(next_version=7)
+    pipeline = IngestionPipeline(embedder=_StubEmbedder(), store=store)
+    await pipeline.run(_StubIngester([_doc()]))
+    assert all(c.knowledge_version == 7 for c in store.upserts[0])
+
+
+@pytest.mark.asyncio
+async def test_pipeline_falls_back_when_store_lacks_versioning():
+    """store 沒實作 next_knowledge_version → chunk.knowledge_version=None
+    （insert 走 schema 預設值，sqlite_vec / pinecone 也不會炸）。"""
+    store = _StubStore()
+    pipeline = IngestionPipeline(embedder=_StubEmbedder(), store=store)
+    await pipeline.run(_StubIngester([_doc()]))
+    assert all(c.knowledge_version is None for c in store.upserts[0])
+
+
+@pytest.mark.asyncio
+async def test_pipeline_continues_when_next_knowledge_version_raises():
+    """store.next_knowledge_version 失敗時降級為 None，pipeline 不打斷。"""
+
+    class _BrokenStore(_StubStore):
+        async def next_knowledge_version(self) -> int:
+            raise RuntimeError("boom")
+
+    store = _BrokenStore()
+    pipeline = IngestionPipeline(embedder=_StubEmbedder(), store=store)
+    stats = await pipeline.run(_StubIngester([_doc()]))
+    assert stats.docs == 1
+    assert all(c.knowledge_version is None for c in store.upserts[0])
