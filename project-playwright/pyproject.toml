@@ -17,10 +17,7 @@ dev = [
     "pytest-playwright>=0.6.2",
 ]
 scraping = [
-    "beautifulsoup4>=4.12.0",
-    "lxml>=5.0.0",
     "pandas>=2.2.0",
-    "openpyxl>=3.1.0",
 ]
 supabase = [
     "supabase>=2.0.0",
