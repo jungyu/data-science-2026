@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import logging
 from typing import Any
+from urllib.parse import urljoin
 
 from utils.db_types import SourceRow
 from utils.worker.types import ListExtractionResult, SourcePageSnapshot
@@ -63,7 +64,7 @@ class ListExtractor:
 
             urls.append(url)
 
-        logger.info("HN list extracted %d URLs from %s", len(urls), await page.url())
+        logger.info("HN list extracted %d URLs from %s", len(urls), page.url)
         return ListExtractionResult(
             title=await page.title(),
             discovered_urls=urls,
@@ -90,26 +91,50 @@ class ListExtractor:
         next_page_sel: str | None = list_cfg.get("next_page_selector")
 
         urls: list[str] = []
+        base_url = page.url
         items = page.locator(item_sel)
         count = await items.count()
 
+        # 若 item_sel == link_sel，或 link_sel 為空，視為「item 本身就是 anchor」
+        item_is_anchor = (not link_sel) or (link_sel == item_sel)
+
         for i in range(count):
             item = items.nth(i)
-            link_el = item.locator(link_sel) if link_sel else item
-            if await link_el.count() == 0:
+            if item_is_anchor:
+                # item 自己有 href 屬性
+                href = await item.get_attribute("href") or ""
+            else:
+                link_el = item.locator(link_sel)
+                if await link_el.count() == 0:
+                    continue
+                href = await link_el.first.get_attribute("href") or ""
+
+            if not href:
                 continue
-            href = await link_el.first.get_attribute("href") or ""
-            if href and href.startswith("http"):
-                urls.append(href)
+
+            # 把相對 URL 轉為絕對（依當前頁面 URL 為 base）
+            # 跳過 anchor only (#xxx)、JS (#javascript:)、mailto: 等
+            if href.startswith(("#", "javascript:", "mailto:", "tel:")):
+                continue
+            absolute = urljoin(base_url, href)
+            if absolute.startswith(("http://", "https://")):
+                urls.append(absolute)
 
         next_page_url: str | None = None
         if next_page_sel:
             next_el = page.locator(next_page_sel)
             if await next_el.count() > 0:
-                next_page_url = await next_el.first.get_attribute("href")
+                raw_next = await next_el.first.get_attribute("href") or ""
+                if raw_next:
+                    next_page_url = urljoin(base_url, raw_next)
+
+        # 去重保留順序
+        seen: set[str] = set()
+        urls = [u for u in urls if not (u in seen or seen.add(u))]
 
         logger.info(
-            "Schema-based list extracted %d URLs from %s", len(urls), await page.url()
+            "Schema-based list extracted %d URLs from %s (item_count=%d, item_is_anchor=%s)",
+            len(urls), base_url, count, item_is_anchor,
         )
         return ListExtractionResult(
             title=await page.title(),

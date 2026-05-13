@@ -59,8 +59,14 @@ def verify_offline() -> bool:
 
     # ── 步驟 1：套件是否安裝 ──────────────────────────────────────
     try:
-        import playwright
-        print(f"[✓] playwright 套件已安裝（版本：{playwright.__version__}）")
+        import playwright  # noqa: F401 — 僅做存在性檢查
+        # playwright 不在 module 暴露 __version__，從 dist-info 取得
+        from importlib.metadata import PackageNotFoundError, version
+        try:
+            pw_version = version("playwright")
+        except PackageNotFoundError:
+            pw_version = "unknown"
+        print(f"[✓] playwright 套件已安裝（版本：{pw_version}）")
     except ImportError:
         print("[✗] playwright 套件未安裝")
         print()

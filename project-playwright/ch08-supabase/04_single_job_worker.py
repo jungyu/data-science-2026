@@ -262,9 +262,9 @@ def extract_article_page(page: Page) -> dict:
     """
     title = page.title() or ""
 
-    # meta description（大多數站都有）
+    # meta description（大多數站都有；有些站會放重複 meta，所以用 .first）
     abstract = ""
-    meta_el = page.locator('meta[name="description"]')
+    meta_el = page.locator('meta[name="description"]').first
     if meta_el.count() > 0:
         abstract = meta_el.get_attribute("content") or ""
 
@@ -417,8 +417,33 @@ def get_source(source_code: str) -> dict:
     return result.data
 
 
+# 非 HTML 副檔名 — Playwright 會把它們當「下載」處理而非導航
+# 真實 HN 連結常見：研究論文 PDF、軟體 release zip、學術資料集等
+_NON_HTML_EXTENSIONS = (
+    ".pdf", ".zip", ".tar.gz", ".tgz", ".dmg", ".exe", ".pkg",
+    ".epub", ".mobi", ".mp3", ".mp4", ".avi", ".mov",
+    ".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg",
+    ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
+)
+
+
+class NonHtmlContentError(RuntimeError):
+    """URL 指向二進位 / 下載檔，不是可導航的 HTML 頁面。"""
+
+
 def _fetch_page(page: Page, url: str) -> _FetchedPage:
-    """攔截重量資源後導航 URL，回傳原始 HTML / title / 連結。"""
+    """攔截重量資源後導航 URL，回傳原始 HTML / title / 連結。
+
+    若 URL 是非 HTML 內容（PDF / zip / image 等），會明確拋
+    NonHtmlContentError 給呼叫端，避免 Playwright 的「Download is starting」
+    錯誤訊息混淆學生。
+    """
+    lowered = url.lower().split("?")[0]
+    if lowered.endswith(_NON_HTML_EXTENSIONS):
+        raise NonHtmlContentError(
+            f"URL 副檔名為非 HTML 內容（{Path(lowered).suffix}），跳過爬取"
+        )
+
     page.route(
         "**/*",
         lambda route: route.abort()
@@ -547,6 +572,10 @@ def run_single_job(source_code: str) -> None:
         finish_job(job, CrawlQueueStatus.DONE)
         logger.info("任務完成：%s", job["id"])
 
+    except NonHtmlContentError as e:
+        # 非 HTML 內容是「預期的、不可爬」狀況，不算 error；只記資訊性 log + 標為 skipped
+        logger.info("任務略過：%s — %s", job["id"], e)
+        finish_job(job, CrawlQueueStatus.FAILED, error_msg=str(e))
     except Exception as e:
         stats["error_count"] += 1
         logger.error("任務失敗：%s — %s", job["id"], e, exc_info=True)

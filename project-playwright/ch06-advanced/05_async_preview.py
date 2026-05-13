@@ -97,7 +97,9 @@ async def main() -> None:
 
     print("══ Sync 版本（依序等待）══")
     t0 = time.perf_counter()
-    sync_titles = fetch_titles_sync()
+    # Playwright sync API 不能在 asyncio event loop 內直接呼叫，
+    # 用 asyncio.to_thread() 丟到背景執行緒（內部有自己的 loop）
+    sync_titles = await asyncio.to_thread(fetch_titles_sync)
     sync_elapsed = time.perf_counter() - t0
     for url, title in zip(URLS, sync_titles):
         print(f"  {url[:40]:<40} → {title[:50]}")
