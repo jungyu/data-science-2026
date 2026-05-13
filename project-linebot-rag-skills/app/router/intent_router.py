@@ -4,6 +4,7 @@ import json
 from dataclasses import dataclass
 from typing import Protocol
 
+from app.router.categories import VALID_RAG_CATEGORIES
 from app.router.emotion_detector import detect_emotion
 from app.router.prompts import render_router_prompt
 from app.router.schemas import EmotionState, ResponseMode, RouterResult, SkillId
@@ -50,6 +51,9 @@ class IntentRouter:
             update={
                 "rag_query": result.rag_query.strip() or user_input.strip(),
                 "emotion_state": result.emotion_state or fallback_emotion,
+                "rag_categories": [
+                    c for c in result.rag_categories if c in VALID_RAG_CATEGORIES
+                ],
             }
         )
         if normalized.confidence < self.confidence_threshold:
@@ -115,7 +119,7 @@ class IntentRouter:
                 emotion_state=emotion,
                 response_mode="reflection",
                 is_rag_required=any(keyword in lowered for keyword in KNOWLEDGE_KEYWORDS),
-                rag_categories=["philosophy", "reflection", "notes"],
+                rag_categories=["philosophy", "notes"],
                 confidence=0.6,
             )
         return RouterResult.fallback(

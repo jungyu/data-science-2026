@@ -61,29 +61,51 @@ class _StubMessagesRepo:
 
 
 class _StubSkillRegistry:
+    """Stub：根據 router 要的 skill_id 動態產出對應 SkillDefinition。
+
+    測「judge 跳過」的個案請覆寫 self._skill 為固定值（例如
+    general_chat / emotional_calibration），其餘情況依 router 動態回傳。
+    """
+
     def __init__(self) -> None:
-        self._skill = SkillDefinition(
-            skill_id="general_chat",
-            name="一般對話",
+        # 為相容既有測試保留可覆寫的 attribute；非 None 時 lookup 一律回此實例。
+        self._skill: SkillDefinition | None = None
+
+    def _build(self, skill_id: str) -> SkillDefinition:
+        return SkillDefinition(
+            skill_id=skill_id,
+            name=skill_id,
             description="desc",
             category="general",
             system_prompt="prompt",
         )
 
     def get(self, skill_id: str) -> SkillDefinition | None:
-        return self._skill
+        return self._skill or self._build(skill_id)
 
     def require(self, skill_id: str) -> SkillDefinition:
-        return self._skill
+        return self._skill or self._build(skill_id)
 
 
 class _StubRouter:
-    def __init__(self, *, is_rag_required: bool = True) -> None:
+    """預設 target_skill=tech_architect，避免落入 SKIP_JUDGE_SKILLS
+    （general_chat / emotional_calibration）讓 judge 流程的測試失效。
+
+    需要測「judge 跳過」的個案請傳 target_skill="general_chat"。
+    """
+
+    def __init__(
+        self,
+        *,
+        is_rag_required: bool = True,
+        target_skill: str = "tech_architect",
+    ) -> None:
         self._is_rag_required = is_rag_required
+        self._target_skill = target_skill
 
     async def route_message(self, user_input: str, recent_history: str) -> RouterResult:
         return RouterResult(
-            target_skill="general_chat",
+            target_skill=self._target_skill,
             is_rag_required=self._is_rag_required,
             rag_query=user_input,
             rag_categories=[],

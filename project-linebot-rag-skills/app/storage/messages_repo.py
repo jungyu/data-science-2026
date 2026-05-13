@@ -42,6 +42,61 @@ class MessagesRepository:
             },
         )
 
+    async def mark_pending_review(
+        self,
+        *,
+        thread_id: str,
+        line_user_id: str,
+        status: str = "pending",
+    ) -> None:
+        """spec-21 §「`mark_pending_review`」：HITL interrupt 觸發時記錄一筆。
+
+        寫入 `hitl_pending_reviews`（schema.sql 內 opt-in 表，沒套 schema 時
+        Supabase 會回 404，這裡靜默忽略——讓 graph 主流程不受 schema 缺失影響）。
+        """
+        try:
+            await self._client.upsert(
+                "hitl_pending_reviews",
+                [
+                    {
+                        "thread_id": thread_id,
+                        "line_user_id": line_user_id,
+                        "status": status,
+                    }
+                ],
+                on_conflict="thread_id",
+            )
+        except Exception:
+            # opt-in 表不存在時不該打斷主流程
+            pass
+
+    async def list_pending_reviews(self, limit: int = 50) -> list[dict[str, Any]]:
+        try:
+            return await self._client.select(
+                "hitl_pending_reviews",
+                {
+                    "select": "thread_id,line_user_id,status,created_at",
+                    "status": "eq.pending",
+                    "order": "created_at.desc",
+                    "limit": str(limit),
+                },
+            )
+        except Exception:
+            return []
+
+    async def resolve_pending_review(
+        self, *, thread_id: str, status: str
+    ) -> None:
+        """approve / revise / drop 之後更新狀態（spec-21 §HITL）。"""
+        try:
+            await self._client.upsert(
+                "hitl_pending_reviews",
+                [{"thread_id": thread_id, "status": status}],
+                on_conflict="thread_id",
+            )
+        except Exception:
+            pass
+
     async def build_recent_history(self, line_user_id: str, limit: int = 5) -> str:
         rows = await self.list_recent_messages(line_user_id, limit=limit)
         if not rows:

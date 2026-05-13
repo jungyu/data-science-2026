@@ -90,8 +90,10 @@ class Settings(BaseSettings):
     # HITL + Persistence（spec-21 / task-21）
     hitl_enabled: bool = False
     hitl_always_review_skills: list[str] = []
-    checkpoint_backend: str = "memory"   # memory | sqlite | none
+    checkpoint_backend: str = "memory"   # memory | sqlite | postgres | none
     checkpoint_sqlite_path: str = ".checkpoints/rag.db"
+    # spec-21 §「Checkpointer 選擇」postgres backend：與 Supabase 共用 DB
+    supabase_db_url: str = ""
 
     # spec-26 query transform
     query_transform_strategy: str = "none"   # none | hyde | step_back | decompose

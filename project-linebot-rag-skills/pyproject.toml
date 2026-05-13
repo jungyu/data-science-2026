@@ -49,6 +49,15 @@ hitl = [
   "langgraph-checkpoint-sqlite>=2.0",
   "aiosqlite>=0.20",
 ]
+# spec-21 §「Checkpointer 選擇」postgres backend（生產 / Supabase 共用 DB）
+hitl-postgres = [
+  "langgraph-checkpoint-postgres>=2.0",
+  "psycopg[binary]>=3.2",
+]
+# spec-22 §「介面契約」：CI / ELK 想吃結構化 JSON log 時安裝
+observability-json = [
+  "python-json-logger>=2.0",
+]
 crawler = [
   "playwright>=1.40",
   "markdownify>=0.11",

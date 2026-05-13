@@ -56,17 +56,21 @@ async def chat(
         "recent_history": history,
     }
 
+    # spec-21：與 webhook 一致，必須帶 thread_id config，checkpointer / HITL 才會生效。
+    thread_id = channel.build_thread_id(inp)
+    graph_config = {"configurable": {"thread_id": thread_id}}
+
     tracer = None
     token = None
     if services.tracer_registry is not None:
         tracer = services.tracer_registry.start(
-            thread_id=channel.build_thread_id(inp),
+            thread_id=thread_id,
             variant=services.settings.graph_variant,
         )
         token = set_current_tracer(tracer)
 
     try:
-        final = await services.rag_graph.ainvoke(state)
+        final = await services.rag_graph.ainvoke(state, config=graph_config)
     finally:
         if token is not None:
             reset_current_tracer(token)

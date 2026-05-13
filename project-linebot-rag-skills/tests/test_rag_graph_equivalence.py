@@ -19,8 +19,10 @@ async def test_graph_runs_linearly(stub_services):
         }
     )
     assert final["router_result"] is not None
-    assert final["router_result"].target_skill == "general_chat"
-    assert final["skill"].skill_id == "general_chat"
+    # conftest _StubRouter 預設 target_skill=tech_architect（為了讓 judge 流程
+    # 的測試有作用——general_chat 在 SKIP_JUDGE_SKILLS 中）。
+    assert final["router_result"].target_skill == "tech_architect"
+    assert final["skill"].skill_id == "tech_architect"
     assert final["responses"] == ["假回覆"]
     # push_node 已經呼叫 line_client
     assert stub_services.line_client.pushed == [("U_test", ["假回覆"])]

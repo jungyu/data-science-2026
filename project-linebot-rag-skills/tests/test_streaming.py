@@ -257,8 +257,10 @@ class TestSseEndpoint:
         class _S:
             streaming_enabled: bool = True
 
-        async def fake_astream(state, stream_mode="custom"):
+        async def fake_astream(state, config=None, stream_mode="custom"):
+            # spec-21：stream endpoint 現在會帶 thread_id config
             assert stream_mode == "custom"
+            assert config and config["configurable"]["thread_id"]
             for tok in ["第一", "段", "回覆"]:
                 yield {"token": tok}
 

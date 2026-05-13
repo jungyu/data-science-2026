@@ -43,12 +43,58 @@ async def test_runner_records_clarification(stub_services_insufficient):
 
 
 @pytest.mark.asyncio
-async def test_runner_flags_unexpected_clarify(stub_services_insufficient):
-    """case 沒寫 expect_clarification 但 graph 走了 clarify → 標 failure。"""
+async def test_runner_flags_unexpected_clarify_when_chunks_expected(
+    stub_services_insufficient,
+):
+    """expected_chunks 非空但 graph 走了 clarify → 標 failure。
+    （hallucination case 即 expected_chunks=[] 是測 forbidden_phrase，
+    走 clarify 不算 failure，另一個測試覆蓋。）"""
     runner = EvalRunner(stub_services_insufficient)
-    cases = [GoldenCase(id="x", query="?", expect_clarification=False)]
+    cases = [
+        GoldenCase(
+            id="x",
+            query="?",
+            expected_chunks=["chunk-1"],
+            expect_clarification=False,
+        )
+    ]
     results = await runner.run(cases=cases, variants=["selfrag"])
     assert any("unexpected clarify" in r for r in results[0].failure_reasons)
+
+
+@pytest.mark.asyncio
+async def test_hallucination_case_allows_clarify(stub_services_insufficient):
+    """spec-20：expected_chunks=[] 的 hallucination 案例走 clarify 不算 failure。"""
+    runner = EvalRunner(stub_services_insufficient)
+    cases = [
+        GoldenCase(
+            id="ground-001",
+            query="知識庫沒有的查詢",
+            expected_chunks=[],
+            expect_clarification=False,
+            forbidden_phrases=["亂編的事實"],
+        )
+    ]
+    results = await runner.run(cases=cases, variants=["selfrag"])
+    assert all("unexpected clarify" not in r for r in results[0].failure_reasons)
+
+
+@pytest.mark.asyncio
+async def test_basic_variant_skips_must_cite_failure(stub_services):
+    """spec-20 §Metric：basic variant 不產 answer_contract，must_cite 不該列 failure。"""
+    runner = EvalRunner(stub_services)
+    cases = [
+        GoldenCase(
+            id="x",
+            query="?",
+            expected_chunks=["chunk-1"],
+            must_cite_sources=["some-source.md"],
+        )
+    ]
+    results = await runner.run(cases=cases, variants=["basic"])
+    assert all(
+        "missing required citation" not in r for r in results[0].failure_reasons
+    )
 
 
 @pytest.mark.asyncio

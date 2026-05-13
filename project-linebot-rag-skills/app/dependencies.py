@@ -28,6 +28,7 @@ from app.storage.logs_repo import LogsRepository
 from app.storage.messages_repo import MessagesRepository
 from app.storage.stores import build_store
 from app.storage.supabase_client import SupabaseRestClient
+from app.storage.traces_repo import TracesRepository
 
 
 @dataclass
@@ -172,11 +173,22 @@ def get_narrative_renderer() -> NarrativeRenderer:
 
 
 @lru_cache(maxsize=1)
+def get_traces_repo() -> TracesRepository:
+    return TracesRepository(get_supabase_client())
+
+
+@lru_cache(maxsize=1)
 def get_tracer_registry() -> TracerRegistry | None:
     s = get_settings()
     if not s.observability_enabled:
         return None
-    return TracerRegistry(trace_dir=s.trace_dir, persist=s.observability_persist)
+    # 只在 persist=True 時注入 traces_repo（避免不必要的 Supabase client 建構）
+    traces_repo = get_traces_repo() if s.observability_persist else None
+    return TracerRegistry(
+        trace_dir=s.trace_dir,
+        persist=s.observability_persist,
+        traces_repo=traces_repo,
+    )
 
 
 @lru_cache(maxsize=1)

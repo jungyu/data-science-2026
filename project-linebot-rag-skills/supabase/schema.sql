@@ -48,6 +48,19 @@ create table if not exists private_knowledge (
   updated_at timestamptz default now()
 );
 
+-- spec-21 HITL：interrupt 時記一筆 pending 狀態，CLI / Dashboard 可枚舉待審
+-- 對應 messages_repo.mark_pending_review。HITL_ENABLED=false 時可不建。
+create table if not exists hitl_pending_reviews (
+  thread_id text primary key,
+  line_user_id text not null,
+  status text not null default 'pending',  -- pending | approved | revised | dropped
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create index if not exists idx_hitl_pending_status_created
+  on hitl_pending_reviews (status, created_at desc);
+
 create table if not exists line_messages (
   id uuid primary key default gen_random_uuid(),
   line_user_id text not null,

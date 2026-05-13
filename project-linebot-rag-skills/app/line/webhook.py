@@ -78,9 +78,14 @@ async def process_channel_input(inp, services: RuntimeServices) -> None:
         except Exception:
             logger.warning("Failed to send streaming placeholder")
 
+    # spec-21：每次 invocation 都帶 thread_id config，否則 checkpointer + HITL
+    # 都不會運作（LangGraph 沒有 thread_id 不會持久化 / 不會 interrupt）。
+    thread_id = channel.build_thread_id(inp)
+    graph_config = {"configurable": {"thread_id": thread_id}}
+
     final_state = None
     try:
-        final_state = await services.rag_graph.ainvoke(initial_state)
+        final_state = await services.rag_graph.ainvoke(initial_state, config=graph_config)
     except Exception:
         logger.exception("rag_graph invocation failed")
     finally:
@@ -93,6 +98,17 @@ async def process_channel_input(inp, services: RuntimeServices) -> None:
                 logger.exception("write_trace failed")
 
     if final_state is None:
+        return
+
+    # spec-21：偵測 interrupt — 若 graph 在 push 前中斷（hitl_enabled + judge fail），
+    # 只標記 pending review，不執行 outbound 落庫 / 推送，等 review_queue.py 接手。
+    if await _is_interrupted(services.rag_graph, graph_config):
+        try:
+            await services.messages_repo.mark_pending_review(
+                thread_id=thread_id, line_user_id=user_id
+            )
+        except Exception:
+            logger.warning("mark_pending_review failed for thread=%s", thread_id, exc_info=True)
         return
 
     # —— outbound 落庫（讀 final_state）
@@ -111,6 +127,19 @@ async def process_channel_input(inp, services: RuntimeServices) -> None:
         )
     except Exception:
         logger.warning("save_message outbound failed for user=%s", user_id, exc_info=True)
+
+
+async def _is_interrupted(graph, config: dict) -> bool:
+    """spec-21：判斷 graph 是否在 interrupt_before 節點處中斷。
+
+    LangGraph 中斷時 `aget_state(config).next` 會回傳 pending 節點名稱 tuple；
+    無 checkpointer / 無 thread_id 時 aget_state 會拋例外，安全當作未中斷處理。
+    """
+    try:
+        snapshot = await graph.aget_state(config)
+    except Exception:
+        return False
+    return bool(getattr(snapshot, "next", ()))
 
 
 # 向後相容：既有 test_line_webhook.py 直接測 process_text_event

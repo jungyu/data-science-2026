@@ -289,7 +289,10 @@ async def render_narrative_node(state: RAGState, services: Any) -> dict[str, Any
     return {"responses": responses}
 
 
-SKIP_JUDGE_SKILLS: set[str] = {"small_talk", "emotional_calibration"}
+# spec-17：不送 judge 的 skill 清單。必須對齊 app/router/schemas.py::SkillId 字面值。
+# "small_talk" 雖在語意上等價於閒聊，但實際 SkillId 是 "general_chat"——之前寫錯導致
+# 生產環境 general_chat（無 RAG chunks）總被送進 judge、必拿低分、觸發品質警告。
+SKIP_JUDGE_SKILLS: set[str] = {"general_chat", "emotional_calibration"}
 
 
 @traced("judge")

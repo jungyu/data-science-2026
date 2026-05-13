@@ -151,32 +151,68 @@ class GraphTracer:
 
 @dataclass
 class TracerRegistry:
-    """每個 graph invocation 建一個 tracer，跑完寫 trace JSON。"""
+    """每個 graph invocation 建一個 tracer，跑完寫 trace JSON。
+
+    `persist=True` 時同時把 finalize 的 payload 透過 traces_repo 寫進 Supabase
+    `graph_traces` 表（spec-22 §Supabase Schema）；traces_repo=None 時退化為
+    只寫本機檔案，並在第一次 persist 嘗試時 log 一筆 warning。
+    """
 
     trace_dir: Path
     persist: bool = False
+    traces_repo: Any = None  # app.storage.traces_repo.TracesRepository | None
 
     def __post_init__(self):
         self.trace_dir = Path(self.trace_dir)
         self.trace_dir.mkdir(parents=True, exist_ok=True)
+        self._persist_warned = False
 
     def start(self, *, thread_id: str, variant: str) -> GraphTracer:
         return GraphTracer(thread_id=thread_id, variant=variant)
 
     def write_trace(self, tracer: GraphTracer) -> Path:
-        """同步寫檔（供 scripts / eval 等非 async 呼叫端使用）。"""
+        """同步寫檔（供 scripts / eval 等非 async 呼叫端使用）。
+
+        sync 路徑無法 await traces_repo（async）；persist 開啟時 caller 應走
+        async_write_trace 才能同步落 Supabase。本路徑只警告一次。
+        """
         payload = tracer.finalize()
+        path = self._write_local(payload, tracer.thread_id)
+        if self.persist and not self._persist_warned:
+            logger.warning(
+                "TracerRegistry.write_trace called sync but persist=True; "
+                "Supabase write skipped — use async_write_trace from async contexts."
+            )
+            self._persist_warned = True
+        return path
+
+    async def async_write_trace(self, tracer: GraphTracer) -> Path:
+        """非同步：本機 .traces JSON + （opt-in）Supabase graph_traces 一起寫。"""
+        payload = tracer.finalize()
+        path = await asyncio.to_thread(self._write_local, payload, tracer.thread_id)
+        if self.persist:
+            if self.traces_repo is None:
+                if not self._persist_warned:
+                    logger.warning(
+                        "OBSERVABILITY_PERSIST=true but traces_repo is None; "
+                        "skipping Supabase write. Wire TracesRepository in dependencies."
+                    )
+                    self._persist_warned = True
+            else:
+                try:
+                    await self.traces_repo.insert(payload)
+                except Exception:
+                    logger.exception("traces_repo.insert failed (non-fatal)")
+        return path
+
+    def _write_local(self, payload: dict, thread_id: str) -> Path:
         # 檔名 sanitize：thread_id 可能含 "/" 等
-        safe = "".join(c if c.isalnum() or c in "-_." else "_" for c in tracer.thread_id)
+        safe = "".join(c if c.isalnum() or c in "-_." else "_" for c in thread_id)
         path = self.trace_dir / f"{safe}.json"
         path.write_text(
             json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
         )
         return path
-
-    async def async_write_trace(self, tracer: GraphTracer) -> Path:
-        """非同步包裝，避免在 async 事件迴圈中阻塞（webhook / background task 使用）。"""
-        return await asyncio.to_thread(self.write_trace, tracer)
 
 
 _current_node_name: ContextVar[str | None] = ContextVar("current_node_name", default=None)

@@ -73,18 +73,22 @@ async def test_judge_skipped_for_no_rag(stub_services_no_rag):
 
 
 @pytest.mark.asyncio
-async def test_judge_skipped_for_small_talk_skill(stub_services_judge_always_fail):
-    """skill=small_talk → judge 跳過。即使 ScriptedJudge 永遠 fail 也不會被呼叫到。"""
-    # 把 skill 換成 small_talk
+async def test_judge_skipped_for_general_chat_skill(stub_services_judge_always_fail):
+    """spec-17：skill=general_chat → judge 跳過。即使 ScriptedJudge 永遠 fail 也不會
+    被呼叫到，不該觸發品質警告。
+
+    （前版誤用 "small_talk" 比對，但 SkillId 沒有 "small_talk"——閒聊真實的
+    skill_id 是 "general_chat"，導致生產環境 general_chat 永遠被 judge 評分。）
+    """
     services = stub_services_judge_always_fail
-    small_talk_skill = SkillDefinition(
-        skill_id="small_talk",
+    general_chat_skill = SkillDefinition(
+        skill_id="general_chat",
         name="閒聊",
         description="d",
         category="general",
         system_prompt="prompt",
     )
-    services.skill_registry._skill = small_talk_skill  # noqa: SLF001（測試用）
+    services.skill_registry._skill = general_chat_skill  # noqa: SLF001（測試用）
 
     final = await services.rag_graph.ainvoke(
         {

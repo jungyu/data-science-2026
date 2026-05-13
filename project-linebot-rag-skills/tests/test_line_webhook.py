@@ -272,6 +272,59 @@ def test_line_webhook_accepts_valid_signature_and_runs_background_task() -> None
     assert len(messages_repo.saved_messages) == 2
 
 
+def test_line_webhook_passes_thread_id_config_to_graph() -> None:
+    """spec-21 §「config 與 thread_id」：webhook 呼叫 graph.ainvoke 必須帶
+    `config={"configurable": {"thread_id": ...}}`，否則 checkpointer / HITL
+    在 production 路徑都不會生效。"""
+    secret = "unit-test-secret"
+    line_client = FakeLineClient(secret)
+    messages_repo = FakeMessagesRepo()
+    services = _build_fake_services(line_client, messages_repo)
+
+    captured: dict = {}
+    real_ainvoke = services.rag_graph.ainvoke
+
+    async def spy_ainvoke(state, config=None, **kw):
+        captured["config"] = config
+        return await real_ainvoke(state, config=config, **kw) if config else await real_ainvoke(state, **kw)
+
+    services.rag_graph.ainvoke = spy_ainvoke  # type: ignore[method-assign]
+
+    app = create_app()
+    app.dependency_overrides[get_runtime_services] = lambda: services
+
+    body = b"""
+    {
+      "destination": "bot",
+      "events": [
+        {
+          "type": "message",
+          "replyToken": "token",
+          "source": {"type": "user", "userId": "U999"},
+          "timestamp": 1,
+          "message": {"id": "msg-42", "type": "text", "text": "hi"}
+        }
+      ]
+    }
+    """
+
+    async def send_request() -> httpx.Response:
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+            return await client.post(
+                "/api/line/webhook",
+                content=body,
+                headers={"x-line-signature": build_signature(secret, body)},
+            )
+
+    response = asyncio.run(send_request())
+    assert response.status_code == 200
+    assert captured.get("config") is not None, "graph.ainvoke 未收到 config"
+    thread_id = captured["config"]["configurable"]["thread_id"]
+    # FakeLineChannel.build_thread_id 回 line-{user}-{msg_id}
+    assert thread_id == "line-U999-msg-42"
+
+
 def test_line_webhook_rejects_invalid_signature() -> None:
     secret = "unit-test-secret"
     app = create_app()

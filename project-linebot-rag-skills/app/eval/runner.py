@@ -82,11 +82,20 @@ class EvalRunner:
         failures: list[str] = []
         if case.expect_clarification and not went_to_clarify:
             failures.append("expected clarify but went to generate")
-        if not case.expect_clarification and went_to_clarify:
+        # spec-20 §「易誘發 hallucination」：expected_chunks=[] 的 hallucination 案例
+        # 測的是 forbidden_phrase，不是 clarify 路由。selfrag / reflection 在無 chunks
+        # 時 sufficiency=insufficient → 走 clarify 是 _正確行為_，不該標 failure。
+        if (
+            not case.expect_clarification
+            and went_to_clarify
+            and case.expected_chunks  # 只有「應該找到 chunks」的 case 才檢查
+        ):
             failures.append("unexpected clarify (case has chunks but graph asked to clarify)")
         if forbidden_hit:
             failures.append(f"hit forbidden phrase: {case.forbidden_phrases}")
-        if cite_satisfied is False:
+        # spec-20 §「Metric」：citation_accuracy 不適用 basic variant（basic 不產 contract、
+        # 沒 cited_sources），不應把 must_cite 列為 failure。
+        if cite_satisfied is False and variant != "basic":
             failures.append(f"missing required citation: {case.must_cite_sources}")
 
         return EvalResult(

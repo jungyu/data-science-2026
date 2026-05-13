@@ -105,6 +105,56 @@ def test_write_trace_sanitizes_filename(tmp_path):
     assert out.exists()
 
 
+# ---- persist=True 路徑（spec-22 §Supabase Schema）----------------------------
+
+
+class _StubTracesRepo:
+    def __init__(self) -> None:
+        self.inserts: list[dict] = []
+
+    async def insert(self, payload: dict) -> None:
+        self.inserts.append(payload)
+
+
+@pytest.mark.asyncio
+async def test_async_write_trace_persists_when_enabled(tmp_path):
+    """spec-22 驗收：OBSERVABILITY_PERSIST=true 時 async_write_trace 會把
+    finalize() payload 寫進 traces_repo。"""
+    repo = _StubTracesRepo()
+    reg = TracerRegistry(trace_dir=tmp_path, persist=True, traces_repo=repo)
+    tracer = reg.start(thread_id="line-U1-msg1", variant="reflection")
+    with tracer.span(node="route"):
+        pass
+
+    out = await reg.async_write_trace(tracer)
+    assert out.exists()
+    assert len(repo.inserts) == 1
+    assert repo.inserts[0]["thread_id"] == "line-U1-msg1"
+    assert repo.inserts[0]["variant"] == "reflection"
+
+
+@pytest.mark.asyncio
+async def test_async_write_trace_skips_supabase_when_persist_false(tmp_path):
+    """persist=False 時不該呼叫 traces_repo（即使有注入）。"""
+    repo = _StubTracesRepo()
+    reg = TracerRegistry(trace_dir=tmp_path, persist=False, traces_repo=repo)
+    tracer = reg.start(thread_id="x", variant="basic")
+    await reg.async_write_trace(tracer)
+    assert repo.inserts == []
+
+
+@pytest.mark.asyncio
+async def test_async_write_trace_warns_when_persist_without_repo(tmp_path, caplog):
+    """persist=True 但 traces_repo=None 時 log 警告但不該 raise。"""
+    import logging
+
+    reg = TracerRegistry(trace_dir=tmp_path, persist=True, traces_repo=None)
+    tracer = reg.start(thread_id="x", variant="basic")
+    with caplog.at_level(logging.WARNING, logger="observability"):
+        await reg.async_write_trace(tracer)
+    assert any("traces_repo is None" in rec.message for rec in caplog.records)
+
+
 # ---- ContextVar dispatch -------------------------------------------------
 
 

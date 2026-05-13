@@ -29,12 +29,20 @@ class CohereReranker(BaseReranker):
         if not chunks:
             return []
         docs = [c.content for c in chunks]
-        resp = await self._client.rerank(
-            model=self._model,
-            query=query,
-            documents=docs,
-            top_n=min(top_n, len(docs)),
-        )
+        try:
+            resp = await self._client.rerank(
+                model=self._model,
+                query=query,
+                documents=docs,
+                top_n=min(top_n, len(docs)),
+            )
+        except Exception as exc:
+            # spec-04 §Fallback：API 失敗（超時 / 限流 / 網路）靜默降回 RRF 排序，
+            # 不打斷主流程；只留 log。
+            logger.warning(
+                "Cohere rerank failed (%s); falling back to RRF score sort", exc
+            )
+            return sorted(chunks, key=lambda c: c.combined_score, reverse=True)[:top_n]
         reranked: list[KnowledgeChunk] = []
         for result in resp.results:
             chunk = chunks[result.index].model_copy()
@@ -77,9 +85,13 @@ def make_reranker(settings: object) -> BaseReranker | None:
     if provider == "cohere":
         api_key = getattr(settings, "cohere_api_key", "")
         if not api_key:
-            raise ValueError(
-                "reranker_provider=cohere requires COHERE_API_KEY to be set"
+            # spec-04 §Fallback：缺 key 時靜默降回 RRF（回 None → select_top_chunks
+            # 走 score-sort 路徑），不拋例外。
+            logger.warning(
+                "reranker_provider=cohere but COHERE_API_KEY is empty; "
+                "falling back to RRF score sort (no rerank)"
             )
+            return None
         return CohereReranker(
             api_key=api_key,
             model=getattr(settings, "reranker_model", "rerank-multilingual-v3.0"),

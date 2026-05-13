@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 def build_checkpointer(settings: Settings) -> Any | None:
-    """同步建構：memory / none 立即可用。sqlite 回 None 並提示走 async setup。"""
+    """同步建構：memory / none 立即可用。sqlite / postgres 回 None 並提示走 async setup。"""
     backend = settings.checkpoint_backend
     if backend in ("none", ""):
         return None
@@ -33,7 +33,43 @@ def build_checkpointer(settings: Settings) -> Any | None:
             "Falling back to None for now."
         )
         return None
+    if backend == "postgres":
+        # spec-21 §「Checkpointer 選擇」：與既有 Supabase 共用 connection。
+        # 需 optional dep：`pip install -e ".[hitl-postgres]"`，且在 FastAPI
+        # startup hook 內走 build_postgres_saver_async（PostgresSaver 需 setup）。
+        logger.warning(
+            "checkpoint_backend=postgres needs async setup; "
+            "use build_postgres_saver_async() in FastAPI startup hook. "
+            "Falling back to None for now."
+        )
+        return None
     raise ValueError(f"unknown checkpoint_backend: {backend!r}")
+
+
+async def build_postgres_saver_async(conn_url: str):
+    """在 FastAPI startup（async context）建構 AsyncPostgresSaver。
+
+    對應 spec-21 §「Checkpointer 選擇」postgres backend。
+    需 `pip install -e ".[hitl-postgres]"`。
+
+    用法：
+        async def startup():
+            services = get_runtime_services()
+            services.checkpointer = await build_postgres_saver_async(
+                services.settings.supabase_db_url
+            )
+            services.rag_graph = build_rag_graph(services)
+    """
+    from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+
+    # AsyncPostgresSaver.from_conn_string 是 async context manager；
+    # FastAPI lifespan 內持有後在 shutdown 時 close。
+    cm = AsyncPostgresSaver.from_conn_string(conn_url)
+    saver = await cm.__aenter__()
+    await saver.setup()
+    # 讓 caller 能 release：把 cm 掛在 saver 上。
+    saver._cm = cm  # type: ignore[attr-defined]
+    return saver
 
 
 async def build_sqlite_saver_async(path: str):

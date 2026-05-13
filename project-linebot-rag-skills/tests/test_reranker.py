@@ -65,10 +65,14 @@ class TestMakeReranker:
         s = _Settings(reranker_enabled=False)
         assert make_reranker(s) is None
 
-    def test_cohere_missing_api_key_raises(self):
+    def test_cohere_missing_api_key_returns_none(self, caplog):
+        """spec-04 §Fallback：缺 COHERE_API_KEY 時靜默降回 RRF，不拋。"""
+        import logging
         s = _Settings(reranker_enabled=True, reranker_provider="cohere", cohere_api_key="")
-        with pytest.raises(ValueError, match="COHERE_API_KEY"):
-            make_reranker(s)
+        with caplog.at_level(logging.WARNING):
+            result = make_reranker(s)
+        assert result is None
+        assert any("COHERE_API_KEY" in rec.message for rec in caplog.records)
 
     def test_unknown_provider_raises(self):
         s = _Settings(reranker_enabled=True, reranker_provider="unknown")
@@ -120,6 +124,27 @@ class TestCohereReranker:
         with patch.dict(sys.modules, {"cohere": mock_cohere}):
             r = CohereReranker(api_key="test")
             assert await r.rerank("query", [], top_n=5) == []
+
+    @pytest.mark.asyncio
+    async def test_rerank_api_failure_falls_back_to_rrf(self, caplog):
+        """spec-04 §Fallback：Cohere API 拋例外（超時 / 限流）時不打斷，依
+        既有 combined_score 排序回傳 top_n。"""
+        import logging
+
+        mock_client = MagicMock()
+        mock_client.rerank = AsyncMock(side_effect=RuntimeError("cohere down"))
+
+        mock_cohere = MagicMock()
+        mock_cohere.AsyncClientV2 = MagicMock(return_value=mock_client)
+
+        with patch.dict(sys.modules, {"cohere": mock_cohere}):
+            r = CohereReranker(api_key="test")
+            chunks = _make_chunks(5)
+            with caplog.at_level(logging.WARNING):
+                result = await r.rerank("query", chunks, top_n=3)
+            # 回 3 筆且依 combined_score 倒序（=RRF fallback 行為）
+            assert [c.id for c in result] == ["c-4", "c-3", "c-2"]
+            assert any("Cohere rerank failed" in rec.message for rec in caplog.records)
 
     @pytest.mark.asyncio
     async def test_top_n_capped_at_input_size(self):

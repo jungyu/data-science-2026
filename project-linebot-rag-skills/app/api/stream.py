@@ -75,6 +75,10 @@ async def stream_query(request: Request):
     if _stream_slots.locked() and _stream_slots._value <= 0:
         raise HTTPException(status_code=503, detail="too many concurrent streams")
 
+    # spec-21：每次 invocation 帶 thread_id config（即使 HITL 不開、checkpointer
+    # 仍能正常持久化 state）。
+    graph_config = {"configurable": {"thread_id": thread_id}}
+
     # ── Mode 1: streaming disabled ─────────────────────────────────────────
     if not getattr(settings, "streaming_enabled", False):
         async def single_event():
@@ -86,7 +90,7 @@ async def stream_query(request: Request):
                     "dry_run": True,
                 }
                 try:
-                    result = await services.rag_graph.ainvoke(state)
+                    result = await services.rag_graph.ainvoke(state, config=graph_config)
                     text = "\n\n".join(result.get("responses") or [""])
                     yield f"data: {json.dumps({'token': text})}\n\n"
                 except Exception:
@@ -106,7 +110,9 @@ async def stream_query(request: Request):
                 "dry_run": True,
             }
             try:
-                async for chunk in services.rag_graph.astream(state, stream_mode="custom"):
+                async for chunk in services.rag_graph.astream(
+                    state, config=graph_config, stream_mode="custom"
+                ):
                     if isinstance(chunk, dict):
                         token = chunk.get("token", "")
                         if token:

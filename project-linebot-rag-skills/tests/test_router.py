@@ -2,6 +2,7 @@ import asyncio
 
 import pytest
 
+from app.router.categories import VALID_RAG_CATEGORIES
 from app.router.intent_router import IntentRouter
 
 
@@ -97,3 +98,43 @@ def test_router_low_confidence_falls_back_to_tech_for_technical_query() -> None:
         router.route_message("FastAPI webhook schema 怎麼設計？", "No recent conversation.")
     )
     assert result.target_skill == "tech_architect"
+
+
+def test_heuristic_categories_are_all_valid() -> None:
+    """spec-03 驗收：所有 heuristic 路徑產出的 rag_categories ⊂ VALID_RAG_CATEGORIES。"""
+    router = IntentRouter(llm=None)
+    queries = [
+        # 觸發各 heuristic 分支
+        "supabase webhook 怎麼設計",                # tech
+        "ab test 指標怎麼看",                        # data
+        "我的產品定位該怎麼調整",                    # business
+        "存在的意義是什麼",                          # philosophy
+        "今天天氣不錯",                              # general_chat
+    ]
+    for q in queries:
+        result = asyncio.run(router.route_message(q, ""))
+        invalid = set(result.rag_categories) - VALID_RAG_CATEGORIES
+        assert not invalid, f"query={q!r} produced invalid categories: {invalid}"
+
+
+def test_llm_output_invalid_categories_are_filtered() -> None:
+    """spec-03 驗收：LLM 若回非法 category，normalize 後會被過濾。"""
+    router = IntentRouter(
+        llm=FakeRouterLLM(
+            """
+            {
+              "target_skill": "philosophical_dialectic",
+              "is_rag_required": true,
+              "rag_query": "意義與自由",
+              "rag_categories": ["philosophy", "reflection", "made_up"],
+              "emotion_state": "reflective",
+              "response_mode": "reflection",
+              "confidence": 0.9
+            }
+            """
+        )
+    )
+    result = asyncio.run(router.route_message("自由意志是真的嗎？", ""))
+    assert set(result.rag_categories) <= VALID_RAG_CATEGORIES
+    assert "reflection" not in result.rag_categories
+    assert "made_up" not in result.rag_categories
