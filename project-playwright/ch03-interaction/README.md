@@ -22,7 +22,7 @@ page.get_by_role("button", name="送出").click()
 
 | 檔案 | 需要網路 | 說明 |
 |------|---------|------|
-| `01_click_and_type.py` | ✅（DuckDuckGo） | 基本點擊與文字輸入（selector 可能隨網站改版變動） |
+| `01_click_and_type.py` | ✅（Wikipedia） | 基本點擊與文字輸入（從 DuckDuckGo 遷至 Wikipedia 以避反爬不穩定） |
 | `02_form_operations.py` | ❌（自建 HTML） | 下拉選單、核取方塊、單選鈕（結果穩定） |
 | `03_keyboard_mouse.py` | ❌（自建 HTML） | 鍵盤快捷鍵與滑鼠操作（結果穩定） |
 
