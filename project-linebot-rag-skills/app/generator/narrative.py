@@ -14,6 +14,7 @@ from typing import Protocol
 
 from app.generator.contract import AnswerContract
 from app.generator.formatter import split_for_line
+from app.generator.prompts import _emotion_instruction, _mode_instruction
 from app.skills.loader import SkillDefinition
 
 logger = logging.getLogger(__name__)
@@ -26,7 +27,14 @@ _PROMPT = """你是 {skill_name} 的回覆撰寫者。依照以下 Answer Contra
 2. 不得引入 Contract 外的資訊
 3. 每個論點若 Contract 中有 citations，必須在敘述後標註「[來源 N]」（N 從 1 起）
 4. caveats 必須完整呈現，不可省略
-5. 語氣依 response_mode：{response_mode}
+
+## Mode Instruction（spec-01，response_mode={response_mode}）
+
+{mode_instruction}
+
+## Emotion Instruction（spec-02，emotion_state={emotion_state}；優先於 Mode 的長度與選項數量）
+
+{emotion_instruction}
 
 Skill system prompt（語氣依據）：
 {skill_system_prompt}
@@ -91,10 +99,15 @@ class NarrativeRenderer:
         contract: AnswerContract,
         skill: SkillDefinition,
         response_mode: str,
+        emotion_state: str = "neutral",
         feedback: list[str] | None = None,
     ) -> list[str]:
         text = await self._render_text(
-            contract=contract, skill=skill, response_mode=response_mode, feedback=feedback
+            contract=contract,
+            skill=skill,
+            response_mode=response_mode,
+            emotion_state=emotion_state,
+            feedback=feedback,
         )
         return split_for_line(text, max_chars=self.line_max_message_chars)
 
@@ -104,13 +117,18 @@ class NarrativeRenderer:
         contract: AnswerContract,
         skill: SkillDefinition,
         response_mode: str,
+        emotion_state: str,
         feedback: list[str] | None,
     ) -> str:
         if self.llm is None:
             return _fallback_render(contract)
 
         prompt = self._build_prompt(
-            contract=contract, skill=skill, response_mode=response_mode, feedback=feedback
+            contract=contract,
+            skill=skill,
+            response_mode=response_mode,
+            emotion_state=emotion_state,
+            feedback=feedback,
         )
         try:
             return await self.llm.complete(prompt)
@@ -124,6 +142,7 @@ class NarrativeRenderer:
         contract: AnswerContract,
         skill: SkillDefinition,
         response_mode: str,
+        emotion_state: str,
         feedback: list[str] | None,
     ) -> str:
         feedback_section = ""
@@ -137,6 +156,9 @@ class NarrativeRenderer:
             skill_name=skill.name,
             skill_system_prompt=skill.system_prompt,
             response_mode=response_mode,
+            emotion_state=emotion_state,
+            mode_instruction=_mode_instruction(response_mode),
+            emotion_instruction=_emotion_instruction(emotion_state),
             contract_json=contract.model_dump_json(indent=2),
             feedback_section=feedback_section,
         )
@@ -147,6 +169,7 @@ class NarrativeRenderer:
         contract: AnswerContract,
         skill: SkillDefinition,
         response_mode: str,
+        emotion_state: str = "neutral",
         feedback: list[str] | None = None,
     ):
         """spec-31：以 async generator 形式 yield 文字 chunk。
@@ -160,7 +183,11 @@ class NarrativeRenderer:
             return
 
         prompt = self._build_prompt(
-            contract=contract, skill=skill, response_mode=response_mode, feedback=feedback
+            contract=contract,
+            skill=skill,
+            response_mode=response_mode,
+            emotion_state=emotion_state,
+            feedback=feedback,
         )
 
         stream_method = getattr(self.llm, "stream_complete", None)

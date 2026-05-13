@@ -22,6 +22,7 @@ from app.line.client import LineMessagingClient
 from app.rag.retriever import RAGRetriever
 from app.router.intent_router import IntentRouter
 from app.skills.registry import SkillRegistry
+from app.storage.cache_repo import CacheRepository
 from app.storage.knowledge_repo import KnowledgeRepository
 from app.storage.knowledge_store import KnowledgeStore
 from app.storage.logs_repo import LogsRepository
@@ -120,10 +121,19 @@ def get_retriever() -> RAGRetriever:
 
 
 @lru_cache(maxsize=1)
+def get_cache_repo() -> CacheRepository:
+    return CacheRepository(get_supabase_client())
+
+
+@lru_cache(maxsize=1)
 def get_responder() -> ResponseGenerator:
     settings = get_settings()
     llm = build_llm(settings, "generator") if has_llm_configured(settings) else None
-    return ResponseGenerator(llm=llm, line_max_message_chars=settings.line_max_message_chars)
+    return ResponseGenerator(
+        llm=llm,
+        line_max_message_chars=settings.line_max_message_chars,
+        cache_repo=get_cache_repo(),
+    )
 
 
 @lru_cache(maxsize=1)

@@ -241,7 +241,10 @@ async def render_narrative_node(state: RAGState, services: Any) -> dict[str, Any
     stream_render 並透過 LangGraph custom stream writer 推送每個 token；
     成品 responses 仍寫回 state（供 judge / push 使用）。
     """
-    response_mode = getattr(state["router_result"], "response_mode", "default")
+    router_result = state["router_result"]
+    response_mode = getattr(router_result, "response_mode", "default")
+    # spec-02：把 emotion_state 一路餵進 narrative renderer，讓 prompt 能差異化
+    emotion_state = getattr(router_result, "emotion_state", "neutral")
     settings = services.settings
     use_stream = (
         getattr(settings, "streaming_enabled", False)
@@ -262,6 +265,7 @@ async def render_narrative_node(state: RAGState, services: Any) -> dict[str, Any
                 contract=state["answer_contract"],
                 skill=state["skill"],
                 response_mode=response_mode,
+                emotion_state=emotion_state,
                 feedback=state.get("judge_feedback"),
             ):
                 full += token
@@ -281,6 +285,7 @@ async def render_narrative_node(state: RAGState, services: Any) -> dict[str, Any
             contract=state["answer_contract"],
             skill=state["skill"],
             response_mode=response_mode,
+            emotion_state=emotion_state,
             feedback=state.get("judge_feedback"),
         )
     except Exception:
