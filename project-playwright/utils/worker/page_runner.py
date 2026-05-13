@@ -15,10 +15,15 @@ from __future__ import annotations
 import logging
 import time
 
-from playwright.async_api import BrowserContext, Page
+from playwright.async_api import BrowserContext, Page, Route
 from playwright.async_api import TimeoutError as PwTimeout
 
+from utils.config import (
+    DISCOVERY_BATCH_LIMIT,
+    WORKER_NAV_TIMEOUT_MS,
+)
 from utils.db_types import CrawlPageType
+from utils.time_helpers import now_iso as _now_iso
 from utils.worker.consumer import SupabaseQueueConsumer
 from utils.worker.extractors.article_extractor import ArticleExtractor
 from utils.worker.extractors.list_extractor import ListExtractor
@@ -46,7 +51,9 @@ from utils.worker.browser_pool import BrowserPool
 logger = logging.getLogger(__name__)
 
 # 阻擋的資源類型（加速爬取、降低流量）
-_BLOCK_RESOURCE_TYPES = {"image", "font", "media", "stylesheet"}
+_BLOCK_RESOURCE_TYPES: frozenset[str] = frozenset(
+    {"image", "font", "media", "stylesheet"}
+)
 
 
 class PageRunner:
@@ -102,7 +109,9 @@ class PageRunner:
             # 3. 導航
             t0 = time.monotonic()
             response = await page.goto(
-                job.url, wait_until="domcontentloaded", timeout=30000
+                job.url,
+                wait_until="domcontentloaded",
+                timeout=WORKER_NAV_TIMEOUT_MS,
             )
             ttfb_ms = (time.monotonic() - t0) * 1000
             http_status = response.status if response else None
@@ -136,33 +145,27 @@ class PageRunner:
                 discovered_urls = result.discovered_urls
 
                 # 把發現的文章 URL 加入佇列（partial unique index 防重複）
-                for url in discovered_urls[:20]:  # 每次最多 20 筆
-                    try:
-                        await self._consumer.enqueue(
-                            EnqueueUrlInput(
-                                project_id=project_id,
-                                source_id=job.source_id,
-                                url=url,
-                                page_type=CrawlPageType.ARTICLE,
-                                priority=50,
-                            )
+                for url in discovered_urls[:DISCOVERY_BATCH_LIMIT]:
+                    await self._safe_enqueue(
+                        EnqueueUrlInput(
+                            project_id=project_id,
+                            source_id=job.source_id,
+                            url=url,
+                            page_type=CrawlPageType.ARTICLE,
+                            priority=50,
                         )
-                    except Exception:
-                        pass  # upsert 衝突（已在佇列中）靜默忽略
+                    )
 
                 if result.next_page_url:
-                    try:
-                        await self._consumer.enqueue(
-                            EnqueueUrlInput(
-                                project_id=project_id,
-                                source_id=job.source_id,
-                                url=result.next_page_url,
-                                page_type=CrawlPageType.LIST,
-                                priority=150,
-                            )
+                    await self._safe_enqueue(
+                        EnqueueUrlInput(
+                            project_id=project_id,
+                            source_id=job.source_id,
+                            url=result.next_page_url,
+                            page_type=CrawlPageType.LIST,
+                            priority=150,
                         )
-                    except Exception:
-                        pass
+                    )
 
             elif job.page_type in (CrawlPageType.ARTICLE, CrawlPageType.DETAIL):
                 draft = await self._article_extractor.extract_article(page, source)
@@ -244,17 +247,26 @@ class PageRunner:
             retryable=False,
         )
 
+    async def _safe_enqueue(self, payload: EnqueueUrlInput) -> None:
+        """Enqueue URL；URL 已在佇列（unique 衝突）視為正常，其餘錯誤留下警告。"""
+        try:
+            await self._consumer.enqueue(payload)
+        except Exception as exc:
+            msg = str(exc).lower()
+            # PostgreSQL unique_violation (23505) / PostgREST 對應訊息
+            if "23505" in msg or "duplicate key" in msg or "unique" in msg:
+                logger.debug("Skip enqueue (already queued): %s", payload.url)
+                return
+            logger.warning(
+                "Enqueue failed for %s: %s", payload.url, exc, exc_info=True
+            )
+
     async def _setup_blocking(self, page: Page) -> None:
         """攔截並拒絕不必要的資源請求，加速爬取。"""
-        async def handle(route):
+        async def handle(route: Route) -> None:
             if route.request.resource_type in _BLOCK_RESOURCE_TYPES:
                 await route.abort()
             else:
                 await route.continue_()
 
         await page.route("**/*", handle)
-
-
-def _now_iso() -> str:
-    from datetime import datetime, timezone
-    return datetime.now(timezone.utc).isoformat()

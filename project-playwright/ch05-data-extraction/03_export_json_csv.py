@@ -16,12 +16,13 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from utils.console import setup_stdout
 
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import Page, sync_playwright
 
 OUTPUT_DIR = Path(__file__).parent.parent / "output"
+LINK_FIELDS = ("text", "url", "is_external")
 
 
-def scrape_links(page) -> list[dict]:
+def scrape_links(page: Page) -> list[dict]:
     """擷取頁面中所有連結的文字與 URL。"""
     links = page.locator("a[href]")
     data = []
@@ -41,27 +42,32 @@ def scrape_links(page) -> list[dict]:
     return data
 
 
-def export_json(data: list[dict], filepath: Path):
+def export_json(data: list[dict], filepath: Path) -> None:
     """匯出為 JSON 格式。"""
     with open(filepath, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
     print(f"[JSON] 已匯出 {len(data)} 筆 → {filepath}")
 
 
-def export_csv(data: list[dict], filepath: Path):
-    """匯出為 CSV 格式。"""
+def export_csv(data: list[dict], filepath: Path) -> None:
+    """匯出為 CSV 格式。
+
+    使用 utf-8-sig（含 BOM）而非純 utf-8 — 這是給 Excel 開的 escape hatch：
+    Excel 在 Windows 下若無 BOM 會以 Big5/ANSI 解讀 utf-8 CSV，導致中文亂碼。
+    JSON 因下游皆為程式碼解析，固定用 utf-8（無 BOM）才符合慣例。
+    """
     if not data:
         print("[CSV] 無資料可匯出")
         return
 
     with open(filepath, "w", encoding="utf-8-sig", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=data[0].keys())
+        writer = csv.DictWriter(f, fieldnames=LINK_FIELDS)
         writer.writeheader()
         writer.writerows(data)
     print(f"[CSV] 已匯出 {len(data)} 筆 → {filepath}")
 
 
-def main():
+def main() -> None:
     setup_stdout()
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 

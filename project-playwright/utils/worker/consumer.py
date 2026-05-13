@@ -10,27 +10,17 @@ PageRunner 只依賴 QueueConsumer Protocol，不直接操作 Supabase。
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
 
 from supabase import AsyncClient
 
+from utils.config import LEASE_DURATION_MINUTES
 from utils.db_types import CrawlPageType, CrawlQueueRow
+from utils.time_helpers import future_iso as _future_iso
+from utils.time_helpers import now_iso as _now_iso
 from utils.worker.service_inputs import EnqueueUrlInput
 from utils.worker.types import Json, LeasedJob, WorkerError
 
 logger = logging.getLogger(__name__)
-
-
-# ── 時間工具 ──────────────────────────────────────────────────────
-
-def _now_iso() -> str:
-    """UTC 當前時間 ISO 字串。"""
-    return datetime.now(timezone.utc).isoformat()
-
-
-def _future_iso(minutes: int) -> str:
-    """UTC 當前時間 + N 分鐘 ISO 字串。"""
-    return (datetime.now(timezone.utc) + timedelta(minutes=minutes)).isoformat()
 
 
 # ── 佇列消費者 ────────────────────────────────────────────────────
@@ -88,7 +78,7 @@ class SupabaseQueueConsumer:
     async def heartbeat(self, job_id: str, lease_token: str) -> None:
         """延長 lease 5 分鐘，供長時間任務避免到期被其他 Worker 接手。"""
         await self._table().update(
-            {"lease_expires_at": _future_iso(5)}
+            {"lease_expires_at": _future_iso(LEASE_DURATION_MINUTES)}
         ).eq("id", job_id).eq("lease_token", lease_token).execute()
 
     async def complete_job(

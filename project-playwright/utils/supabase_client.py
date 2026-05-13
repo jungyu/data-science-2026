@@ -31,7 +31,7 @@ import os
 from functools import lru_cache
 
 from dotenv import load_dotenv
-from supabase import Client, create_client
+from supabase import AsyncClient, Client, create_async_client, create_client
 
 load_dotenv()
 
@@ -58,6 +58,22 @@ def get_supabase() -> Client:
     """
     url, key = _validate_env()
     return create_client(url, key)
+
+
+_async_client: AsyncClient | None = None
+
+
+async def get_async_supabase() -> AsyncClient:
+    """取得 async Supabase client（singleton）。
+
+    `create_async_client` 是 awaitable，所以無法直接套用 lru_cache。
+    用模組層級變數快取首次建立的實例，供 ch09 等 async 腳本共用。
+    """
+    global _async_client
+    if _async_client is None:
+        url, key = _validate_env()
+        _async_client = await create_async_client(url, key)
+    return _async_client
 
 
 def get_crawler_table(table_name: str):

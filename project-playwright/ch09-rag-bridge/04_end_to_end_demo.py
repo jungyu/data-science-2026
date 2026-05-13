@@ -27,7 +27,6 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import os
 import sys
 from pathlib import Path
 
@@ -39,13 +38,12 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+from utils.config import RAG_VERIFY_QUERY_LIMIT
+from utils.supabase_client import get_async_supabase
+
 
 async def check_articles(category: str | None) -> dict:
-    from supabase import create_async_client
-
-    url = os.environ["SUPABASE_URL"]
-    key = os.environ["SUPABASE_SERVICE_KEY"]
-    client = await create_async_client(url, key)
+    client = await get_async_supabase()
 
     q = (
         client.schema("crawler")
@@ -55,7 +53,7 @@ async def check_articles(category: str | None) -> dict:
     if category:
         q = q.eq("category", category)
 
-    result = await q.limit(500).execute()
+    result = await q.limit(RAG_VERIFY_QUERY_LIMIT).execute()
     rows = result.data or []
 
     total = len(rows)

@@ -26,10 +26,13 @@ import hashlib
 import os
 import sys
 import uuid
-from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from dataclasses import dataclass
+
+from playwright.sync_api import Page
 
 from utils.browser import BrowserManager
 from utils.db_types import (
@@ -46,19 +49,28 @@ from utils.db_types import (
     SourcePageSnapshot,
     to_insert_dict,
 )
+from utils.config import DISCOVERY_BATCH_LIMIT, TEACHING_NAV_TIMEOUT_MS
+from utils.crawl_queue import insert_new_pending_jobs
 from utils.logger import setup_logger
 from utils.supabase_client import get_crawler_table, get_supabase
+from utils.time_helpers import now_iso
+
+_BLOCKED_RESOURCES = frozenset({"image", "font", "media", "stylesheet"})
+
+
+@dataclass
+class _FetchedPage:
+    """單次導航回傳的原始資料載荷。"""
+
+    http_status: int | None
+    title: str
+    html: str
+    links: list[str]
 
 PROJECT_ID = os.getenv("PROJECT_ID", "demo-project")
 WORKER_ID = f"worker-{uuid.uuid4().hex[:8]}"
 
 logger = setup_logger("ch08-worker")
-
-
-# ── 時間工具 ──────────────────────────────────────────────────────
-
-def now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
 
 
 # ── Step 1: crawl_runs ────────────────────────────────────────────
@@ -193,7 +205,7 @@ def save_page(
 
 # ── Step 5: 擷取 HN 文章列表 ─────────────────────────────────────
 
-def extract_hn_articles(page) -> list[dict]:
+def extract_hn_articles(page: Page) -> list[dict]:
     """從 Hacker News 首頁擷取文章列表。
 
     對應 docs 的 extractors/list_extractor.py 的職責：
@@ -238,7 +250,7 @@ def extract_hn_articles(page) -> list[dict]:
 
 # ── Step 5b: 擷取文章頁內容 ──────────────────────────────────────
 
-def extract_article_page(page) -> dict:
+def extract_article_page(page: Page) -> dict:
     """從任意文章頁面擷取最小可用內容。
 
     HN 的文章 URL 指向外部網站，各站結構差異極大。
@@ -405,20 +417,95 @@ def get_source(source_code: str) -> dict:
     return result.data
 
 
+def _fetch_page(page: Page, url: str) -> _FetchedPage:
+    """攔截重量資源後導航 URL，回傳原始 HTML / title / 連結。"""
+    page.route(
+        "**/*",
+        lambda route: route.abort()
+        if route.request.resource_type in _BLOCKED_RESOURCES
+        else route.continue_(),
+    )
+    response = page.goto(
+        url, timeout=TEACHING_NAV_TIMEOUT_MS, wait_until="domcontentloaded"
+    )
+    return _FetchedPage(
+        http_status=response.status if response else None,
+        title=page.title(),
+        html=page.content(),
+        links=page.eval_on_selector_all("a[href]", "els => els.map(e => e.href)"),
+    )
+
+
+def _extract_and_persist_articles(
+    page: Page,
+    page_type: str,
+    source_id: str,
+    source_page_id: str,
+    url: str,
+    stats: dict,
+) -> list[str]:
+    """依 page_type 擷取內容並 upsert articles。回傳本次新發現需排隊的 URL。"""
+    new_urls: list[str] = []
+
+    if page_type == CrawlPageType.LIST.value:
+        articles_data = extract_hn_articles(page)
+        logger.info("擷取到 %d 篇文章連結", len(articles_data))
+        for article_data in articles_data:
+            _, updated = upsert_article(source_id, source_page_id, article_data)
+            if updated:
+                stats["articles_extracted"] += 1
+                logger.info("  [新增/更新] %s", article_data["title"][:50])
+                if article_data["source_url"].startswith("http"):
+                    new_urls.append(article_data["source_url"])
+
+    elif page_type == CrawlPageType.ARTICLE.value:
+        content = extract_article_page(page)
+        _, updated = upsert_article_content(source_id, source_page_id, url, content)
+        if updated:
+            stats["articles_extracted"] += 1
+            logger.info("  [內容更新] %s", content["title"][:50])
+        else:
+            logger.info("  [內容未變，跳過] %s", url)
+
+    return new_urls
+
+
+def _enqueue_discovered_articles(
+    source_id: str, referrer_url: str, urls: list[str]
+) -> None:
+    """把列表頁發現的文章 URL（受 DISCOVERY_BATCH_LIMIT 限制）塞回 crawl_queue。"""
+    if not urls:
+        return
+    payloads = [
+        to_insert_dict(
+            CrawlQueueInsert(
+                project_id=PROJECT_ID,
+                source_id=source_id,
+                url=u,
+                page_type=CrawlPageType.ARTICLE,
+                priority=50,
+                payload=CrawlQueuePayload(
+                    discovered_from="list",
+                    referrer_url=referrer_url,
+                    depth=1,
+                ),
+            )
+        )
+        for u in urls[:DISCOVERY_BATCH_LIMIT]
+    ]
+    inserted, _ = insert_new_pending_jobs(source_id, payloads)
+    logger.info("已將 %d 個文章 URL 加入佇列", inserted)
+
+
 def run_single_job(source_code: str) -> None:
     """執行一次完整的 Worker 流程（消費一筆 crawl_queue 任務）。"""
-
-    # ── 取得 source 設定 ──────────────────────────────────────────
     source = get_source(source_code)
     source_id = source["id"]
     logger.info("來源：%s（%s）", source["name"], source_id)
 
-    # ── Step 1: 建立 crawl_run ────────────────────────────────────
     run_id = start_run(source_id)
-
     stats = {"pages_fetched": 0, "articles_extracted": 0, "error_count": 0}
 
-    # ── Step 2: 搶一筆任務 ────────────────────────────────────────
     job = lease_next_job(source_id)
     if job is None:
         logger.info("找不到屬於 source='%s' 的待執行任務（請先執行 03_enqueue_urls.py）", source_code)
@@ -434,108 +521,29 @@ def run_single_job(source_code: str) -> None:
     }).eq("id", job["id"]).eq("lease_token", job["lease_token"]).execute()
     logger.info("開始處理：%s", url)
 
-    # ── Step 3: 開啟瀏覽器 ───────────────────────────────────────
     try:
         with BrowserManager(headless=True, stealth=True) as bm:
             page = bm.new_page()
+            fetched = _fetch_page(page, url)
 
-            # 阻擋不必要資源（加速）
-            page.route(
-                "**/*",
-                lambda route: route.abort()
-                if route.request.resource_type in ("image", "font", "media", "stylesheet")
-                else route.continue_(),
-            )
-
-            response = page.goto(url, timeout=15000, wait_until="domcontentloaded")
-            http_status = response.status if response else None
-            title = page.title()
-            html = page.content()
-
-            # 收集頁面所有連結（供 snapshot 記錄）
-            links = page.eval_on_selector_all(
-                "a[href]", "els => els.map(e => e.href)"
-            )
-
-            # ── Step 4: 存 source_pages ──────────────────────────
             source_page_id = save_page(
                 run_id, source_id, url, page_type,
-                title=title,
-                html=html,
-                http_status=http_status,
-                links=links,
+                title=fetched.title,
+                html=fetched.html,
+                http_status=fetched.http_status,
+                links=fetched.links,
             )
             stats["pages_fetched"] += 1
-            logger.info("source_page 已儲存：%s（HTTP %s）", source_page_id, http_status)
+            logger.info(
+                "source_page 已儲存：%s（HTTP %s）",
+                source_page_id, fetched.http_status,
+            )
 
-            # ── Step 5 & 6: 擷取 + upsert 文章 ──────────────────
-            #
-            # page_type == list：從列表頁解析文章骨架（title + url），
-            #   upsert 到 articles，並將文章 URL 加入佇列等待 article worker。
-            #
-            # page_type == article：訪問文章頁本身，擷取 content_text，
-            #   更新 articles 記錄（補入列表頁 worker 留下的骨架）。
-            #
-            new_urls_to_enqueue = []
+            new_urls = _extract_and_persist_articles(
+                page, page_type, source_id, source_page_id, url, stats,
+            )
+            _enqueue_discovered_articles(source_id, url, new_urls)
 
-            if page_type == CrawlPageType.LIST.value:
-                articles_data = extract_hn_articles(page)
-                logger.info("擷取到 %d 篇文章連結", len(articles_data))
-
-                for article_data in articles_data:
-                    article_id, updated = upsert_article(
-                        source_id, source_page_id, article_data
-                    )
-                    if updated:
-                        stats["articles_extracted"] += 1
-                        logger.info("  [新增/更新] %s", article_data["title"][:50])
-                        # 收集外部文章 URL 以便後續排入佇列
-                        if article_data["source_url"].startswith("http"):
-                            new_urls_to_enqueue.append(article_data["source_url"])
-
-            elif page_type == CrawlPageType.ARTICLE.value:
-                # 文章頁：擷取內容並補全 articles 記錄
-                content = extract_article_page(page)
-                article_id, updated = upsert_article_content(
-                    source_id, source_page_id, url, content
-                )
-                if updated:
-                    stats["articles_extracted"] += 1
-                    logger.info("  [內容更新] %s", content["title"][:50])
-                else:
-                    logger.info("  [內容未變，跳過] %s", url)
-
-            # 將發現的文章 URL 塞入 crawl_queue（priority 較低）
-            if new_urls_to_enqueue:
-                new_jobs = [
-                    to_insert_dict(CrawlQueueInsert(
-                        project_id=PROJECT_ID,
-                        source_id=source_id,
-                        url=u,
-                        page_type=CrawlPageType.ARTICLE,
-                        priority=50,
-                        payload=CrawlQueuePayload(
-                            discovered_from="list",
-                            referrer_url=url,
-                            depth=1,
-                        ),
-                    ))
-                    for u in new_urls_to_enqueue[:20]  # 每次最多加 20 筆
-                ]
-                existing = (
-                    get_crawler_table("crawl_queue")
-                    .select("url")
-                    .eq("source_id", source_id)
-                    .eq("status", "pending")
-                    .execute()
-                )
-                existing_urls = {row["url"] for row in (existing.data or [])}
-                unique_jobs = [j for j in new_jobs if j["url"] not in existing_urls]
-                if unique_jobs:
-                    get_crawler_table("crawl_queue").insert(unique_jobs).execute()
-                logger.info("已將 %d 個文章 URL 加入佇列", len(unique_jobs))
-
-        # ── Step 7: 任務完成 ─────────────────────────────────────
         finish_job(job, CrawlQueueStatus.DONE)
         logger.info("任務完成：%s", job["id"])
 
@@ -544,13 +552,12 @@ def run_single_job(source_code: str) -> None:
         logger.error("任務失敗：%s — %s", job["id"], e, exc_info=True)
         finish_job(job, CrawlQueueStatus.FAILED, error_msg=str(e))
 
-    # ── Step 8: 更新 crawl_run ────────────────────────────────────
-    # error_count > 0 表示任務執行中有部分失敗，用 PARTIAL 而非 SUCCESS，
-    # 讓學生在 crawl_runs 裡能直接看出「跑過但有問題」。
-    run_status = CrawlRunStatus.PARTIAL if stats["error_count"] > 0 else CrawlRunStatus.SUCCESS
+    # error_count > 0 → PARTIAL，讓 crawl_runs 一眼可辨識「跑過但有問題」
+    run_status = (
+        CrawlRunStatus.PARTIAL if stats["error_count"] > 0 else CrawlRunStatus.SUCCESS
+    )
     finish_run(run_id, stats, run_status=run_status)
 
-    # ── 結果摘要 ─────────────────────────────────────────────────
     print("\n" + "=" * 50)
     print("執行摘要")
     print("=" * 50)
@@ -562,7 +569,7 @@ def run_single_job(source_code: str) -> None:
     print(f"  errors     : {stats['error_count']}")
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description="Playwright Worker")
     parser.add_argument(
         "--source", default="hacker-news",
