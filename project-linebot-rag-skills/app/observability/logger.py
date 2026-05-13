@@ -67,14 +67,14 @@ def configure_observability(settings: Any) -> None:
         formatter = _FallbackJsonFormatter()
 
     root = logging.getLogger()
-    # 避免重複掛 handler：如果第一個 handler 已是 JSON 格式就跳過
-    if not any(
-        isinstance(h, logging.StreamHandler)
-        and isinstance(getattr(h, "formatter", None), type(formatter))
-        for h in root.handlers
-    ):
+    # 避免重複掛 handler：用顯式 marker attribute 標記本函式加上的 handler，
+    # 重複呼叫（測試 / 多次 create_app）時辨識並 skip。比較 formatter type 不可靠
+    # — fallback 與 jsonlogger 切換時會被當成不同 handler 而重複加。
+    _MARKER = "_observability_handler"
+    if not any(getattr(h, _MARKER, False) for h in root.handlers):
         handler = logging.StreamHandler(sys.stdout)
         handler.setFormatter(formatter)
+        setattr(handler, _MARKER, True)
         root.addHandler(handler)
 
     level_name = str(getattr(settings, "log_level", "INFO")).upper()

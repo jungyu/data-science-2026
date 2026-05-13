@@ -64,6 +64,12 @@ async def main() -> None:
         with tempfile.TemporaryDirectory(prefix="notion-export-") as tmp:
             tmp_path = Path(tmp)
             with zipfile.ZipFile(src) as zf:
+                # zip-slip 防護：拒絕含絕對路徑或 ".." 跳脫的 entry。Notion 官方 export
+                # 不會產出這種檔，但本機 CLI 直接吃任意 zip，加保護不費事。
+                for info in zf.infolist():
+                    name = info.filename
+                    if Path(name).is_absolute() or ".." in Path(name).parts:
+                        sys.exit(f"refusing to extract suspicious zip entry: {name!r}")
                 zf.extractall(tmp_path)
             await ingest_directory(tmp_path, category=args.category)
     elif src.is_dir():

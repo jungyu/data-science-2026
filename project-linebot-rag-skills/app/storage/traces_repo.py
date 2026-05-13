@@ -26,7 +26,11 @@ class TracesRepository:
         self._client = client
 
     async def insert(self, trace: dict[str, Any]) -> None:
-        """寫一筆 trace（GraphTracer.finalize() 的輸出）。"""
+        """寫一筆 trace（GraphTracer.finalize() 的輸出）。
+
+        失敗（schema 未套用 / 網路斷）由 caller 統一處理；本層不 swallow，
+        避免「TracerRegistry log 一次、repo 又 log 一次」的重複噪音。
+        """
         row = {
             "thread_id": trace["thread_id"],
             "variant": trace["variant"],
@@ -38,15 +42,12 @@ class TracesRepository:
             "total_cost_usd": trace.get("total_cost_usd", 0),
             "payload": trace,
         }
-        try:
-            await self._client.insert("graph_traces", row)
-        except Exception as exc:
-            # opt-in 表不存在 / 暫時連不上 Supabase 時不該打斷主流程
-            logger.warning("TracesRepository.insert failed: %s", exc)
+        await self._client.insert("graph_traces", row)
 
     async def recent(
         self, *, variant: str | None = None, limit: int = 50
     ) -> list[dict[str, Any]]:
+        """讀近 N 筆 trace。失敗由 caller 處理（不 swallow）。"""
         params: dict[str, str] = {
             "select": "thread_id,variant,started_at,total_duration_ms,total_cost_usd",
             "order": "started_at.desc",
@@ -54,8 +55,4 @@ class TracesRepository:
         }
         if variant:
             params["variant"] = f"eq.{variant}"
-        try:
-            return await self._client.select("graph_traces", params)
-        except Exception as exc:
-            logger.warning("TracesRepository.recent failed: %s", exc)
-            return []
+        return await self._client.select("graph_traces", params)

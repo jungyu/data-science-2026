@@ -59,8 +59,10 @@ async def lifespan(app: FastAPI):
             reload_task.cancel()
             try:
                 await reload_task
-            except (asyncio.CancelledError, Exception):
-                pass
+            except asyncio.CancelledError:
+                pass  # 正常 shutdown 路徑
+            except Exception as exc:
+                logger.warning("skill_reload_loop shutdown raised: %r", exc)
 
 
 def create_app() -> FastAPI:

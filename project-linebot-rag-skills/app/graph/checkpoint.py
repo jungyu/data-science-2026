@@ -46,42 +46,47 @@ def build_checkpointer(settings: Settings) -> Any | None:
     raise ValueError(f"unknown checkpoint_backend: {backend!r}")
 
 
-async def build_postgres_saver_async(conn_url: str):
+async def build_postgres_saver_async(conn_url: str) -> tuple[Any, Any]:
     """在 FastAPI startup（async context）建構 AsyncPostgresSaver。
 
     對應 spec-21 §「Checkpointer 選擇」postgres backend。
     需 `pip install -e ".[hitl-postgres]"`。
 
-    用法：
-        async def startup():
-            services = get_runtime_services()
-            services.checkpointer = await build_postgres_saver_async(
-                services.settings.supabase_db_url
-            )
-            services.rag_graph = build_rag_graph(services)
+    回傳 `(saver, cm)` tuple — caller 必須在 shutdown 時 `await cm.__aexit__(None, None, None)`
+    才不會洩漏 postgres 連線。
+
+    用法（lifespan）：
+        saver, cm = await build_postgres_saver_async(settings.supabase_db_url)
+        services.checkpointer = saver
+        services._checkpoint_cm = cm
+        services.rag_graph = build_rag_graph(services)
+        try:
+            yield
+        finally:
+            await cm.__aexit__(None, None, None)
     """
     from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
-    # AsyncPostgresSaver.from_conn_string 是 async context manager；
-    # FastAPI lifespan 內持有後在 shutdown 時 close。
     cm = AsyncPostgresSaver.from_conn_string(conn_url)
     saver = await cm.__aenter__()
     await saver.setup()
-    # 讓 caller 能 release：把 cm 掛在 saver 上。
-    saver._cm = cm  # type: ignore[attr-defined]
-    return saver
+    return saver, cm
 
 
-async def build_sqlite_saver_async(path: str):
+async def build_sqlite_saver_async(path: str) -> tuple[Any, Any]:
     """在 FastAPI startup（async context）建構 AsyncSqliteSaver。
 
-    用法：
-        async def startup():
-            services = get_runtime_services()
-            services.checkpointer = await build_sqlite_saver_async(
-                services.settings.checkpoint_sqlite_path
-            )
-            services.rag_graph = build_rag_graph(services)  # rebuild with checkpointer
+    回傳 `(saver, conn)` — caller 必須在 shutdown 時 `await conn.close()`。
+
+    用法（lifespan）：
+        saver, conn = await build_sqlite_saver_async(settings.checkpoint_sqlite_path)
+        services.checkpointer = saver
+        services._checkpoint_conn = conn
+        services.rag_graph = build_rag_graph(services)
+        try:
+            yield
+        finally:
+            await conn.close()
     """
     import aiosqlite
     from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
@@ -91,4 +96,4 @@ async def build_sqlite_saver_async(path: str):
     conn = await aiosqlite.connect(path)
     saver = AsyncSqliteSaver(conn)
     await saver.setup()
-    return saver
+    return saver, conn

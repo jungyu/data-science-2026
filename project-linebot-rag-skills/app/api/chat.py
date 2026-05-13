@@ -76,7 +76,9 @@ async def chat(
             reset_current_tracer(token)
         if tracer is not None and services.tracer_registry is not None:
             try:
-                services.tracer_registry.write_trace(tracer)
+                # spec-22：必須走 async_write_trace 才會在 persist=True 時把 trace
+                # 同步寫進 Supabase graph_traces；sync write_trace 會 log warning 後跳過。
+                await services.tracer_registry.async_write_trace(tracer)
             except Exception:
                 logger.exception("write_trace failed")
 

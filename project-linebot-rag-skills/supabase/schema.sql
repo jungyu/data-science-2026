@@ -61,6 +61,12 @@ create table if not exists hitl_pending_reviews (
 create index if not exists idx_hitl_pending_status_created
   on hitl_pending_reviews (status, created_at desc);
 
+-- approve / revise / drop 時把 updated_at 推到當下，方便 CLI 排序 / dashboard 顯示
+drop trigger if exists hitl_pending_reviews_set_updated_at on hitl_pending_reviews;
+create trigger hitl_pending_reviews_set_updated_at
+before update on hitl_pending_reviews
+for each row execute function set_updated_at();
+
 create table if not exists line_messages (
   id uuid primary key default gen_random_uuid(),
   line_user_id text not null,

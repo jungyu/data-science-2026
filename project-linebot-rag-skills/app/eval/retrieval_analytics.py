@@ -48,12 +48,16 @@ def aggregate_empty_hits(rows: list[dict]) -> list[dict]:
 
 
 def aggregate_low_score(rows: list[dict], threshold: float) -> list[dict]:
-    """spec-09 §「2. 低分檢索」：max(combined_score) < threshold，升序。"""
+    """spec-09 §「2. 低分檢索」：有命中但 max(combined_score) < threshold，升序。
+
+    完全 0 命中的 query 由 `aggregate_empty_hits` 負責；本函式只看「有 chunk
+    被回傳但分數普遍偏低」的情境（典型 retrieval 品質問題：query 與知識庫
+    語意相關但匹配不佳）。
+    """
     out: list[tuple[float, dict]] = []
     for row in rows:
         if not row.get("retrieved_ids"):
-            # 無命中視為極低分但已由 empty_hits 覆蓋；這裡只看「有命中但都低分」
-            continue
+            continue  # 由 aggregate_empty_hits 覆蓋
         max_score = _max_combined(row.get("scores") or {})
         if max_score is None or max_score >= threshold:
             continue

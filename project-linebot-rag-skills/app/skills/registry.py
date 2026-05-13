@@ -4,8 +4,9 @@
 - file：從 `skills/*/SKILL.md` 載入（預設、向後相容）
 - supabase：從 `ai_skills` 資料表載入；可定時 reload
 
-Reload 採 asyncio.Lock 確保 in-memory replace 是原子的，避免 lookup 半途看到
-半新半舊的 _skills。Supabase 拉取失敗時保留舊 skills，記 warning，不中斷服務。
+Reload 用單次 attribute rebind（Python GIL 下原子）；reader 看到的要嘛是
+舊 dict、要嘛是新 dict，無半新半舊狀態。Supabase 拉取失敗時保留舊 skills，
+記 warning，不中斷服務。
 """
 
 from __future__ import annotations
@@ -49,8 +50,11 @@ def _row_to_skill(row: dict[str, Any]) -> SkillDefinition | None:
 
 class SkillRegistry:
     def __init__(self, skills: list[SkillDefinition]) -> None:
+        # Python attribute rebind 在 GIL 下是原子的——reader（get/require/list）
+        # 看到的要嘛是舊 dict、要嘛是新 dict，不會看到半新半舊狀態。因此 reload
+        # 不需要 lock；之前的 asyncio.Lock 沒在保護任何東西（reader 也未取 lock），
+        # 移除避免誤導未來改 code 的人覺得「有 lock 就有保護」。
         self._skills: dict[str, SkillDefinition] = {s.skill_id: s for s in skills}
-        self._lock = asyncio.Lock()
 
     @classmethod
     def from_directory(cls, skills_root: Path) -> "SkillRegistry":
@@ -85,8 +89,8 @@ class SkillRegistry:
             logger.warning("skill reload returned 0 rows; keeping previous")
             return False
 
-        async with self._lock:
-            self._skills = {s.skill_id: s for s in skills}
+        # 單次 attribute rebind；無需 lock（見 __init__ 註解）。
+        self._skills = {s.skill_id: s for s in skills}
         logger.info("skills reloaded from supabase: count=%d", len(skills))
         return True
 

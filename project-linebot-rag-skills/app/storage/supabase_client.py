@@ -75,3 +75,23 @@ class SupabaseRestClient:
             )
             response.raise_for_status()
             return response.json()
+
+    async def update(
+        self,
+        table: str,
+        patch: Mapping[str, Any],
+        *,
+        filters: Mapping[str, str],
+    ) -> None:
+        """PostgREST PATCH — 只更新 patch 列的欄位，依 filters 篩 row（不會 INSERT）。
+
+        `filters` 的 value 必須含 PostgREST operator prefix，例如 `eq.foo` / `in.(a,b)`。
+        """
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.patch(
+                self._url(table),
+                headers={**self._headers(), "Prefer": "return=minimal"},
+                params=dict(filters),
+                json=dict(patch),
+            )
+            response.raise_for_status()

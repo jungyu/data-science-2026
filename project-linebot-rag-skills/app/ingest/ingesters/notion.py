@@ -123,8 +123,9 @@ class NotionIngester:
             return [page]
         pages: list[dict[str, Any]] = []
         cursor: str | None = None
-        # 防呆：上限 1000 page，超過視為設定錯誤
-        for _ in range(20):
+        # 防呆：上限 20 batch（Notion 預設一批 100 → 約 2000 page），超過視為設定錯誤
+        max_batches = 20
+        for _ in range(max_batches):
             kwargs: dict[str, Any] = {"database_id": self._database_id}
             if cursor:
                 kwargs["start_cursor"] = cursor
@@ -133,6 +134,12 @@ class NotionIngester:
             if not resp.get("has_more"):
                 break
             cursor = resp.get("next_cursor")
+        else:
+            logger.warning(
+                "NotionIngester._list_pages hit batch cap (%d) for database_id=%s; "
+                "page list may be truncated. Consider narrowing the database or raising the cap.",
+                max_batches, self._database_id,
+            )
         return pages
 
     async def _page_to_document(
@@ -200,7 +207,8 @@ class NotionIngester:
     ) -> list[dict[str, Any]]:
         blocks: list[dict[str, Any]] = []
         cursor: str | None = None
-        for _ in range(50):  # 防呆：最多 5000 blocks / page
+        max_batches = 50  # 防呆：最多 ~5000 blocks / page
+        for _ in range(max_batches):
             kwargs: dict[str, Any] = {"block_id": block_id}
             if cursor:
                 kwargs["start_cursor"] = cursor
@@ -209,4 +217,9 @@ class NotionIngester:
             if not resp.get("has_more"):
                 break
             cursor = resp.get("next_cursor")
+        else:
+            logger.warning(
+                "NotionIngester._list_all_blocks hit batch cap (%d) for block_id=%s; "
+                "blocks may be truncated.", max_batches, block_id,
+            )
         return blocks

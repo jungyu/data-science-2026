@@ -11,11 +11,28 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import time
 from typing import Any
 
 from app.storage.supabase_client import SupabaseRestClient
 
 logger = logging.getLogger(__name__)
+
+
+def _describe(exc: Exception) -> str:
+    """讓 silent fallback 的 log 能區分 schema 缺、網路、認證錯誤等情境。"""
+    out = type(exc).__name__
+    status = getattr(getattr(exc, "response", None), "status_code", None)
+    if status is not None:
+        out += f"(status={status})"
+    msg = str(exc)
+    if msg:
+        out += f" {msg[:120]}"
+    return out
+
+# spec-05 cache 命中前每次都查一次 knowledge_version，會把 cache 延遲收益吃掉一半。
+# 用 in-process TTL cache：60 秒內共用同一個 version；ingest 後最多 60 秒延遲生效。
+_KNOWLEDGE_VERSION_TTL_SECONDS = 60
 
 
 def _normalize(user_input: str) -> str:
@@ -30,8 +47,16 @@ def build_cache_key(
 
 
 class CacheRepository:
-    def __init__(self, client: SupabaseRestClient) -> None:
+    def __init__(
+        self,
+        client: SupabaseRestClient,
+        *,
+        version_ttl_seconds: int = _KNOWLEDGE_VERSION_TTL_SECONDS,
+    ) -> None:
         self._client = client
+        self._version_ttl = version_ttl_seconds
+        # (cached_version, cached_at_monotonic)；None 代表未 cache。
+        self._version_cache: tuple[int, float] | None = None
 
     async def get(self, cache_key: str) -> str | None:
         try:
@@ -44,7 +69,7 @@ class CacheRepository:
                 },
             )
         except Exception as exc:
-            logger.warning("CacheRepository.get failed: %s", exc)
+            logger.warning("CacheRepository.get failed: %s", _describe(exc))
             return None
         if not rows:
             return None
@@ -74,13 +99,20 @@ class CacheRepository:
                 on_conflict="cache_key",
             )
         except Exception as exc:
-            logger.warning("CacheRepository.set failed: %s", exc)
+            logger.warning("CacheRepository.set failed: %s", _describe(exc))
 
     async def get_knowledge_version(self) -> int:
         """spec-05 §「Knowledge Version 來源」：取 private_knowledge 的 max version。
 
-        失敗 / 表空時回 0 → cache_key 仍可生成、未來資料補進後自然新版本。
+        - 命中 TTL cache：直接回快取值，省一次 Supabase 來回（cache 命中時延遲收益的關鍵）
+        - 失敗 / 表空時回 0；不寫入 cache（下一次仍會嘗試），避免「Supabase 短暫不可用 →
+          整段時間共用 version=0 cache 鍵」的滯後問題
         """
+        if self._version_cache is not None:
+            version, cached_at = self._version_cache
+            if time.monotonic() - cached_at < self._version_ttl:
+                return version
+
         try:
             rows = await self._client.select(
                 "private_knowledge",
@@ -91,8 +123,10 @@ class CacheRepository:
                 },
             )
         except Exception as exc:
-            logger.warning("get_knowledge_version failed: %s", exc)
+            logger.warning("get_knowledge_version failed: %s", _describe(exc))
             return 0
         if not rows:
             return 0
-        return int(rows[0].get("knowledge_version") or 0)
+        version = int(rows[0].get("knowledge_version") or 0)
+        self._version_cache = (version, time.monotonic())
+        return version

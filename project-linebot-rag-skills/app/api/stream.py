@@ -71,8 +71,12 @@ async def stream_query(request: Request):
             status_code=413, detail=f"query exceeds {max_chars} chars"
         )
 
-    # Concurrency guard — 用 semaphore 限制同時 SSE 連線數
-    if _stream_slots.locked() and _stream_slots._value <= 0:
+    # Concurrency guard — 全部 slot 都被占用就直接 503，不讓 SSE response 長時間 hang。
+    # 之前的版本訪問 asyncio.Semaphore._value 私有屬性（CPython 內部，未來版本可改）；
+    # 改用公開的 `locked()`（slot 全占用時為 True）。
+    # 殘留的 TOCTOU window 寬度為微秒級，最壞情況偶爾多放 1 條；
+    # 教學版預設可接受，生產環境建議搭配 reverse proxy 限流（見檔頭 docstring）。
+    if _stream_slots.locked():
         raise HTTPException(status_code=503, detail="too many concurrent streams")
 
     # spec-21：每次 invocation 帶 thread_id config（即使 HITL 不開、checkpointer

@@ -8,9 +8,21 @@
 > - webhook 新增 `_is_interrupted` helper + 偵測中斷後改呼叫 `mark_pending_review`，不送 outbound
 > - `app/storage/messages_repo.py` 加 `mark_pending_review` / `list_pending_reviews` / `resolve_pending_review`
 > - `supabase/schema.sql` 加 `hitl_pending_reviews` opt-in 表（schema 未套用時靜默退化）
-> - `app/graph/checkpoint.py` 加 `build_postgres_saver_async`；`config.py` 加 `supabase_db_url`
+> - `app/graph/checkpoint.py` 加 `build_postgres_saver_async`（回 `(saver, cm)` tuple，
+>   lifespan 在 shutdown 需 `await cm.__aexit__`，避免連線洩漏）；
+>   `config.py` 加 `supabase_db_url`
 > - `pyproject.toml` 加 `hitl-postgres` extra（`langgraph-checkpoint-postgres` + `psycopg[binary]`）
+> - `scripts/review_queue.py` 在 resume 後同步呼叫 `resolve_pending_review`，
+>   並新增 `list-db` 子命令從 Supabase 視圖列待審——讓 `hitl_pending_reviews` 表
+>   不只是 webhook 寫入沒人讀的 dead code
 > - 驗收測試：`tests/test_line_webhook.py::test_line_webhook_passes_thread_id_config_to_graph`
+>
+> **⚠️ Thread granularity 設計選擇**：`build_thread_id(inp)` 用
+> `line-{user_id}-{message_id}` 是**單訊息粒度**，每則訊息一條獨立 thread；
+> checkpointer 不會跨訊息保留 state，多輪對話的歷史靠 `recent_history`（從
+> `line_messages` 表組）。若需要「user 級別的多輪 thread」（讓 LangGraph 在
+> 訊息間持續累積 state），請改 `app/channels/line.py::build_thread_id` 為
+> `f"line-{user_id}"` —— 但要同步注意 reflection retry 計數需手動重置。
 
 ## 背景
 

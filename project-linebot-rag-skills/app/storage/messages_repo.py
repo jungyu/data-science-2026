@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from app.storage.supabase_client import SupabaseRestClient
+
+logger = logging.getLogger(__name__)
 
 
 class MessagesRepository:
@@ -66,9 +69,13 @@ class MessagesRepository:
                 ],
                 on_conflict="thread_id",
             )
-        except Exception:
-            # opt-in 表不存在時不該打斷主流程
-            pass
+        except Exception as exc:
+            # opt-in 表不存在時不打斷主流程，但 production debug 需要看得到
+            # 真正錯誤類型（schema 缺 vs 認證錯 vs 網路斷）
+            logger.warning(
+                "mark_pending_review failed thread=%s: %s(%s)",
+                thread_id, type(exc).__name__, exc,
+            )
 
     async def list_pending_reviews(self, limit: int = 50) -> list[dict[str, Any]]:
         try:
@@ -81,21 +88,32 @@ class MessagesRepository:
                     "limit": str(limit),
                 },
             )
-        except Exception:
+        except Exception as exc:
+            logger.warning(
+                "list_pending_reviews failed: %s(%s)", type(exc).__name__, exc
+            )
             return []
 
     async def resolve_pending_review(
         self, *, thread_id: str, status: str
     ) -> None:
-        """approve / revise / drop 之後更新狀態（spec-21 §HITL）。"""
+        """approve / revise / drop 之後更新狀態（spec-21 §HITL）。
+
+        必須走 PATCH（update by filter）而非 upsert：upsert 預設行為是缺欄位
+        就 INSERT，但 hitl_pending_reviews.line_user_id 是 NOT NULL，沒帶上會
+        被 DB 拒絕。本方法假設 row 已由 mark_pending_review 建立。
+        """
         try:
-            await self._client.upsert(
+            await self._client.update(
                 "hitl_pending_reviews",
-                [{"thread_id": thread_id, "status": status}],
-                on_conflict="thread_id",
+                {"status": status},
+                filters={"thread_id": f"eq.{thread_id}"},
             )
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning(
+                "resolve_pending_review failed thread=%s status=%s: %s",
+                thread_id, status, exc,
+            )
 
     async def build_recent_history(self, line_user_id: str, limit: int = 5) -> str:
         rows = await self.list_recent_messages(line_user_id, limit=limit)

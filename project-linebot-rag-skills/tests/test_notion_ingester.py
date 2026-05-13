@@ -205,3 +205,62 @@ async def test_empty_page_returns_no_document():
 def test_constructor_requires_database_or_page_id():
     with pytest.raises(ValueError, match="database_id or page_id"):
         NotionIngester(api_key="x", category="c")
+
+
+# ── paginate（has_more=True 邊界）─────────────────────────────────────────────
+
+
+class _PaginatingDatabaseClient:
+    """每次 query 回固定 batch 大小，依 start_cursor 切；模擬 Notion 真實 paginate。"""
+
+    def __init__(self, all_pages: list[dict], batch_size: int = 1) -> None:
+        self._all = all_pages
+        self._batch = batch_size
+        self.query_calls = 0
+        outer = self
+
+        class _Databases:
+            async def query(self, *, database_id, start_cursor=None):
+                outer.query_calls += 1
+                start = int(start_cursor) if start_cursor else 0
+                end = start + outer._batch
+                batch = outer._all[start:end]
+                has_more = end < len(outer._all)
+                return {
+                    "results": batch,
+                    "has_more": has_more,
+                    "next_cursor": str(end) if has_more else None,
+                }
+
+        class _Pages:
+            async def retrieve(self, *, page_id):
+                raise NotImplementedError
+
+        class _BlocksChildren:
+            async def list(self, *, block_id, start_cursor=None):
+                return {"results": [_para(f"body {block_id}")], "has_more": False}
+
+        class _Blocks:
+            def __init__(self) -> None:
+                self.children = _BlocksChildren()
+
+        self.databases = _Databases()
+        self.pages = _Pages()
+        self.blocks = _Blocks()
+
+
+@pytest.mark.asyncio
+async def test_database_paginates_until_has_more_false():
+    """spec-25：has_more=True 時用 next_cursor 連續查；驗收 yield 出全部 page。"""
+    pages = [
+        _title_page(f"p{i}", f"Page {i}", "2026-05-01T00:00:00Z")
+        for i in range(5)
+    ]
+    client = _PaginatingDatabaseClient(pages, batch_size=2)
+    ing = NotionIngester(
+        api_key="x", database_id="db", category="c", client=client
+    )
+    docs = [d async for d in ing.yield_documents()]
+    # 5 pages、batch=2 → 3 次 query（2 + 2 + 1，第 3 次 has_more=False）
+    assert client.query_calls == 3
+    assert {d.source_id for d in docs} == {f"p{i}" for i in range(5)}

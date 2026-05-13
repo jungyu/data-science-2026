@@ -101,7 +101,11 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--days", type=int, default=7, help="time window (default 7)")
     p.add_argument(
         "--threshold", type=float, default=0.3,
-        help="--low-score 閾值（max combined < threshold 視為低分；default 0.3）",
+        help=(
+            "--low-score 閾值（max combined < threshold 視為低分；default 0.3）。"
+            "注意：--low-score 只看「有命中但分數低」的 query；"
+            "完全 0 命中的 query 請用 --empty-hits 看。"
+        ),
     )
     return p
 
