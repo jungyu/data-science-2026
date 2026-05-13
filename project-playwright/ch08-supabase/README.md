@@ -34,16 +34,28 @@ pip install -e ".[all]"
 cp .env.example .env
 ```
 
-編輯 `.env`，填入以下欄位：
+編輯 `.env`，依「本機」或「雲端」二選一填入。
+
+**本機 Supabase（Docker）：**
 
 ```env
 SUPABASE_URL=http://127.0.0.1:55421
-SUPABASE_SERVICE_KEY=<本機 service_role JWT，見下方說明>
+SUPABASE_SERVICE_KEY=<本機 service_role JWT，見「本機 Supabase 設定」>
 PROJECT_ID=local-dev
 ```
 
-> **安全提醒**：`service_role` key 擁有完整 DB 存取權，僅用於後端 worker，
-> 絕對不要提交至版控（`.env` 已在 `.gitignore`）。
+**雲端 Supabase（supabase.com）：**
+
+```env
+SUPABASE_URL=https://你的-project-ref.supabase.co
+SUPABASE_SERVICE_KEY=sb_secret_xxxxxxxxxxxxxxxxxxxx  # 或 legacy eyJ...
+PROJECT_ID=demo-project
+```
+
+> **安全提醒**：`service_role` / `sb_secret_...` key 擁有完整 DB 存取權，
+> 僅用於後端 worker，絕對不要提交至版控（`.env` 已在 `.gitignore`）。
+>
+> **不要用 publishable / anon / legacy public key**——那些前端用，被 RLS 擋。
 
 ---
 
@@ -96,6 +108,107 @@ supabase db reset
 
 > `crawler` schema 的 PostgREST expose 已設定在 `supabase/config.toml` 的
 > `[api] schemas` 欄位，`supabase start` 後自動生效，**不需要** Dashboard 手動設定。
+
+---
+
+## 雲端 Supabase 設定（supabase.com）
+
+> 適合：要把資料留下來給 ch09 RAG / production demo / 多人協作。
+> 若只是教學試跑，**用上面的本機 Docker 版更簡單**。
+
+### Step 1 — 找到你的 project ref
+
+到 Supabase Dashboard 點進專案，看瀏覽器網址：
+
+```
+https://supabase.com/dashboard/project/abcdefghijklmnop
+                                      ^^^^^^^^^^^^^^^^
+                                      這 20 字元就是 project ref
+```
+
+把它記下來；後續 `.env` 與 CLI 都會用到。
+
+### Step 2 — 取得 service key 寫入 `.env`
+
+到 Dashboard → Project Settings → API：
+
+- **新系統「API Keys」區塊** → 複製 `secret` 開頭那個（`sb_secret_...`）
+- **舊系統「Project API keys」區塊**（legacy） → 複製 `service_role` row（`eyJ...`）
+
+兩者擇一填入 `.env` 的 `SUPABASE_SERVICE_KEY`（**不要用 `anon` / `publishable`**）：
+
+```env
+SUPABASE_URL=https://abcdefghijklmnop.supabase.co
+SUPABASE_SERVICE_KEY=sb_secret_xxxxxxxxxxxxxxxxxxxx
+PROJECT_ID=demo-project
+```
+
+### Step 3 — 安裝 CLI 並 link 專案
+
+```bash
+brew install supabase/tap/supabase
+supabase login                                    # 開瀏覽器登入 Supabase 帳號
+
+supabase link --project-ref abcdefghijklmnop      # 用你的 project ref
+```
+
+`link` 過程會：
+1. 問是否 sync `local config differences` → 通常 **N**（保留本地 config.toml 的本機 port 設定）
+2. 問 **Database password**（沒回顯，正常） → 這是建立專案時設的 DB 密碼，**不是** API key 也不是登入密碼
+
+> 💡 忘記 DB 密碼？到 Dashboard → Project Settings → Database → **Reset database password**
+> 換一個強密碼，等 30-60 秒同步後再 link。
+
+### Step 4 — 套用 migrations 到雲端
+
+```bash
+supabase db push
+```
+
+期待輸出依序套三個 SQL 檔：
+
+```
+Applying migration 20260401130500_crawler_schema.sql...
+Applying migration 20260401140000_lease_with_source.sql...
+Applying migration 20260507000000_articles_rag_columns.sql...
+Finished supabase db push.
+```
+
+### Step 5 — 把 `crawler` schema 暴露給 Data API（**雲端特有**）
+
+> 本機版本由 `config.toml` 自動處理；雲端必須手動。
+
+Supabase 2025 新版 UI 已把這項設定從 **Settings → API** 搬到
+**Settings → Integrations → Data API**：
+
+1. Dashboard 左側 sidebar → **Project Settings**（齒輪）
+2. 找 **INTEGRATIONS** 區塊 → 點 **Data API**
+3. 切到 **Settings** 分頁
+4. 找到 **Exposed schemas** 區塊，點右邊的下拉選單
+5. 勾選 `crawler`（連同預設的 `public` / `graphql_public`）
+6. 應該顯示 **3 of 3 schemas exposed**（不需要按 Save，勾選即生效）
+
+直接走網址也可以（會自動 redirect）：
+
+```
+https://supabase.com/dashboard/project/<你的-ref>/settings/api
+```
+
+> ⚠️ 跳過這步的話，[01_connect_supabase.py](01_connect_supabase.py) 會回
+> `relation "crawler.sources" does not exist` —— 不是 schema 沒套用，是
+> PostgREST（Data API）拒絕對外曝露。
+>
+> ℹ️ Supabase 2024 之前的舊版 UI 把這設定放在 **Settings → API → Exposed
+> schemas** 的純文字輸入欄。網路教學若看到舊截圖對不上時，認準新位置：
+> **Settings → Integrations → Data API → Settings 分頁**。
+
+### Step 6 — 驗證
+
+```bash
+python ch08-supabase/01_connect_supabase.py
+```
+
+期待看到 `crawler.sources / crawl_queue / articles` 三個表都「可讀取（目前 0 筆）」。
 
 ---
 
@@ -174,10 +287,30 @@ crawler.crawl_queue      <- 03_enqueue_urls.py 塞入種子 URL
 本機 Docker 預設為 `http://127.0.0.1:55421`（見 `supabase/config.toml`）。
 雲端版填 Supabase Dashboard → Project Settings → API → Project URL。
 
+### Q: `supabase db push` 報 `Cannot find project ref. Have you run supabase link?`
+
+你跳過了 link 步驟。先：
+
+```bash
+supabase link --project-ref 你的-20字元-ref
+```
+
+ref 在 Dashboard 網址 `https://supabase.com/dashboard/project/<這裡>` 找。
+
+### Q: link 時問 Database password 是什麼？
+
+是你在建立專案時設定的 DB 密碼（**不是** API key，**不是** Supabase 帳號登入密碼）。
+忘了就到 Dashboard → Project Settings → Database → Reset database password。
+
 ### Q: `crawler` schema 的 API 打不到
 
-確認 `supabase/config.toml` 的 `[api] schemas` 包含 `"crawler"`，
+**本機（Docker）**：確認 `supabase/config.toml` 的 `[api] schemas` 包含 `"crawler"`，
 然後重新執行 `supabase start`（或 `supabase stop && supabase start`）。
+
+**雲端**：到 Dashboard → Settings → **Integrations → Data API → Settings**
+分頁 → **Exposed schemas** 下拉勾選 `crawler`。
+這是雲端特有的步驟，CLI 不會自動代勞。
+（2024 前舊 UI 在 Settings → API，2025 起搬到 Data API；別找錯地方。）
 
 ### Q: `insert` 報 unique constraint 錯誤
 

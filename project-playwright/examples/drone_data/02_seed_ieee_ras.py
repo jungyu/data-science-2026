@@ -9,6 +9,17 @@ IEEE RAS（https://www.ieee-ras.org/）是 IEEE 機器人與自動化學會的�
     Mozilla/5.0 真實瀏覽器；如要在生產環境長期運行，請額外檢查站點
     robots.txt 與 ToS。
 
+已知限制（2025-05 實測）：
+    IEEE RAS 站點受 Cloudflare 保護，常見反爬機制：
+      - 對自動化 User-Agent 直接回 challenge 頁面（cf-cookie-error）
+      - 對短時間多次請求啟動 JS challenge
+    Playwright 真實瀏覽器有機會通過 challenge，但**首次連線常被擋**，
+    導致 `Schema-based list extracted 0 URLs`。若你看到此狀況：
+      1. 把 User-Agent 換成更接近真實瀏覽器（含 sec-ch-ua headers）
+      2. 用 ch06 學到的 stealth mode（utils/worker/browser_pool 加 init_script）
+      3. 或者放棄這站，改用 PX4 / OpenAlex 等友善來源
+    這正是 ch10 想教的「真實爬蟲一半時間在跟反爬鬥」的教學重點。
+
 執行方式：
     python examples/drone_data/02_seed_ieee_ras.py
 

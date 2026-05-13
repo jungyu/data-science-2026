@@ -28,6 +28,9 @@ test-results/
 blob-report/
 trace/
 
+# Supabase CLI runtime state（supabase link 後產生的本地連結資料）
+supabase/.temp/
+
 # IDE
 .vscode/
 .idea/

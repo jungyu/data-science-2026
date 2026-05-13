@@ -1,7 +1,7 @@
 """drone_data/01 — 將 PX4 開源無人機文件站接入 crawler pipeline。
 
 PX4（https://docs.px4.io/main/en/）是開源無人機自駕儀的官方文件站，
-採 Docusaurus 架構、CC-BY 授權，適合作為「結構穩定、可放心爬取」的
+採 VitePress（VuePress 2）架構、CC-BY 授權，適合作為「結構穩定、可放心爬取」的
 教學樣本。
 
 本腳本做兩件事：
@@ -44,16 +44,16 @@ PROJECT_ID = os.getenv("PROJECT_ID", "demo-project")
 
 # ── PX4 source 設定 ────────────────────────────────────────────────
 #
-# Docusaurus 結構特徵：
-#   - 左側 sidebar 連結用 .menu__link，整站導覽都靠它
-#   - 內文容器是 <article class="markdown">
-#   - 沒有傳統的「下一頁」分頁，靠 sidebar 結構發現所有頁面
+# VitePress 結構特徵（2025-05 實測 docs.px4.io）：
+#   - 全站連結（sidebar + nav + 內文）統一用 a.VPLink，整頁有 ~900 個
+#   - 內文容器是 <div class="vp-doc">
+#   - 沒有傳統「下一頁」分頁，靠 sidebar 結構發現所有頁面
 #
 PX4_SOURCE = SourceInsert(
     project_id=PROJECT_ID,
     code="px4-docs",
     name="PX4 Autopilot Docs",
-    description="開源無人機自駕儀 PX4 的官方文件站（Docusaurus、CC-BY 授權）",
+    description="開源無人機自駕儀 PX4 的官方文件站（VitePress、CC-BY 授權）",
     base_url="https://docs.px4.io",
     domain="docs.px4.io",
     crawler_url="https://docs.px4.io/main/en/",
@@ -69,20 +69,23 @@ PX4_SOURCE = SourceInsert(
     ),
     extractor_schema=ExtractorSchema(
         list=ListExtractorSchema(
-            # Docusaurus 側欄每個導覽連結
-            item_selector="li.theme-doc-sidebar-item-link",
-            link_selector="a.menu__link",
-            title_selector="a.menu__link",
+            # VitePress 用 a.VPLink 作為全站連結容器；item 本身就是 anchor
+            # list_extractor 偵測到 item_sel == link_sel 後直接讀 href
+            item_selector="a.VPLink",
+            link_selector="a.VPLink",
+            title_selector="a.VPLink",
         ),
         article=ArticleExtractorSchema(
             title_selector="h1",
-            content_selector="article.markdown",
-            # 移除「上一頁/下一頁」、TOC、編輯連結等噪音
+            # VitePress 的內文容器：.vp-doc / main 為兜底
+            content_selector=".vp-doc, main",
+            # 移除側欄、TOC、編輯連結等噪音
             remove_selectors=[
-                ".theme-edit-this-page",
-                ".theme-doc-toc-mobile",
-                ".pagination-nav",
-                ".theme-doc-footer",
+                ".VPSidebar",
+                ".VPDocAside",
+                ".edit-link-button",
+                ".pager",
+                ".VPFooter",
             ],
         ),
     ),
