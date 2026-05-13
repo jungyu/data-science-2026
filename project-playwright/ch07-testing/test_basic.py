@@ -5,12 +5,21 @@ pytest-playwright 會自動提供 `page` fixture，
 不需要手動建立瀏覽器和頁面。
 
 執行方式：
-    pytest ch07-testing/test_basic.py -v
-    pytest ch07-testing/test_basic.py -v --headed  # 看到瀏覽器
+    pytest ch07-testing/test_basic.py -v --run-network            # 跑所有
+    pytest ch07-testing/test_basic.py -v --run-network --headed   # 看到瀏覽器
+
+注意：本檔所有測試都實際導航到外站，預設會被 ch07-testing/conftest.py
+的 ``@pytest.mark.network`` 機制跳過，避免外站 DOM 變動或網路不穩時
+誤判為程式碼壞掉。加 ``--run-network`` 才會執行。
 """
 
 import re
+
+import pytest
 from playwright.sync_api import Page, expect
+
+# 整檔皆依賴外站 — 統一標記，conftest 預設會跳過，--run-network 才執行
+pytestmark = pytest.mark.network
 
 
 def test_example_com_title(page: Page):
@@ -27,9 +36,9 @@ def test_example_com_heading(page: Page):
 
 
 def test_example_com_has_link(page: Page):
-    """驗證 example.com 有指向 IANA 說明頁的連結。"""
+    """驗證 example.com 有指向 IANA 的連結（容許 IANA 變更子路徑）。"""
     page.goto("https://example.com")
-    link = page.locator("a[href='https://www.iana.org/domains/example']")
+    link = page.locator("a[href*='iana.org']").first
     expect(link).to_be_visible()
 
 
