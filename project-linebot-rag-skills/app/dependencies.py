@@ -62,7 +62,24 @@ def get_supabase_client() -> SupabaseRestClient:
 
 @lru_cache(maxsize=1)
 def get_skill_registry() -> SkillRegistry:
+    """spec-08：file 為預設來源；skill_source=supabase 時 lifespan 會在 startup
+    呼叫 `replace_skill_registry` 用 SkillRegistry.from_supabase() 取代。
+
+    這裡同步建構保留 from_directory 為 fallback——若 Supabase 啟動拉失敗
+    （網路 / 表空），bot 仍能用 file 版啟動。
+    """
     return SkillRegistry.from_directory(get_settings().skills_path)
+
+
+def replace_skill_registry(new_registry: SkillRegistry) -> None:
+    """spec-08：lifespan 啟動時把 file-based registry 換成 supabase 版。
+
+    Graph node 透過 `services.skill_registry` 動態 lookup，所以只需要替換
+    RuntimeServices 上的 attribute，不必重建 rag_graph。
+    """
+    if get_runtime_services.cache_info().currsize > 0:
+        services = get_runtime_services()
+        services.skill_registry = new_registry
 
 
 @lru_cache(maxsize=1)

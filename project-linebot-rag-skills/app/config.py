@@ -56,6 +56,10 @@ class Settings(BaseSettings):
     router_confidence_threshold: float = Field(default=0.55, ge=0.0, le=1.0)
     skills_dir: str = "skills"
 
+    # spec-08 Skill hot reload
+    skill_source: str = "file"            # file | supabase
+    skill_reload_interval: int = 600      # 秒；skill_source=supabase 時生效，<=0 表停用 reload
+
     # P2 multi-seed retrieval（spec-14 / task-14）
     fusion_strategy: str = "max"   # max | mean | rrf
     max_seeds: int = 5
