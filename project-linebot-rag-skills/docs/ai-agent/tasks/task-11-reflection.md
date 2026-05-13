@@ -1,5 +1,13 @@
 # task-11：實作 LangGraph Reflection Node
 
+> **⚠️ 已被 task-17 取代（superseded by task-17-judge-reflection）**
+>
+> 本 task 對應的 [spec-11](../specs/spec-11-reflection.md) 已被 [spec-17](../specs/spec-17-judge-reflection.md) 取代；
+> 實作改採 4 軸結構化 Judge（groundedness / completeness / faithfulness / tone），
+> 不再使用本 task 描述的單一 reflection_score 自評欄位。
+>
+> 本文件保留作為設計演進記錄。
+
 > 規格詳見 [spec-11](../specs/spec-11-reflection.md)
 
 ---

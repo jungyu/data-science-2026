@@ -1,5 +1,12 @@
 # task-10：實作 LangGraph Self-RAG
 
+> **⚠️ 已被 task-15 取代（superseded by task-15-sufficiency-clarify）**
+>
+> 本 task 對應的 [spec-10](../specs/spec-10-selfrag.md) 已被 [spec-15](../specs/spec-15-sufficiency-clarify.md) 取代；
+> 實作改採 sufficiency + clarify，不再執行本 task 描述的 query 改寫重試流程。
+>
+> 本文件保留作為設計演進記錄。
+
 > 規格詳見 [spec-10](../specs/spec-10-selfrag.md)
 
 ---

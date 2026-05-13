@@ -336,7 +336,7 @@ P1 / P3 / P4 完成時，graph 形態剛好對應 [docs/RAG/LangGraph/ch06](../.
 | Skill 熱更新 | [spec-08](../specs/spec-08-skill-hot-reload.md) | 維運便利 |
 | Retrieval Log 分析 | [spec-09](../specs/spec-09-retrieval-analytics.md) | 觀測性 |
 
-> ⚠️ 既有的 [spec-10 Self-RAG](../specs/spec-10-selfrag.md) 與 [spec-11 Reflection](../specs/spec-11-reflection.md) 將被新的 P3 / P4 spec 取代（Self-RAG 的「query 改寫重試」會被 Sufficiency + Multi-seed 的組合取代；Reflection 升級為結構化 4 軸 Judge）。
+> ⚠️ 既有的 [spec-10 Self-RAG](../specs/spec-10-selfrag.md) 與 [spec-11 Reflection](../specs/spec-11-reflection.md) 已被取代並標記為 superseded：spec-10 → [spec-15 Sufficiency + Clarify](../specs/spec-15-sufficiency-clarify.md)（Self-RAG 的「query 改寫重試」改為偵測不足時向使用者澄清，避免幻覺）；spec-11 → [spec-17 Judge Reflection](../specs/spec-17-judge-reflection.md)（單一 reflection_score 升級為 4 軸結構化 Judge）。spec-10 / spec-11 文件保留作為設計演進記錄。
 
 ### 第二梯次：Advanced RAG 強化（spec-26–31）
 

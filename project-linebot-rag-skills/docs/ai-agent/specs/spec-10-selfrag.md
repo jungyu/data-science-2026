@@ -1,5 +1,16 @@
 # Spec-10：LangGraph Self-RAG
 
+> **⚠️ 已被 spec-15 取代（superseded by spec-15-sufficiency-clarify）**
+>
+> 本 spec 原設計「無資料 → rewrite_query → 重試 retrieve」的 retry 路徑。
+> 後續改採 spec-15 的 sufficiency + clarify 流程：偵測資料不足時不自動改寫
+> 重試，而是回頭向使用者要求澄清，避免幻覺。
+>
+> 實作對應：`app/graph/variants/selfrag.py` 走的是 `check_sufficiency → clarify`，
+> 不是本文件描述的 `check_retrieval → rewrite_query → retrieve`。
+>
+> 本文件保留作為設計演進記錄，請以 spec-15 為準。
+
 ## 背景
 
 現行 pipeline 是線性的：route → retrieve → generate。若第一次 RAG 找不到資料，直接加前綴「目前知識庫沒有足夠資料」後生成，不會嘗試改寫 query 重試。Self-RAG 引入條件分支：找不到資料時，自動改寫 query 並重試一次。

@@ -1,5 +1,16 @@
 # Spec-11：LangGraph Reflection Node
 
+> **⚠️ 已被 spec-17 取代（superseded by spec-17-judge-reflection）**
+>
+> 本 spec 原設計單一 `reflection_score` / `reflection_reason` 自評欄位。
+> 後續改採 spec-17 的 4 軸 judge（groundedness / completeness / faithfulness /
+> tone）+ contract-based 評分，提供更可解釋的品質訊號。
+>
+> 實作對應：`app/judge/` 與 `app/graph/nodes.py::judge_node`，state 沒有
+> `reflection_score`/`reflection_reason` 是設計選擇而非缺漏。
+>
+> 本文件保留作為設計演進記錄，請以 spec-17 為準。
+
 ## 背景
 
 目前 Generator 單次生成後直接送出，沒有任何自我評估機制。對於重要的技術問題，回覆品質可能不穩定。Reflection Node 讓模型先對自己的回覆評分，不足時重新生成。
