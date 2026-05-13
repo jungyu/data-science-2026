@@ -1,7 +1,8 @@
 # task-25：Multi-format Ingestion
 
 > 規格詳見 [spec-25](../specs/spec-25-multi-format-ingestion.md)
-
+>
+> **✅ 已完成（commit `44b630d`）** — 實作記錄與驗收測試見 spec-25 頂部「實作狀態」段。
 ---
 
 引入統一 `Document` 中介格式 + `Ingester` Protocol；提供 Web / PDF / Notion / CSV 四個範例 ingester。spec-18 Playwright 重新定位為其中一個 ingester。

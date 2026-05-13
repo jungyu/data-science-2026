@@ -1,7 +1,8 @@
 # task-21：Persistence + Human-in-the-Loop
 
 > 規格詳見 [spec-21](../specs/spec-21-persistence-hitl.md)
-
+>
+> **✅ 已完成（commit `2387555`）** — 實作記錄與驗收測試見 spec-21 頂部「實作狀態」段。
 ---
 
 接 LangGraph checkpointer + interrupt_before + review CLI。HITL **只配 reflection variant**（其他兩個 variant 不啟用）。

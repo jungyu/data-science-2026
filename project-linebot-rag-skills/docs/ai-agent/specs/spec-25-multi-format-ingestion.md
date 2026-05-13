@@ -1,5 +1,15 @@
 # Spec-25：Multi-format Ingestion
 
+> **✅ Notion ingester 已實作（commit `44b630d`）；PDF outline / tables 仍為已知 gap**
+>
+> - `app/ingest/ingesters/notion.py::NotionIngester.yield_documents` 從 `raise NotImplementedError` 重寫為真實作
+> - 支援 `database_id` / `page_id` 兩種模式（後者走 `pages.retrieve`）
+> - 自動 walk blocks：heading_1~3 切 `section_path`，paragraph / list / quote / code 流入內容
+> - `content_hash = sha256(page_id + last_edited_time)`：未編輯的 page 由 IngestionPipeline 跳過（增量更新）
+> - 建構時接受 `client` 注入，便於單測（不打真 Notion API）
+> - 驗收測試：`tests/test_notion_ingester.py`（6 cases 含 heading 結構、`content_hash` 穩定、empty page skip）
+> - **仍缺**：PDF outline → `section_path`、`pdfplumber.extract_tables()` 表格抽取（屬於後續優化）
+
 ## 背景
 
 spec-18 只示範 Web crawler（Playwright），但學生實際做專業 RAG 服務面對的資料來源更多：

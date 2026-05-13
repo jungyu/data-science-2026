@@ -1,5 +1,14 @@
 # Spec-05：Prompt Cache
 
+> **✅ 已實作（commit `44b630d`）**
+>
+> - 新增 `app/storage/cache_repo.py::CacheRepository`（含 `get` / `set` / `get_knowledge_version`）
+> - `ResponseGenerator` 加 `cache_repo: CacheRepository | None`：hit 跳過 LLM、miss 寫入
+> - 落實 spec §「快取條件」：只有 `is_rag_required=True` 且 `rag_chunks` 非空才快取
+> - cache_key 依 `knowledge_version` 變動自動失配（不需手動清表）
+> - 由 `app/dependencies.py::get_cache_repo` 自動注入 generator
+> - 驗收測試：`tests/test_prompt_cache.py`（7 cases 含 normalized key、version 失效）
+
 ## 背景
 
 `supabase/schema.sql` 已定義 `prompt_cache` 資料表，但整個應用完全沒有程式碼讀寫這張表。對於重複性高的問題（如「什麼是 RAG？」），每次都重新呼叫 LLM 既浪費 token 也增加延遲。

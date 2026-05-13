@@ -1,5 +1,12 @@
 # Spec-09：Retrieval Log 分析
 
+> **✅ 已實作（commit `0328e58`）**
+>
+> - 新建 `app/eval/retrieval_analytics.py`（5 個純函式：empty_hits / low_score / category_stats / filter_query / render_table）
+> - 新建 `scripts/analyze_retrieval.py` CLI，4 個模式對應 spec §「分析功能」
+> - PostgREST 不支 GROUP BY 與 jsonb path filter，拉 rows 後在 Python 端聚合
+> - 驗收測試：`tests/test_retrieval_analytics.py`（12 cases 含 empty rows fallback、flat score dict 相容）
+
 ## 背景
 
 `retrieval_logs` 資料表已有記錄（query、category_filter、retrieved_ids、scores），但目前沒有任何查詢或分析工具。ADR-004 明確說明「除錯時需直接查 retrieval_logs」，但手動寫 SQL 不方便。

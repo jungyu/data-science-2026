@@ -1,5 +1,14 @@
 # Spec-08：Skill 熱更新
 
+> **✅ 已實作（commit `0328e58`）**
+>
+> - `SkillRegistry` 加 `from_supabase` / `reload_from_supabase`（async + `asyncio.Lock` 原子替換）
+> - 新增 `skill_reload_loop` 背景無限迴圈；`config.py` 加 `skill_source` / `skill_reload_interval`
+> - `app/main.py` 改寫為 `lifespan` 模式：startup 從 `ai_skills` 載入並啟動 reload task，shutdown cancel
+> - `app/dependencies.py::replace_skill_registry` 在 runtime 替換 services.skill_registry
+> - Supabase 拉取失敗保留舊 skills，不中斷服務
+> - 驗收測試：`tests/test_skill_hot_reload.py`（8 cases 含 supabase 失敗 fallback、空表 fallback、reload loop 循環）
+
 ## 背景
 
 目前 `SkillRegistry` 在 App 啟動時從本地 `skills/*/SKILL.md` 載入，修改 skill system prompt 後需重啟 App 才能生效。`ai_skills` Supabase 資料表已存在並由 `seed_skills.py` 寫入，但 App runtime 不讀它。

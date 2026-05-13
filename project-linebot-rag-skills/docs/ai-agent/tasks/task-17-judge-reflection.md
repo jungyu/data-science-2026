@@ -1,7 +1,8 @@
 # task-17：LLM-as-Judge + Reflection 迴圈
 
 > 規格詳見 [spec-17](../specs/spec-17-judge-reflection.md)
-
+>
+> **✅ 已完成（commit `2387555`）** — 實作記錄與驗收測試見 spec-17 頂部「實作狀態」段。
 ---
 
 在 `render_narrative` 後加入 `judge` node，4 軸結構化評分。不通過時帶 feedback 回到 `render_narrative` 重生成（最多 1 次，硬上限 2）。

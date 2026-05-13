@@ -1,5 +1,12 @@
 # Spec-07：Notion Ingestion
 
+> **✅ 已修補 ImportError（commit `2387555`）；UUID/連結清理仍為已知 gap**
+>
+> - 原本 `scripts/ingest_notion_export.py` import 不存在的 `ingest_path` 直接 ImportError，現已重寫
+> - 新版支援 dir 與 `.zip` 兩種輸入；走 `IngestionPipeline + MarkdownIngester`
+> - 不打 Notion API；走 API 路徑請看 [spec-25](./spec-25-multi-format-ingestion.md) 的 `NotionIngester`
+> - Notion UUID 後綴清理、內部連結轉換、metadata block 移除仍未實作（屬於後續優化）
+
 ## 背景
 
 `scripts/ingest_notion_export.py` 目前只是掃描 `.md` 檔案並呼叫通用的 Markdown ingestion，沒有 Notion 特定的邏輯。Notion Export 的 ZIP 包含特定的資料夾結構與 `.md` 格式（含 Notion ID 後綴、資料庫頁面等），需要特別處理。

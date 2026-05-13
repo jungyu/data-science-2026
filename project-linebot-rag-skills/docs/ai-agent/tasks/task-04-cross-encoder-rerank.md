@@ -1,7 +1,8 @@
 # task-04：實作 Cross-Encoder Rerank（Cohere）
 
 > 規格詳見 [spec-04](../specs/spec-04-cross-encoder-rerank.md)
-
+>
+> **✅ 已完成（commit `2387555`）** — 實作記錄與驗收測試見 spec-04 頂部「實作狀態」段。
 ---
 
 請修改 `app/rag/reranker.py`，加入 Cohere Rerank API 整合，並讓 `RAGRetriever` 可選用。

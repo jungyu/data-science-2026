@@ -1,5 +1,12 @@
 # Spec-04：Cross-Encoder Rerank
 
+> **✅ 已實作（commit `2387555` 修補 fallback 路徑；rerank 主體在 spec-28）**
+>
+> - `CohereReranker.rerank()` 包 try/except；API 失敗（超時 / 限流 / 網路）靜默 fallback 回 RRF 排序
+> - `make_reranker()` 缺 key 時回 None + warning，**不再 raise**（過去會直接打斷主流程）
+> - 驗收測試：`tests/test_reranker.py::test_rerank_api_failure_falls_back_to_rrf` +
+>   `test_cohere_missing_api_key_returns_none`
+
 ## 背景
 
 `app/rag/reranker.py` 的 `select_top_chunks()` 目前只是依 `combined_score`（RRF 分數）排序取前 k 筆，不是真正的 reranker。RRF 對精確關鍵字召回表現良好，但對於「語意相似但詞彙不同」的問題，排名品質有限。

@@ -1,7 +1,8 @@
 # task-03：Heuristic Categories 同步
 
 > 規格詳見 [spec-03](../specs/spec-03-heuristic-sync.md)
-
+>
+> **✅ 已完成（commit `2387555`）** — 實作記錄與驗收測試見 spec-03 頂部「實作狀態」段。
 ---
 
 請新增 `app/router/categories.py` 作為 category 的單一來源，並修正 `intent_router.py` 與 `prompts.py` 的不一致。

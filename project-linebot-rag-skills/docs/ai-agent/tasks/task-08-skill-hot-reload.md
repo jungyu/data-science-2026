@@ -1,7 +1,8 @@
 # task-08：實作 Skill 熱更新
 
 > 規格詳見 [spec-08](../specs/spec-08-skill-hot-reload.md)
-
+>
+> **✅ 已完成（commit `0328e58`）** — 實作記錄與驗收測試見 spec-08 頂部「實作狀態」段。
 ---
 
 請修改 `app/skills/registry.py` 與 `app/main.py`，支援從 Supabase 定時載入 skills。

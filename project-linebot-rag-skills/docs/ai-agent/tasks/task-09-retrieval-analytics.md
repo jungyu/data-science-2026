@@ -1,7 +1,8 @@
 # task-09：實作 Retrieval Log 分析 CLI
 
 > 規格詳見 [spec-09](../specs/spec-09-retrieval-analytics.md)
-
+>
+> **✅ 已完成（commit `0328e58`）** — 實作記錄與驗收測試見 spec-09 頂部「實作狀態」段。
 ---
 
 請新增 `scripts/analyze_retrieval.py`，提供四種 retrieval log 分析功能。

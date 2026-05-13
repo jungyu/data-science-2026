@@ -1,6 +1,8 @@
 # task-01：實作 Response Mode 差異化
 
 > 規格詳見 [spec-01](../specs/spec-01-response-mode.md)
+>
+> **✅ 已完成（commit `44b630d`）** — 實作記錄與驗收測試見 spec-01 頂部「實作狀態」段。
 
 ---
 

@@ -1,5 +1,13 @@
 # Spec-20：Evaluation Framework
 
+> **✅ 已實作；修補 runner 兩個誤判（commit `2387555`）**
+>
+> - hallucination 案例（`expected_chunks=[]`）走 clarify 不再誤標 `unexpected clarify`
+>   — 這類案例本意是測 `forbidden_phrase`，不是測 clarify 路由
+> - basic variant 無 answer_contract，不再對 `must_cite_sources` 誤標 failure
+> - 驗收測試：`tests/test_eval_runner.py::test_hallucination_case_allows_clarify` +
+>   `test_basic_variant_skips_must_cite_failure`
+
 ## 背景
 
 本專案教學設計的核心是「**完成基礎後讓學生轉到自己題目**」（[roadmap.md §給學生](../plan/roadmap.md)）。沒有 evaluation，學生在替換 skills、知識庫、Feature Extractor 後**無從驗證自己的 RAG 是不是真的在工作**——只能憑感覺看「回覆好像可以」。這對教學是致命缺陷。

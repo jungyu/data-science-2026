@@ -1,7 +1,8 @@
 # task-05：實作 Prompt Cache
 
 > 規格詳見 [spec-05](../specs/spec-05-prompt-cache.md)
-
+>
+> **✅ 已完成（commit `44b630d`）** — 實作記錄與驗收測試見 spec-05 頂部「實作狀態」段。
 ---
 
 請新增 `app/storage/cache_repo.py` 並整合到 `ResponseGenerator`。

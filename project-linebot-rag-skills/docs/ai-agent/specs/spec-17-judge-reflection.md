@@ -1,5 +1,12 @@
 # Spec-17：LLM-as-Judge + Reflection 迴圈（P4）
 
+> **✅ 已實作；修補 SKIP_JUDGE_SKILLS 對齊 SkillId（commit `2387555`）**
+>
+> - `SKIP_JUDGE_SKILLS` 從錯誤的 `"small_talk"` 改回 `"general_chat"`（與 `app/router/schemas.py::SkillId` 對齊）
+> - 過去寫錯導致閒聊在 production 一律被 judge 評分、必拿低分、觸發品質警告
+> - 測試 fixture 同步調整（`test_judge_skipped_for_general_chat_skill`、`_StubRouter` 預設改 `tech_architect`）
+> - 取代 [spec-11](./spec-11-reflection.md) 的單一 reflection_score 設計
+
 ## 背景
 
 P3 完成後 Generator 是兩階段（Answer Contract + Narrative），輸出結構穩定。本 phase 加入**自我審查**：另一個 LLM 呼叫（最好換廠商或換模型）對 narrative 做**結構化多軸評分**，分數不足時把評語回灌到 narrative renderer 重新生成。

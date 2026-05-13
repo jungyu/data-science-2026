@@ -1,7 +1,8 @@
 # task-22：Observability + Cost Tracking
 
 > 規格詳見 [spec-22](../specs/spec-22-observability.md)
-
+>
+> **✅ 已完成（commit `2387555`）** — 實作記錄與驗收測試見 spec-22 頂部「實作狀態」段。
 ---
 
 加結構化 log + per-invocation trace JSON + cost 估算 + summary CLI。spec-19 demo / spec-20 eval / spec-21 HITL 都共用這個觀測底座。

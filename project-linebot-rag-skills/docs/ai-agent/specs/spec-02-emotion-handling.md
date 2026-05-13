@@ -1,5 +1,12 @@
 # Spec-02：Emotion 應對策略
 
+> **✅ 已實作（commit `44b630d`）**
+>
+> - `app/generator/prompts.py::_emotion_instruction()` — 7 種 emotion 的行為指令
+> - `anxious` / `frustrated`：≤3 句、只給 1 個下一步、加鼓勵句的限制已落地
+> - `render_narrative_node` 從 `router_result.emotion_state` 抽值餵入下游
+> - 驗收測試：`tests/test_prompt_differentiation.py` 涵蓋「emotion 覆寫 mode 的長度與選項數量」
+
 ## 背景
 
 Router 已能偵測 7 種情緒狀態，但 Generator 只把 `emotion_state` 作為字串注入 prompt，沒有根據情緒調整回覆策略（長度、語氣、選項數量）。`anxious` / `frustrated` 的使用者仍然可能收到冗長的技術列表。

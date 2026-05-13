@@ -1,5 +1,13 @@
 # Spec-03：Heuristic Categories 同步
 
+> **✅ 已實作（commit `2387555`）**
+>
+> - 新增 `app/router/categories.py::VALID_RAG_CATEGORIES` 作 single source of truth
+> - 移除 `philosophical_dialectic` 中非法的 `"reflection"` category（會被 DB filter 默默丟資料的 bug）
+> - `IntentRouter._normalize_result` 過濾 LLM 輸出中的非法 category
+> - 驗收測試：`tests/test_router.py::test_heuristic_categories_are_all_valid` +
+>   `test_llm_output_invalid_categories_are_filtered`
+
 ## 背景
 
 `app/router/intent_router.py` 的 heuristic fallback 的 `rag_categories` 與 `app/router/prompts.py` 中 Router prompt 列出的合法 category 清單不一致。若 LLM 路由失敗降回 heuristic，技術問題的 category filter 只有 `["engineering", "architecture", "code", "rag"]`，缺少 `analytics`、`experiments` 等，導致部分知識庫資料永遠找不到。

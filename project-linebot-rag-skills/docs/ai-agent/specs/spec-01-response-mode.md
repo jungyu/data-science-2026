@@ -1,5 +1,12 @@
 # Spec-01：Response Mode 差異化
 
+> **✅ 已實作（commit `44b630d`）**
+>
+> - `app/generator/prompts.py::_mode_instruction()` — 6 種 mode 的明確格式指令
+> - `SYNTHESIS_PROMPT` 重寫成分節式，把 mode 指令插入 prompt
+> - `app/generator/narrative.py` 同步加入 mode 指令，讓 selfrag/reflection 變體也差異化
+> - 驗收測試：`tests/test_prompt_differentiation.py`（13 cases）
+
 ## 背景
 
 Router 已輸出 6 種 `response_mode`，但 Generator 的 `render_synthesis_prompt()` 只是把 mode 名稱貼入 prompt 字串，沒有任何對應的生成策略。使用者無論問什麼，回覆格式實際上沒有差異。

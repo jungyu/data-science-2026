@@ -1,7 +1,8 @@
 # task-07：實作 Notion Export Ingestion
 
 > 規格詳見 [spec-07](../specs/spec-07-notion-ingestion.md)
-
+>
+> **✅ 已完成（commit `2387555`）** — 實作記錄與驗收測試見 spec-07 頂部「實作狀態」段。
 ---
 
 請重寫 `scripts/ingest_notion_export.py`，讓它能正確處理 Notion Export ZIP 格式。

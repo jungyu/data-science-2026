@@ -1,5 +1,17 @@
 # Spec-21：Persistence + Human-in-the-Loop
 
+> **✅ 已實作；修補 production 入口 thread_id 缺失（commit `2387555`）**
+>
+> - webhook / chat / stream 三條 production 入口都改為帶
+>   `config={"configurable": {"thread_id": ...}}` 呼叫 `graph.ainvoke`
+>   — 過去未帶 config，checkpointer + interrupt 在 production 形同沒接
+> - webhook 新增 `_is_interrupted` helper + 偵測中斷後改呼叫 `mark_pending_review`，不送 outbound
+> - `app/storage/messages_repo.py` 加 `mark_pending_review` / `list_pending_reviews` / `resolve_pending_review`
+> - `supabase/schema.sql` 加 `hitl_pending_reviews` opt-in 表（schema 未套用時靜默退化）
+> - `app/graph/checkpoint.py` 加 `build_postgres_saver_async`；`config.py` 加 `supabase_db_url`
+> - `pyproject.toml` 加 `hitl-postgres` extra（`langgraph-checkpoint-postgres` + `psycopg[binary]`）
+> - 驗收測試：`tests/test_line_webhook.py::test_line_webhook_passes_thread_id_config_to_graph`
+
 ## 背景
 
 [`docs/RAG/LangGraph/ch04`](../../RAG/LangGraph/ch04-persistence.md) **整章**在講 checkpoint / interrupt / resume——目前所有 spec 一字未提。`ch06 §3` 明確指出：**高風險領域 Reflection Agent 必須有 human_review 路徑**。學生讀完 ch04 / ch06 來看 spec/task，會找不到對應實作。

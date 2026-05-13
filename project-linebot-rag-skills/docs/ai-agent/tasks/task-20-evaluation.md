@@ -1,7 +1,8 @@
 # task-20：Evaluation Framework
 
 > 規格詳見 [spec-20](../specs/spec-20-evaluation.md)
-
+>
+> **✅ 已完成（commit `2387555`）** — 實作記錄與驗收測試見 spec-20 頂部「實作狀態」段。
 ---
 
 實作 golden case set + 6 項 metric + 跨變體比較表。完成後學生能用一行指令量化驗證 RAG 是否在工作。

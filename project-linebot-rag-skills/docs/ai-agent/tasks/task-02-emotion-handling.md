@@ -1,7 +1,8 @@
 # task-02：實作 Emotion 應對策略
 
 > 規格詳見 [spec-02](../specs/spec-02-emotion-handling.md)
-
+>
+> **✅ 已完成（commit `44b630d`）** — 實作記錄與驗收測試見 spec-02 頂部「實作狀態」段。
 ---
 
 請修改 `app/generator/prompts.py`，讓 synthesis prompt 依 `emotion_state` 加入具體的行為指令。

@@ -1,5 +1,18 @@
 # Spec-22：Observability + Cost Tracking
 
+> **✅ 已實作；修補 persist 寫入路徑 + 補完介面契約檔（commit `2387555`）**
+>
+> - `OBSERVABILITY_PERSIST=true` 過去不會真寫 Supabase；現在 `TracerRegistry` 接受
+>   `traces_repo` 參數，`async_write_trace` 在本機 JSON 之外同步寫 `graph_traces`
+> - 新建 `app/storage/traces_repo.py::TracesRepository`（`insert` / `recent`）
+> - 新建 `app/observability/logger.py::configure_observability`（JSON formatter，
+>   `python-json-logger` 為 opt-in dep `[observability-json]`）
+> - 新建 `scripts/apply_supabase_traces.sh`（套用 opt-in schema）
+> - `app/dependencies.py::get_tracer_registry` 在 `persist=True` 時自動注入 traces_repo
+> - 驗收測試：`tests/test_tracer.py::test_async_write_trace_persists_when_enabled` +
+>   `test_async_write_trace_skips_supabase_when_persist_false` +
+>   `test_async_write_trace_warns_when_persist_without_repo`
+
 ## 背景
 
 [`docs/RAG/LangGraph/ch10`](../../RAG/LangGraph/ch10-production.md) 的核心痛點：學生實作完三變體後，最常問「**為什麼這個變慢/變貴了？**」沒有觀察工具就只能猜——尤其 reflection variant 的 judge + retry 迴圈，cost 與 latency 的放大效應很難憑感覺判斷。
