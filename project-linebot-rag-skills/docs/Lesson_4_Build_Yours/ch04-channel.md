@@ -3,6 +3,8 @@
 > 核心檔案：[`app/channels/base.py`](../../app/channels/base.py)、
 > [`app/channels/line.py`](../../app/channels/line.py)、
 > [`app/channels/http.py`](../../app/channels/http.py)
+>
+> 🔗 **延伸閱讀**：本章聚焦在「**怎麼替你的領域接 channel**」。需要 production 細節（webhook 簽章驗證、`process_channel_input` 統一入口、Stub channel 測試流程、HITL interrupt 偵測、ngrok / cloudflared tunnel 部署、完整 Telegram 範例）請參考 [Lesson 5 Ch 03：Channel 抽象與 LINE Webhook](../Lesson_5_Production/ch03-channel-webhook.md)。
 
 ---
 
@@ -139,6 +141,10 @@ export default function ChatPage() {
 
 ## 4-5  選項 C：Telegram Bot
 
+> 📘 完整 Telegram channel + webhook + `dependencies.py` 註冊 + FastAPI 掛載
+> 範例見 [Lesson 5 Ch 03 §Step 6](../Lesson_5_Production/ch03-channel-webhook.md#step-6-加自己的-channeltelegram-範例)。
+> 下方是最小可行版本，給 Lesson 4 速戰用：
+
 Telegram 目前沒有內建 adapter，但加一個只需要實作四個方法：
 
 ```python
@@ -203,4 +209,12 @@ curl "https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://xxxx.ngrok-free
 ✅ log 顯示 channel=<你的 channel>  routing → <你的 skill_id>
 ```
 
+> 💡 不想架 LINE / Telegram 也能驗收：跑 [`scripts/test_with_stub.py`](../../scripts/test_with_stub.py) 透過 stub channel 灌訊息進 graph，看 stdout 的 push 內容。
+
 下一章 → [Ch 05：Eval Gate 驗收](ch05-eval-gate.md)
+
+---
+
+## 接下來
+
+讀完 Lesson 4 ch05 後若要把整套系統推上 production，建議按順序看 **[Lesson 5：Production 化](../Lesson_5_Production/README.md)**：channel 細節在 [Ch 03](../Lesson_5_Production/ch03-channel-webhook.md)、HITL 進階流程在 [Ch 08](../Lesson_5_Production/ch08-judge-hitl.md)、觀測 / 安全 / cost / 部署清單在 [Ch 09](../Lesson_5_Production/ch09-observability-security.md) 與 [Ch 10](../Lesson_5_Production/ch10-deployment-pitfalls.md)。

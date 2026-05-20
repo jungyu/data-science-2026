@@ -282,3 +282,9 @@ def test_router_forces_human_review_at_max_attempts():
 - 然後回頭讀對應章節調整
 
 > 「Read once. Build twice. Reflect forever.」
+
+---
+
+## 想完整 production 化？
+
+本章是概念導論。如果你要把這套架構真的跑成 24/7 服務，請接著看 **[Lesson 5：Production 化](../../Lesson_5_Production/README.md)**——以本專案 [`app/`](../../../app/) 真實程式為主軸，10 章漸進實作：Supabase schema、Repo pattern、Channel 抽象、Router、Query 理解、Multi-seed 檢索、兩階段生成、Judge 迴圈、觀測安全、部署清單。

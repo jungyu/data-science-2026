@@ -4,6 +4,8 @@
 > [task-25](../ai-agent/tasks/task-25-multi-format-ingestion.md)（Multi-format Ingestion）
 >
 > **本章目標**：讓知識庫能吃進 PDF 和 CSV，並讓高風險回答在送出前等人工確認。
+>
+> 🔗 **延伸閱讀**：HITL 真實 production 流程（`hitl_pending_reviews` schema、`_is_interrupted` 偵測、`mark_pending_review`、`make_route_after_judge` 的 HARD_MAX 保險、既有 [`scripts/review_queue.py`](../../scripts/review_queue.py) CLI 用法）見 [Lesson 5 Ch 08：Judge + Reflection 迴圈 + HITL](../Lesson_5_Production/ch08-judge-hitl.md)；checkpointer 三後端（memory / sqlite / postgres）的 async lifespan 整合見 [Lesson 5 Ch 10 §Step 1-2](../Lesson_5_Production/ch10-deployment-pitfalls.md#step-1build_checkpointer--三種後端)。
 
 ---
 
@@ -202,6 +204,8 @@ judge → route_after_judge
 
 ## 7-7  LangGraph interrupt_before
 
+> 📘 本節示範教學版的 interrupt + resume。Production 版本（含 `_is_interrupted(graph, config)`、`mark_pending_review` 落庫 audit、`reviewer_decision` 寫入 state 與 `ainvoke(None)` resume）的完整實作見 [Lesson 5 Ch 08 §Step 8](../Lesson_5_Production/ch08-judge-hitl.md#step-8hitl-流程--interrupt--resume)。
+
 LangGraph 的 `interrupt_before` 讓 graph 在指定節點前暫停，等外部 resume：
 
 ```python
@@ -365,6 +369,8 @@ g.add_edge("human_review", "push")   # human_review 只是暫停點，繼續走�
 
 ## 7-9  Review Queue（管理介面）
 
+> 💡 本節示範一個自寫 review queue HTTP endpoint。本專案已備好 CLI 版本 [`scripts/review_queue.py`](../../scripts/review_queue.py)（spec-21 / task-21 步驟 6），用 checkpointer 列出 `next=human_review` 的 thread、approve / revise / drop 都直接 resume graph。下方教學版用 HTTP，產品版用 CLI——兩條軸都用得上。完整解說見 [Lesson 5 Ch 08 §Step 10](../Lesson_5_Production/ch08-judge-hitl.md#step-10-啟用-hitl--寫-review-cli)。
+
 人工審查需要一個地方看到等待中的回答：
 
 ```python
@@ -470,4 +476,14 @@ drop 一條回答，使用者收到「人工跟進」通知。
 ---
 
 上一章 → [Ch 06：解耦 channel + store](ch06-channel-store.md)
+
+---
+
+## 接下來
+
+讀完整個 Lesson 3 後若要把 reflection agent 上 production，建議讀 [Lesson 5：Production 化](../Lesson_5_Production/README.md)：
+
+- [Ch 08：Judge + Reflection 迴圈 + HITL](../Lesson_5_Production/ch08-judge-hitl.md) — 本章 HITL 教學版的 production 對應，含 `hitl_pending_reviews` opt-in 表、`HARD_MAX` retry 保險、reflection variant 完整 graph 組裝
+- [Ch 09：觀測 + 安全 Guards](../Lesson_5_Production/ch09-observability-security.md) — Tracer、token cost、JSON logging、prompt injection 防禦
+- [Ch 10：Checkpoint / Cache / 成本 / 部署清單](../Lesson_5_Production/ch10-deployment-pitfalls.md) — checkpointer 後端選擇、12 條地雷集
 下一章 → [Ch 08：Capstone 整合](ch08-capstone.md)

@@ -34,6 +34,18 @@
 - **第二次**：跳到 08（Reflection）和 09（程式碼），動手做。
 - **參考**：把 07（State Schema）和 10（Production）當 cheat sheet。
 
+## 本指南定位
+
+根目錄 README 已經從專案層級說明 LangGraph 的工程價值：確定性狀態圖、Time-Travel、人機協同與可觀測性。這份子指南不再重複那段論述，而是把那些能力拆成 10 章可實作的學習路徑：
+
+- 想先知道「為什麼需要 LangGraph」：讀 [第 1 章](ch01-why-langgraph.md)
+- 想理解狀態機與流程控制：讀 [第 2 章](ch02-stategraph.md) 和 [第 3 章](ch03-conditional-edges.md)
+- 想掌握 checkpoint、interrupt、resume、time-travel：讀 [第 4 章](ch04-persistence.md)
+- 想設計 Reflection Agent：讀 [第 5 章](ch05-agent-loop.md) 到 [第 8 章](ch08-reflection-node.md)
+- 想直接看完整程式與上線注意事項：讀 [第 9 章](ch09-langgraph-in-action.md) 和 [第 10 章](ch10-production.md)
+
+簡單說：**根 README 負責說明 LangGraph 為什麼重要；本指南負責教你怎麼把它做出來。**
+
 ## 一句話收斂
 
 > 這套架構的本質，不是讓 AI 更聰明，而是讓 AI 的錯誤「可以被系統修正」。
